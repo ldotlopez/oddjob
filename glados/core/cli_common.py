@@ -11,7 +11,6 @@ commands never have to special-case which way they were invoked.
 
 from __future__ import annotations
 
-import functools
 import logging
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
@@ -19,10 +18,9 @@ from pathlib import Path
 
 import rich_click as click
 from dotenv import load_dotenv
-from foundation.clilib import click_logging_options
-from foundation.loglib import setup_logger_from_click
 
 from glados.core.backends import BackendError, check_config, resolve
+from glados.core.cli_options import logging_options_for
 from glados.core.config import Config, ConfigError, config_path, load_config
 from glados.core.pipeline import Job
 from glados.core.progress import create_reporter
@@ -81,53 +79,9 @@ class GladosContext:
 pass_glados_context = click.make_pass_decorator(GladosContext, ensure=True)
 
 
-def common_file_options[F: Callable[..., object]](func: F) -> F:
-    """-o/--output and -y/--overwrite are identical across every task
-    (transcribe, rewrite, summarize, expand, ...future ones) — defined
-    once here instead of repeated per command."""
-
-    @click.option(
-        "-o",
-        "--output",
-        type=click.Path(path_type=Path, dir_okay=False),
-        default=None,
-        help="explicit destination path (default: task-specific naming — see this command's --help)",
-    )
-    @click.option(
-        "-y",
-        "--overwrite",
-        is_flag=True,
-        default=False,
-        help="overwrite the destination if it already exists",
-    )
-    @functools.wraps(func)
-    def wrapper(*args: object, **kwargs: object) -> object:
-        return func(*args, **kwargs)
-
-    return wrapper  # type: ignore[return-value]
-
-
-def logging_options[F: Callable[..., object]](func: F) -> F:
-    """--log-level, -v/--verbose and -q/--quiet from foundation.clilib, set
-    up through foundation.loglib before the command runs. Without them the
-    level comes from GLADOS_LOG_LEVEL, else warning. Applied per task
-    command so it works the same under `glados` and standalone."""
-
-    @click_logging_options
-    @functools.wraps(func)
-    def wrapper(
-        *args: object,
-        log_level: str | None,
-        verbose: int,
-        quiet: int,
-        **kwargs: object,
-    ) -> object:
-        setup_logger_from_click(
-            APP_LOGGER, log_level=log_level, verbose=verbose, quiet=quiet
-        )
-        return func(*args, **kwargs)
-
-    return wrapper  # type: ignore[return-value]
+# --log-level/-v/-q for every glados task command, on the `glados` logger
+# (GLADOS_LOG_LEVEL when no flag is given).
+logging_options = logging_options_for(APP_LOGGER)
 
 
 def backend_option[F: Callable[..., object]](task: str) -> Callable[[F], F]:

@@ -10,11 +10,11 @@ import rich_click as click
 from glados.core.cli_common import (
     GladosContext,
     backend_option,
-    common_file_options,
     logging_options,
     model_option,
     pass_glados_context,
 )
+from glados.core.cli_options import common_file_options
 from glados.core.pipeline import Job, TextStep, infix_destination, override_destination
 from glados.tasks.protocols import Summarizer
 

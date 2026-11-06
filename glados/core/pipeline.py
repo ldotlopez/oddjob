@@ -67,6 +67,22 @@ def override_destination(
     return dest_fn
 
 
+def check_destination(dest: Path, overwrite: bool) -> None:
+    """Refuse an existing destination unless overwriting was asked for."""
+    if dest.exists() and not overwrite:
+        raise FileExistsError(
+            f"destination already exists, refusing to overwrite: {dest} (use -y/--overwrite)"
+        )
+
+
+def move_to_destination(produced: Path, dest: Path, overwrite: bool) -> None:
+    """Move a finished temp file into place, re-checking the destination
+    right before the move to avoid a race."""
+    check_destination(dest, overwrite)
+    LOGGER.debug("moving %s to %s", produced, dest)
+    shutil.move(str(produced), str(dest))
+
+
 type TextTransform = Callable[[str], ProgressStream[str]]
 
 
@@ -147,10 +163,7 @@ class Job:
             raise FileNotFoundError(f"input file not found: {input_path}")
 
         dest = self.dest_fn(input_path)
-        if dest.exists() and not overwrite:
-            raise FileExistsError(
-                f"destination already exists, refusing to overwrite: {dest} (use -y/--overwrite)"
-            )
+        check_destination(dest, overwrite)
 
         current = input_path
         intermediates: list[Path] = []
@@ -161,15 +174,7 @@ class Job:
                 LOGGER.debug("%s: produced %s", description, current)
                 intermediates.append(current)
 
-            if (
-                dest.exists() and not overwrite
-            ):  # re-check right before the move to avoid a race
-                raise FileExistsError(
-                    f"destination already exists, refusing to overwrite: {dest} (use -y/--overwrite)"
-                )
-
-            LOGGER.debug("moving %s to %s", current, dest)
-            shutil.move(str(current), str(dest))
+            move_to_destination(current, dest, overwrite)
             moved = True
             return dest
         finally:
