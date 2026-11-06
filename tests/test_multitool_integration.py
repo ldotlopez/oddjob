@@ -1,0 +1,149 @@
+"""multitool's commands against the real ImageMagick, exiftool and ffmpeg.
+
+Each class skips when a tool it needs is not on PATH; img-duplicates also
+needs the multitool extra (Pillow)."""
+
+import importlib.util
+import shutil
+import subprocess
+import tempfile
+import unittest
+from pathlib import Path
+
+from click.testing import CliRunner, Result
+
+from multitool import motionphotos
+from multitool.cli import cli
+
+HAS_PILLOW = importlib.util.find_spec("PIL") is not None
+
+
+def missing(*alternatives: str) -> bool:
+    """Whether none of `alternatives` is on PATH."""
+    return all(shutil.which(name) is None for name in alternatives)
+
+
+def run_tool(*args: str | Path) -> str:
+    """Run a fixture-building or checking tool; return its stdout."""
+    proc = subprocess.run(
+        [str(arg) for arg in args], capture_output=True, text=True, check=True
+    )
+    return proc.stdout
+
+
+def magick(*args: str | Path) -> None:
+    run_tool("magick" if shutil.which("magick") else "convert", *args)
+
+
+def exif_tag(path: Path, tag: str) -> str:
+    """One tag's value, numeric (`-n`), empty if absent."""
+    return run_tool("exiftool", "-s3", "-n", f"-{tag}", path).strip()
+
+
+def make_video(path: Path, seconds: int = 1) -> None:
+    """A short test pattern with a sine tone, in `path`'s container."""
+    run_tool(
+        "ffmpeg", "-hide_banner", "-loglevel", "error",
+        "-f", "lavfi", "-i", f"testsrc=duration={seconds}:size=64x48:rate=10",
+        "-f", "lavfi", "-i", f"sine=duration={seconds}",
+        "-c:v", "mpeg4", "-shortest", path,
+    )  # fmt: skip
+
+
+def stream_codecs(path: Path) -> list[str]:
+    output = run_tool(
+        "ffprobe", "-v", "error", "-show_entries", "stream=codec_name",
+        "-of", "csv=p=0", path,
+    )  # fmt: skip
+    return output.split()
+
+
+class IntegrationCase(unittest.TestCase):
+    def setUp(self) -> None:
+        self.tmp = Path(self.enterContext(tempfile.TemporaryDirectory()))
+        self.runner = CliRunner()
+
+    def multitool(self, *args: str | Path) -> Result:
+        result = self.runner.invoke(cli, [str(arg) for arg in args])
+        self.assertEqual(result.exit_code, 0, result.output)
+        return result
+
+
+@unittest.skipIf(
+    missing("magick", "convert") or missing("exiftool"),
+    "needs ImageMagick and exiftool",
+)
+class JpgizeIntegrationTest(IntegrationCase):
+    def test_keeps_tags_and_uprights_the_image(self) -> None:
+        source = self.tmp / "photo.png"
+        magick("-size", "40x20", "gradient:red-blue", source)
+        run_tool(
+            "exiftool", "-q", "-overwrite_original",
+            "-PNG:Artist=Tester", "-EXIF:Orientation#=6", source,
+        )  # fmt: skip
+        self.multitool("jpgize", "--rm", self.tmp)
+        converted = self.tmp / "photo.jpg"
+        self.assertFalse(source.exists())
+        self.assertEqual(exif_tag(converted, "IFD0:Artist"), "Tester")
+        self.assertEqual(exif_tag(converted, "ImageSize"), "20 40")
+        self.assertIn(exif_tag(converted, "Orientation"), ("", "1"))
+
+
+@unittest.skipIf(missing("ffmpeg") or missing("ffprobe"), "needs ffmpeg and ffprobe")
+class Mp4izeIntegrationTest(IntegrationCase):
+    def test_remuxes_without_reencoding_video(self) -> None:
+        source = self.tmp / "clip.mkv"
+        make_video(source)
+        self.multitool("mp4ize", source)
+        remuxed = self.tmp / "clip.mp4"
+        self.assertTrue(source.exists())
+        self.assertEqual(stream_codecs(remuxed)[0], "mpeg4")
+        self.assertIn(
+            "mp4", run_tool("ffprobe", "-v", "error", "-show_format", remuxed)
+        )
+
+
+@unittest.skipIf(
+    missing("magick", "convert") or missing("ffmpeg") or missing("ffprobe"),
+    "needs ImageMagick and ffmpeg",
+)
+class MotionPhotoIntegrationTest(IntegrationCase):
+    def test_join_and_split_round_trip(self) -> None:
+        still, clip = self.tmp / "still.jpg", self.tmp / "clip.mp4"
+        magick("-size", "64x48", "gradient:red-blue", still)
+        make_video(clip)
+        joined = self.tmp / "motion.jpg"
+        self.multitool("motionphotos", "join", "-i", still, "-v", clip, "-o", joined)
+        self.multitool("motionphotos", "check", joined)
+        magick(joined, self.tmp / "decoded.png")  # still a readable JPEG
+
+        image, video = self.tmp / "out.jpg", self.tmp / "out.mp4"
+        self.multitool("motionphotos", "split", joined, "-i", image, "-v", video)
+        self.assertEqual(image.read_bytes(), still.read_bytes())
+        self.assertEqual(video.read_bytes(), clip.read_bytes())
+        self.assertEqual(stream_codecs(video), stream_codecs(clip))
+
+        self.multitool("motionphotos", "strip", "-y", joined)
+        self.assertIsNone(motionphotos.MotionPhoto.parse(joined.read_bytes()).video)
+
+
+@unittest.skipUnless(HAS_PILLOW, "needs the multitool extra (Pillow)")
+@unittest.skipIf(missing("magick", "convert"), "needs ImageMagick")
+class ImgDuplicatesIntegrationTest(IntegrationCase):
+    def test_groups_a_reencoded_copy(self) -> None:
+        original = self.tmp / "a.png"
+        magick("-size", "64x48", "gradient:red-blue", original)
+        magick(original, "-quality", "40", self.tmp / "a_copy.jpg")
+        magick(
+            "-size", "64x48", "gradient:red-blue", "-rotate", "180", self.tmp / "b.png"
+        )
+        result = self.multitool("img-duplicates", "--no-cache", self.tmp)
+        groups = result.output.split("group ")[1:]
+        self.assertEqual(len(groups), 1, result.output)
+        self.assertIn(str(original), groups[0])
+        self.assertIn(str(self.tmp / "a_copy.jpg"), groups[0])
+        self.assertNotIn(str(self.tmp / "b.png"), groups[0])
+
+
+if __name__ == "__main__":
+    unittest.main()
