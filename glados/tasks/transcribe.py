@@ -36,7 +36,7 @@ from glados.core.progress import ProgressEvent, ProgressStream
 from glados.core.runners import CliArgs, FFMpegRunner
 from glados.tasks.protocols import Transcriber, TranscriptSegment
 
-DEFAULT_OUTPUT_FORMAT = "srt"
+DEFAULT_OUTPUT_FORMAT = "txt"
 
 
 # --------------------------------------------------------------------------
@@ -128,6 +128,19 @@ FORMATTERS: dict[str, SegmentFormatter] = {
     "csv": _format_csv,
     "lrc": _format_lrc,
 }
+
+
+def resolve_output_format(requested: str | None, output: Path | None) -> str:
+    """The -f/--format value if given; otherwise the -o/--output extension
+    when it names a known format (so `-o talk.srt` writes SRT); otherwise
+    DEFAULT_OUTPUT_FORMAT."""
+    if requested is not None:
+        return requested
+    if output is not None:
+        extension = output.suffix.removeprefix(".").lower()
+        if extension in FORMATTERS:
+            return extension
+    return DEFAULT_OUTPUT_FORMAT
 
 
 # --------------------------------------------------------------------------
@@ -250,8 +263,11 @@ class TranscribeStep:
     "--format",
     "output_format",
     type=click.Choice(sorted(FORMATTERS)),
-    default=DEFAULT_OUTPUT_FORMAT,
-    help=f"output format (default: {DEFAULT_OUTPUT_FORMAT})",
+    default=None,
+    help=(
+        "output format (default: the -o extension if it is a known format,"
+        f" else {DEFAULT_OUTPUT_FORMAT})"
+    ),
 )
 @backend_option("transcribe")
 @common_file_options
@@ -262,12 +278,13 @@ def cli(
     input_path: Path,
     model: str | None,
     language: str | None,
-    output_format: str,
+    output_format: str | None,
     backend: str | None,
     output: Path | None,
     overwrite: bool,
 ) -> None:
-    """Extract audio and transcribe INPUT_PATH to a subtitle/text sidecar."""
+    """Extract audio and transcribe INPUT_PATH to a plain-text or subtitle sidecar."""
+    output_format = resolve_output_format(output_format, output)
     transcriber = ctx.backend("transcribe", Transcriber, backend, {"model": model})
     job = Job(
         steps=[
