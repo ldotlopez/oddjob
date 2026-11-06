@@ -139,3 +139,18 @@ override the file.
 
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the module layout and how to add a
 backend, and [docs/decisions/](docs/decisions/) for recorded decisions.
+
+## Roadmap
+
+- **whisper.cpp on the AMD Ryzen AI NPU.** whisper.cpp ≥ 1.9 can offload the encoder
+  to the XDNA NPU via VitisAI (`-DWHISPER_VITISAI=1`); no glados change is needed,
+  only the host setup:
+  - `amdxdna` kernel driver (mainline since 6.14, or AMD's out-of-tree `xdna-driver`)
+    and the NPU firmware for the chip revision (`/usr/lib/firmware/amdnpu/17f0_20`);
+  - XRT (`xrt-smi examine` must list the NPU) and FlexML runtime, both sourced
+    before building and running;
+  - rebuild whisper.cpp with `-DWHISPER_VITISAI=1`, and fetch each model's
+    `.rai` encoder cache with `models/download-vitisai-model.sh <model>`;
+  - verify: `whisper-cli` prints `VITISAI = 1` and logs the offload mode.
+
+  Cheaper interim step: build with `-DGGML_VULKAN=1` to use the integrated GPU.
