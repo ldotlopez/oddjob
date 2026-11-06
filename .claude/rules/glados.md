@@ -45,4 +45,10 @@
   takes `--log-level`/`-v`/`-q` via `cli_common.logging_options`, which sets up the
   `glados` logger with `foundation.loglib` (`GLADOS_LOG_LEVEL` when no flag is given).
   Modules log through `logging.getLogger(__name__)`.
-- There are no tests yet.
+- Tests: `uv run python -m unittest discover -s tests` (stdlib unittest; see
+  `docs/ARCHITECTURE.md`, "Tests"). Unit tests use fake executables and
+  `support.FakeHTTPServer`, never real services. Integration tests read
+  `tests/integration.env` (git-ignored, holds secrets: never commit or print it) and
+  skip when unconfigured. The `whisper` (OpenAI CLI) backend has no tests yet.
+- Call `whisper-cli` with long options only: it exits 0 on an unknown argument, so a
+  wrong short flag fails silently. Its default language is `en`; pass `auto`.

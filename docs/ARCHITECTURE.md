@@ -21,6 +21,7 @@ glados/
     openai.py         openai (Chat Completions, any compatible server): text tasks
     ollama.py         ollama (native /api/chat): text tasks
     llm.py            llm (the llm CLI): text tasks
+tests/                unittest suite, one module per backend module; support.py: shared fakes
 ```
 
 ## Layers
@@ -96,6 +97,23 @@ merged options with that backend's own pydantic model (`extra="forbid"`) and ret
 To add a backend: in a new or existing `glados/plugins/<module>.py`, add its options
 model, have `__glados_plugin__` build it under its name, add one entry-point line per
 task it implements, then `uv sync`.
+
+## Tests
+
+`uv run python -m unittest discover -s tests` (stdlib `unittest`, no test dependency).
+Tests exercise backends directly (options model, transport/backend object,
+`__glados_plugin__`), not through the CLI:
+
+- **Unit tests** replace the outside world, not the code: subprocess backends run a fake
+  executable written by `support.write_executable` (a Python script that records its argv
+  and mimics the real CLI's output and failure modes); HTTP backends talk to
+  `support.FakeHTTPServer`, which answers with a canned response and records requests.
+- **Integration tests** (`*IntegrationTest`) run against the real CLI or service. They
+  read `GLADOS_TEST_*` settings from `tests/integration.env` (git-ignored; template in
+  `integration.env.example`), overridden by the environment, and skip their class when
+  the backend's enabling setting is empty.
+
+The OpenAI `whisper` backend has no tests yet.
 
 ## Configuration
 
