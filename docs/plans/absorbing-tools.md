@@ -233,13 +233,11 @@ stay green.
 ## 3. Decisions to take
 
 
-- **Record the classification as a decision?** The skill's "Classify" step
-  (not absorbed / glados / multitool / filejobs, mixed tools split along the
-  model boundary) is new policy. It could become decision 0008, "Where a new
-  tool goes", extending 0003's scope section, which covered only the
-  ocdutils ports.
-- **Which tools to absorb, and from where.** Section 1 stays empty until the
-  candidates are listed.
+- **Record the classification as a decision?** Decided: yes, as
+  [decision 0008](../decisions/0008-where-a-new-tool-goes.md), "Where a new
+  tool goes", extending 0003's scope.
+- **Which tools to absorb, and from where.** Decided for this round:
+  ocdutils `mediatools/`, section 1.
 
 ## Order
 
