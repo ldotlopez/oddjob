@@ -2,15 +2,18 @@
 
 Which backend implements which task is read from the package's entry-point
 metadata (one group per task, see pyproject.toml), so nothing is imported to
-know it. Only the selected backend is imported, through
-foundation.plugin.Register: its entry point receives the backend's global
-options and returns `(task name, task Protocol, object)` triples. See
-docs/decisions/0001 for why, and how to change it.
+know it. Several backends may live in one module: each entry point's value
+names the module (`glados.plugins.<module>:__glados_plugin__`). Only the
+selected backend's module is imported, through foundation.plugin.Register:
+its entry point receives the backend name and its global options and returns
+`(task name, task Protocol, object)` triples. See docs/decisions/0002 for
+why, and how to change it.
 """
 
 from __future__ import annotations
 
 import logging
+import re
 from collections.abc import Mapping
 from importlib.metadata import entry_points
 from typing import Any
@@ -25,6 +28,9 @@ TASKS = ("transcribe", "rewrite", "summarize", "expand")
 PLUGINS_NAMESPACE = "glados.plugins"
 PLUGIN_ENTRY_POINT = "__glados_plugin__"
 _GROUP_PREFIX = "glados.backends."
+_ENTRY_RE = re.compile(
+    rf"^{re.escape(PLUGINS_NAMESPACE)}\.(\w+):{re.escape(PLUGIN_ENTRY_POINT)}$"
+)
 
 LOGGER = logging.getLogger(__name__)
 
@@ -33,24 +39,34 @@ class BackendError(Exception):
     """No usable backend for a task, or the selected one failed to load."""
 
 
+def _modules(task: str) -> dict[str, str]:
+    """The backends that implement `task`, mapped to the plugin module that
+    provides each, from installed metadata. Imports nothing."""
+    modules: dict[str, str] = {}
+    for entry in entry_points(group=f"{_GROUP_PREFIX}{task}"):
+        match = _ENTRY_RE.match(entry.value)
+        if match is None:
+            raise BackendError(
+                f"entry point {entry.group}:{entry.name} must be"
+                f" '{PLUGINS_NAMESPACE}.<module>:{PLUGIN_ENTRY_POINT}',"
+                f" not {entry.value!r}"
+            )
+        modules[entry.name] = match.group(1)
+    return modules
+
+
 def implementors(task: str) -> list[str]:
     """The sorted names of the backends that implement `task`, from
     installed metadata. Imports nothing."""
-    names: list[str] = []
-    for entry in entry_points(group=f"{_GROUP_PREFIX}{task}"):
-        expected = f"{PLUGINS_NAMESPACE}.{entry.name}:{PLUGIN_ENTRY_POINT}"
-        if entry.value != expected:
-            raise BackendError(
-                f"entry point {entry.group}:{entry.name} must be {expected!r},"
-                f" not {entry.value!r}"
-            )
-        names.append(entry.name)
-    return sorted(names)
+    return sorted(_modules(task))
 
 
 def check_config(cfg: Config) -> None:
-    """Check every task and backend name in `cfg` against the metadata.
-    Backend options are not checked here: that needs loading the backend."""
+    """Check every task and backend name in `cfg` against the metadata, and
+    that each backend comes from the same module for every task it
+    implements. Backend options are not checked here: that needs loading
+    the backend."""
+    _check_one_module_per_backend()
     available = {task: implementors(task) for task in TASKS}
     for task, name in cfg.tasks.items():
         if task not in available:
@@ -91,13 +107,23 @@ def select(task: str, choice: str | None, cfg: Config) -> str:
 
 
 def load[T](name: str, task: str, protocol: type[T], options: Mapping[str, Any]) -> T:
-    """Import backend `name`, build it with `options` and return its object
-    for `task`, checked against `protocol`."""
-    LOGGER.debug("loading backend %s with options %s", name, sorted(options))
+    """Import the module providing backend `name`, build the backend with
+    `options` and return its object for `task`, checked against `protocol`."""
+    modules = _modules(task)
+    if name not in modules:
+        raise BackendError(_not_implemented(name, task, sorted(modules)))
+    module = modules[name]
+    LOGGER.debug(
+        "loading backend %s from %s.%s with options %s",
+        name,
+        PLUGINS_NAMESPACE,
+        module,
+        sorted(options),
+    )
     register = Register(ns=PLUGINS_NAMESPACE, entry_point=PLUGIN_ENTRY_POINT)
     try:
-        register.register(name, options)
-        return register.get_object(name, task, protocol)
+        register.register(module, name, options)
+        return register.get_object(module, task, protocol)
     except PluginError as exc:
         cause = exc.__cause__
         if isinstance(cause, pydantic.ValidationError):
@@ -124,6 +150,18 @@ def resolve[T](
         **{key: value for key, value in overrides.items() if value is not None},
     }
     return load(name, task, protocol, options)
+
+
+def _check_one_module_per_backend() -> None:
+    seen: dict[str, tuple[str, str]] = {}
+    for task in TASKS:
+        for name, module in _modules(task).items():
+            first_task, first_module = seen.setdefault(name, (task, module))
+            if module != first_module:
+                raise BackendError(
+                    f"backend {name!r} comes from module {first_module!r} for"
+                    f" {first_task} but from {module!r} for {task}"
+                )
 
 
 def _not_implemented(name: str, task: str, candidates: list[str]) -> str:

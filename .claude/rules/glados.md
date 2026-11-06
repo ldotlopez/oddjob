@@ -4,19 +4,23 @@
   (raise NotImplementedError); `describe`/`tts` in the pyproject description don't exist.
 - Run tasks via `uv run glados <task> FILE ...`; each task is also a standalone
   script (`uv run transcribe FILE`) using the same click.Command.
-- Runtime needs `ffmpeg`, `ffprobe` and `whisper-cli` on PATH. Default whisper model:
-  `platformdirs.user_data_dir("whisper")/default-model.bin`; override with `-m`.
-- Backends live in `glados/plugins/<name>.py`, one module per backend. Never put
-  non-plugin modules there.
+- Runtime needs `ffmpeg` and `ffprobe` on PATH, plus the selected transcribe
+  backend's CLI: `whisper-cli` (`whisper_cpp`) or `whisper` from `openai-whisper`
+  (`whisper`). Default models: `platformdirs.user_data_dir("whisper")/default-model.bin`
+  for `whisper_cpp`, `turbo` for `whisper`; override with `-m`.
+- Backends live in `glados/plugins/<module>.py`; one module may provide several
+  backends (e.g. `whisper.py`: `whisper` and `whisper_cpp`). Never put non-plugin
+  modules there.
 - Which backend implements which task is declared in `pyproject.toml`, one
   entry-point group per task (`glados.backends.<task>`). The name is the backend,
-  and the value must be `glados.plugins.<name>:__glados_plugin__`. Run `uv sync`
-  after editing it. See `docs/decisions/0001`.
-- `__glados_plugin__(options)` validates its global options with its own pydantic
-  model (`extra="forbid"`, defaults for everything) and returns
-  `(task name, task Protocol, object)` triples, one per task. It is loaded through
-  `foundation.plugin.Register` (`core/backends.py`), and only for the selected
-  backend.
+  and the value must be `glados.plugins.<module>:__glados_plugin__`; a backend must
+  name the same module in every group. Run `uv sync` after editing it. See
+  `docs/decisions/0002`.
+- `__glados_plugin__(backend, options)` builds only the named backend, validating
+  its global options with that backend's own pydantic model (`extra="forbid"`,
+  defaults for everything), and returns `(task name, task Protocol, object)`
+  triples, one per task. It is loaded through `foundation.plugin.Register`
+  (`core/backends.py`, keyed by module), and only for the selected backend.
 - Backend selection per task: `-b`, then `GLADOS_<TASK>_BACKEND`, then `[tasks]` in
   the config, then the only installed implementor. Options: model defaults, then
   `[backends.<name>]`, then CLI overrides (`-m` → `model`). Per-run values are

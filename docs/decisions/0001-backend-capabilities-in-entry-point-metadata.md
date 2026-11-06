@@ -1,6 +1,6 @@
 # 0001. Backend capabilities in entry-point metadata
 
-Status: accepted (2026-11-06)
+Status: superseded by 0002
 
 ## Context
 

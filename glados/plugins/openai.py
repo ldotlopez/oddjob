@@ -102,7 +102,10 @@ class OpenAITransport:
         )
 
 
-def __glados_plugin__(options: Mapping[str, Any]) -> list[tuple[str, type, object]]:
+def __glados_plugin__(
+    backend: str, options: Mapping[str, Any]
+) -> list[tuple[str, type, object]]:
     """Build the transport with its global options; one triple per text
-    task (see core/text_backend.py)."""
+    task (see core/text_backend.py). This module provides only the
+    `openai` backend, so `backend` is not consulted."""
     return text_plugin_triples(OpenAITransport(OpenAIOptions.model_validate(options)))

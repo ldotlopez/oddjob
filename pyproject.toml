@@ -25,11 +25,13 @@ summarize = "glados.tasks.summarize:cli"
 expand = "glados.tasks.expand:cli"
 
 # Which backend implements which task, readable without importing any
-# backend (see docs/decisions/0001). One group per task; the entry point's
+# backend (see docs/decisions/0002). One group per task; the entry point's
 # name is the backend name and its value must be
-# `glados.plugins.<name>:__glados_plugin__`. Run `uv sync` after editing.
+# `glados.plugins.<module>:__glados_plugin__`. One module may provide several
+# backends. Run `uv sync` after editing.
 [project.entry-points."glados.backends.transcribe"]
 whisper = "glados.plugins.whisper:__glados_plugin__"
+whisper_cpp = "glados.plugins.whisper:__glados_plugin__"
 
 [project.entry-points."glados.backends.rewrite"]
 llm = "glados.plugins.llm:__glados_plugin__"
