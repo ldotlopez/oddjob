@@ -147,7 +147,16 @@ backend, and [docs/decisions/](docs/decisions/) for recorded decisions.
   and directories (`uv run transcribe lectures/ extra.m4a`); directories are walked
   recursively for the files the task handles, and each file gets its own output next
   to it. `-o` stays limited to a single input. See
-  [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#inputs).
+  [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#inputs). Adapting the current code:
+  - task commands (`tasks/*.py`): replace the single `input_path` argument with
+    `PATH...` (files or directories, at least one);
+  - `core/`: expand the paths into input files (recursive walk, with a per-task
+    filter for which files qualify), and run one `Job` per file through
+    `GladosContext.run_job`;
+  - each task: declare its accepted files (`transcribe`: audio/video; text tasks:
+    text files);
+  - reject `-o/--output` unless the paths expand to exactly one file;
+  - tests for the expansion, the per-task filter and the `-o` rule.
 - **whisper.cpp on the AMD Ryzen AI NPU.** whisper.cpp ≥ 1.9 can offload the encoder
   to the XDNA NPU via VitisAI (`-DWHISPER_VITISAI=1`); no glados change is needed,
   only the host setup:
