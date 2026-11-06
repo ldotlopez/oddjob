@@ -14,7 +14,11 @@ from filejobs.pipeline import Job, suffix_destination
 from filejobs.progress import ProgressEvent, ProgressStream
 from glados.commands import describe
 from glados.core.config import Prompts
-from glados.tasks.describe import DESCRIPTION_EXTENSION, DescribeStep
+from glados.tasks.describe import (
+    DESCRIPTION_EXTENSION,
+    DescribeStep,
+    describe_image,
+)
 
 
 class FakeDescriber:
@@ -42,6 +46,12 @@ class DescribeStepTests(unittest.TestCase):
         self.assertEqual(dest.read_text(encoding="utf-8"), "a cat")
         self.assertEqual(describer.calls, [(image, "the prompt")])
 
+    def test_describe_image_returns_the_stripped_text(self) -> None:
+        describer = FakeDescriber()
+        text = describe_image(describer, "p", Path("cat.jpg"), NullReporter())
+        self.assertEqual(text, "a cat")
+        self.assertEqual(describer.calls, [(Path("cat.jpg"), "p")])
+
     def test_prompt_takes_optional_instructions(self) -> None:
         self.assertIn("in Spanish", Prompts().render_describe("in Spanish"))
         self.assertNotIn("{", Prompts().render_describe(None))
@@ -62,14 +72,17 @@ class DescribeCommandTests(unittest.TestCase):
             "XDG_CONFIG_HOME": str(self.tmp / "config"),
             "GLADOS_DESCRIBE_BACKEND": None,
         }
-        result = self.runner.invoke(describe.cli, ["-n", str(self.tmp)], env=no_backend)
+        result = self.runner.invoke(
+            describe.cli, ["-n", "-w", str(self.tmp)], env=no_backend
+        )
         self.assertEqual(result.exit_code, 0, result.output)
         self.assertEqual(
             result.stdout,
             f"{self.tmp / 'cat.jpg'} -> {self.tmp / 'cat.description.txt'}\n",
         )
 
-    def test_describes_through_the_selected_backend_silently(self) -> None:
+    def with_fake_llm(self) -> tuple[Path, dict[str, str | None]]:
+        """A fake llm CLI and the environment whose config selects it."""
         llm = write_executable(self.tmp, "llm", ECHO_LLM)
         config = self.tmp / "config" / "glados"
         config.mkdir(parents=True)
@@ -77,12 +90,40 @@ class DescribeCommandTests(unittest.TestCase):
             f'[tasks]\ndescribe = "llm"\n\n[backends.llm]\nbinary = "{llm}"\n',
             encoding="utf-8",
         )
+        return llm, {"XDG_CONFIG_HOME": str(self.tmp / "config")}
+
+    def test_overwrite_and_dry_run_need_write(self) -> None:
+        for flag in ("-y", "-n"):
+            with self.subTest(flag=flag):
+                result = self.runner.invoke(describe.cli, [flag, str(self.tmp)])
+                self.assertEqual(result.exit_code, 2, result.output)
+                self.assertIn("need -w or -o", result.output)
+
+    def test_prints_descriptions_and_writes_nothing_by_default(self) -> None:
+        llm, env = self.with_fake_llm()
+        image = self.tmp / "cat.jpg"
+        result = self.runner.invoke(describe.cli, [str(image)], env=env)
+        self.assertEqual(result.exit_code, 0, result.output)
+        # The fake echoes "<system prompt>|<user text>"; describe sends no text.
+        self.assertRegex(result.stdout, rf"^{image}: Describe the image .*\|\n$")
+        self.assertFalse((self.tmp / "cat.description.txt").exists())
+        self.assertEqual(recorded_argv(llm)[-2:], ["-a", str(image)])
+
+    def test_output_implies_write(self) -> None:
+        _, env = self.with_fake_llm()
+        output = self.tmp / "out.txt"
+        image = str(self.tmp / "cat.jpg")
+        result = self.runner.invoke(describe.cli, ["-o", str(output), image], env=env)
+        self.assertEqual(result.exit_code, 0, result.output)
+        self.assertEqual(result.stdout, "")
+        self.assertTrue(output.read_text(encoding="utf-8").startswith("Describe"))
+
+    def test_write_lands_the_sidecar_silently(self) -> None:
+        llm, env = self.with_fake_llm()
         image = self.tmp / "cat.jpg"
         with self.assertLogs("filejobs", "INFO") as logs:
             result = self.runner.invoke(
-                describe.cli,
-                ["-v", "-i", "in Spanish", str(image)],
-                env={"XDG_CONFIG_HOME": str(self.tmp / "config")},
+                describe.cli, ["-v", "-w", "-i", "in Spanish", str(image)], env=env
             )
         self.assertEqual(result.exit_code, 0, result.output)
         self.assertEqual(result.stdout, "")

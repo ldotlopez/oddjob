@@ -197,6 +197,23 @@ class BytesStep:
         yield ProgressEvent(completed=1, total=1, done=True, result=output_path)
 
 
+def consume_stream[T](
+    events: ProgressStream[T], reporter: BaseProgressReporter, description: str
+) -> T:
+    """Drive a ProgressEvent stream, reflecting it into the reporter as one
+    task, and return the result carried by the final event."""
+    task_id = reporter.add_task(description, total=None)
+    result: T | None = None
+    for event in events:
+        reporter.update(task_id, completed=event.completed, total=event.total)
+        if event.done:
+            reporter.complete(task_id)
+            result = event.result
+    if result is None:
+        raise RuntimeError(f"{description}: step ended without producing a result")
+    return result
+
+
 class Job:
     """Drives a fixed sequence of (step, description) pairs, each
     consuming the previous step's output path, and moves the final
@@ -215,23 +232,6 @@ class Job:
         self.steps = steps
         self.dest_fn = dest_fn
 
-    @staticmethod
-    def _consume[T](
-        events: ProgressStream[T], reporter: BaseProgressReporter, description: str
-    ) -> T:
-        """Drive a ProgressEvent stream, reflecting it into the reporter,
-        and return the result carried by the final event."""
-        task_id = reporter.add_task(description, total=None)
-        result: T | None = None
-        for event in events:
-            reporter.update(task_id, completed=event.completed, total=event.total)
-            if event.done:
-                reporter.complete(task_id)
-                result = event.result
-        if result is None:
-            raise RuntimeError(f"{description}: step ended without producing a result")
-        return result
-
     def run(
         self, input_path: Path, reporter: BaseProgressReporter, overwrite: bool = False
     ) -> Path:
@@ -246,7 +246,7 @@ class Job:
         moved = False
         try:
             for step, description in self.steps:
-                current = self._consume(step.run(current), reporter, description)
+                current = consume_stream(step.run(current), reporter, description)
                 LOGGER.debug("%s: produced %s", description, current)
                 intermediates.append(current)
 

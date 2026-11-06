@@ -1,8 +1,10 @@
-"""describe: an image -> a text description sidecar (NAME.description.txt).
+"""describe: an image -> a text description, printed or written to a
+NAME.description.txt sidecar.
 
-Unlike the other text tasks the input is an image, not text, so the step
-hands the backend the image's path instead of its content; the reply lands
-like any text task's (filejobs.pipeline.land_text_stream).
+Unlike the other text tasks the input is an image, not text, so the backend
+gets the image's path instead of its content. Printed, the reply is just
+collected (describe_image); written, it lands like any text task's
+(DescribeStep, filejobs.pipeline.land_text_stream).
 """
 
 from __future__ import annotations
@@ -10,13 +12,21 @@ from __future__ import annotations
 from pathlib import Path
 
 from filejobs.inputs import media_type_filter
-from filejobs.pipeline import land_text_stream
-from filejobs.progress import ProgressStream
+from filejobs.pipeline import consume_stream, land_text_stream
+from filejobs.progress import BaseProgressReporter, ProgressStream
 from glados.tasks.protocols import Describer
 
 DESCRIPTION_EXTENSION = "description.txt"
 
 is_image = media_type_filter("image/")
+
+
+def describe_image(
+    describer: Describer, prompt: str, image: Path, reporter: BaseProgressReporter
+) -> str:
+    """The description of `image`, with its progress shown on `reporter`."""
+    events = describer.describe(image, prompt=prompt)
+    return consume_stream(events, reporter, f"Describing {image.name}").strip()
 
 
 class DescribeStep:

@@ -1,9 +1,12 @@
-"""Describe command: image -> NAME.description.txt via a Describer backend.
+"""Describe command: print a description of each image, or with -w/--write
+land it at NAME.description.txt, via a Describer backend.
 
 The system prompt comes from `[prompts] describe` in the config, with
 -i/--instructions filling its `{instructions}`. Any text backend whose model
-takes images implements it (tasks/text_backend.py). The same click.Command
-is the `glados describe` subcommand and the standalone `describe` tool.
+takes images implements it (tasks/text_backend.py). Printing is a report
+under run_batch; writing is a file producer (Job + run_jobs), so -o, -y and
+-n apply only then. The same click.Command is the `glados describe`
+subcommand and the standalone `describe` tool.
 """
 
 from __future__ import annotations
@@ -12,10 +15,12 @@ from pathlib import Path
 
 import rich_click as click
 
+from filejobs.batch import run_batch
 from filejobs.cli_options import (
     check_single_output,
     common_file_options,
     dry_run_option,
+    finish_batch,
     job_action,
     paths_argument,
     print_plan,
@@ -23,6 +28,7 @@ from filejobs.cli_options import (
 )
 from filejobs.inputs import expand_inputs
 from filejobs.pipeline import Job, override_destination, suffix_destination
+from filejobs.progress import BaseProgressReporter
 from glados.core.cli_common import (
     GladosContext,
     backend_option,
@@ -30,7 +36,12 @@ from glados.core.cli_common import (
     model_option,
     pass_glados_context,
 )
-from glados.tasks.describe import DESCRIPTION_EXTENSION, DescribeStep, is_image
+from glados.tasks.describe import (
+    DESCRIPTION_EXTENSION,
+    DescribeStep,
+    describe_image,
+    is_image,
+)
 from glados.tasks.protocols import Describer
 
 
@@ -42,6 +53,13 @@ from glados.tasks.protocols import Describer
     default=None,
     help="extra instructions, e.g. 'in Spanish' or 'one sentence'",
 )
+@click.option(
+    "-w",
+    "--write",
+    is_flag=True,
+    default=False,
+    help="write NAME.description.txt instead of printing (implied by -o)",
+)
 @model_option
 @backend_option("describe")
 @common_file_options
@@ -52,14 +70,19 @@ def cli(
     ctx: GladosContext,
     paths: tuple[Path, ...],
     instructions: str | None,
+    write: bool,
     model: str | None,
     backend: str | None,
     output: Path | None,
     overwrite: bool,
     dry_run: bool,
 ) -> None:
-    """Describe each image in PATH... into NAME.description.txt (needs a
-    model that takes images)."""
+    """Print a description of each image in PATH... as `PATH: description`;
+    with -w, write each to NAME.description.txt instead (needs a model that
+    takes images)."""
+    write = write or output is not None
+    if not write and (overwrite or dry_run):
+        raise click.UsageError("-y/--overwrite and -n/--dry-run need -w or -o")
     inputs = expand_inputs(paths, is_image)
     check_single_output(output, inputs)
     dest_fn = override_destination(output, suffix_destination(DESCRIPTION_EXTENSION))
@@ -68,8 +91,22 @@ def cli(
         return
     prompt = ctx.config().prompts.render_describe(instructions)
     describer = ctx.backend("describe", Describer, backend, {"model": model})
-    job = Job(steps=[(DescribeStep(describer, prompt), "Describing")], dest_fn=dest_fn)
-    run_jobs(inputs, job_action(job, overwrite), "Describing")
+    if write:
+        job = Job(
+            steps=[(DescribeStep(describer, prompt), "Describing")], dest_fn=dest_fn
+        )
+        run_jobs(inputs, job_action(job, overwrite), "Describing")
+        return
+
+    descriptions: list[tuple[Path, str]] = []
+
+    def collect(image: Path, reporter: BaseProgressReporter) -> None:
+        descriptions.append((image, describe_image(describer, prompt, image, reporter)))
+
+    report = run_batch(inputs, collect, description="Describing")
+    for image, description in descriptions:
+        click.echo(f"{image}: {description}")
+    finish_batch(report)
 
 
 if __name__ == "__main__":
