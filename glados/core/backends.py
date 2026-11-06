@@ -23,7 +23,7 @@ from foundation.plugin import PluginError, Register
 
 from glados.core.config import Config, ConfigError, validation_message
 
-TASKS = ("transcribe", "rewrite", "summarize", "expand", "translate")
+TASKS = ("transcribe", "rewrite", "summarize", "expand", "translate", "describe")
 
 PLUGINS_NAMESPACE = "glados.plugins"
 PLUGIN_ENTRY_POINT = "__glados_plugin__"

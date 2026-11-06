@@ -3,9 +3,9 @@ matching backends structurally (no inheritance required). Each backend's
 `__glados_plugin__` entry point returns its object once per task it
 implements, under that task's Protocol (see plugins/whisper.py).
 
-Transcriber is implemented by plugins/whisper.py; Rewriter, Summarizer and
-Expander by plugins/openai.py, plugins/ollama.py and plugins/llm.py, all
-through tasks/text_backend.py.
+Transcriber is implemented by plugins/whisper.py; Rewriter, Summarizer,
+Expander, Translator and Describer by plugins/openai.py, plugins/ollama.py
+and plugins/llm.py, all through tasks/text_backend.py.
 """
 
 from __future__ import annotations
@@ -61,3 +61,8 @@ class Expander(Protocol):
 @runtime_checkable
 class Translator(Protocol):
     def translate(self, text: str, *, prompt: str) -> ProgressStream[str]: ...
+
+
+@runtime_checkable
+class Describer(Protocol):
+    def describe(self, image: Path, *, prompt: str) -> ProgressStream[str]: ...

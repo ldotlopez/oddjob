@@ -27,14 +27,15 @@ _PROMPT_PLACEHOLDERS = {
     "summarize": "length",
     "expand": "length",
     "translate": "language",
+    "describe": "instructions",
 }
 
 
 class Prompts(pydantic.BaseModel):
     """System prompt templates for the text tasks, the same for every
     backend. Each may use only its own `str.format` placeholder:
-    `{instructions}` in rewrite, `{length}` in summarize and expand,
-    `{language}` in translate. Write
+    `{instructions}` in rewrite and describe, `{length}` in summarize and
+    expand, `{language}` in translate. Write
     them with plain braces, not `${...}` (that is environment expansion);
     a literal brace is `{{` or `}}`."""
 
@@ -61,8 +62,13 @@ class Prompts(pydantic.BaseModel):
         " meaning, tone and formatting. Reply with the translation only,"
         " with no preamble or commentary."
     )
+    describe: str = (
+        "Describe the image the user sends: its subject, setting and any"
+        " visible text. {instructions} Reply with the description only,"
+        " with no preamble or commentary."
+    )
 
-    @pydantic.field_validator("rewrite", "summarize", "expand", "translate")
+    @pydantic.field_validator("rewrite", "summarize", "expand", "translate", "describe")
     @classmethod
     def _check_placeholders(cls, value: str, info: pydantic.ValidationInfo) -> str:
         allowed = _PROMPT_PLACEHOLDERS[info.field_name]
@@ -91,6 +97,9 @@ class Prompts(pydantic.BaseModel):
 
     def render_translate(self, language: str) -> str:
         return self.translate.format(language=language)
+
+    def render_describe(self, instructions: str | None) -> str:
+        return self.describe.format(instructions=instructions or "")
 
 
 DEFAULT_INSTRUCTIONS = "Improve clarity and correctness without changing the meaning."

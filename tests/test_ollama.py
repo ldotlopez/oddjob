@@ -3,8 +3,11 @@ test against a real server (GLADOS_TEST_OLLAMA_* settings)."""
 
 from __future__ import annotations
 
+import base64
 import json
+import tempfile
 import unittest
+from pathlib import Path
 from typing import Any
 
 import pydantic
@@ -17,7 +20,13 @@ from support import (
 )
 
 from glados.plugins.ollama import OllamaOptions, OllamaTransport, __glados_plugin__
-from glados.tasks.protocols import Expander, Rewriter, Summarizer, Translator
+from glados.tasks.protocols import (
+    Describer,
+    Expander,
+    Rewriter,
+    Summarizer,
+    Translator,
+)
 
 PING_SYSTEM = "Reply with exactly one word: pong. No punctuation."
 
@@ -69,6 +78,23 @@ class OllamaTransportTest(unittest.TestCase):
                 ],
                 "stream": True,
                 "options": {"num_ctx": 8192},
+            },
+        )
+
+    def test_images_go_base64_in_the_user_message(self) -> None:
+        server = self.serve(ndjson(chunk("ok", done=True)))
+        image = Path(self.enterContext(tempfile.TemporaryDirectory())) / "a.jpg"
+        image.write_bytes(b"jpeg bytes")
+
+        drain(self.transport(server.base_url).complete("s", "", [image]))
+
+        [request] = server.requests
+        self.assertEqual(
+            request.body["messages"][1],
+            {
+                "role": "user",
+                "content": "",
+                "images": [base64.b64encode(b"jpeg bytes").decode("ascii")],
             },
         )
 
@@ -133,6 +159,7 @@ class OllamaPluginTest(unittest.TestCase):
                 ("summarize", Summarizer),
                 ("expand", Expander),
                 ("translate", Translator),
+                ("describe", Describer),
             ],
         )
         for _, protocol, backend in triples:

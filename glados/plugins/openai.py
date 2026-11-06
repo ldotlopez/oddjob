@@ -1,4 +1,5 @@
-"""OpenAI Chat Completions backend: implements rewrite, summarize, expand.
+"""OpenAI Chat Completions backend: implements the text tasks (rewrite,
+summarize, expand, translate, describe).
 
 Works with any OpenAI-compatible server through `base_url`. Global options
 (`[backends.openai]` in the config, or `-m/--model`): `model`, `base_url`,
@@ -8,10 +9,13 @@ checked when a request starts, not when the backend is built.
 
 from __future__ import annotations
 
+import base64
 import json
 import logging
+import mimetypes
 import os
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
+from pathlib import Path
 from typing import Any
 
 import pydantic
@@ -42,6 +46,26 @@ def _error_message(response: requests.Response) -> str:
         return response.text.strip() or response.reason
 
 
+def _user_content(user: str, images: Sequence[Path]) -> str | list[dict[str, Any]]:
+    """The user message: plain text, or content parts when there are
+    images (each as a base64 data URI)."""
+    if not images:
+        return user
+    parts: list[dict[str, Any]] = [{"type": "text", "text": user}] if user else []
+    for image in images:
+        media_type = mimetypes.guess_type(image.name)[0]
+        if media_type is None or not media_type.startswith("image/"):
+            raise ValueError(f"not an image type: {image}")
+        encoded = base64.b64encode(image.read_bytes()).decode("ascii")
+        parts.append(
+            {
+                "type": "image_url",
+                "image_url": {"url": f"data:{media_type};base64,{encoded}"},
+            }
+        )
+    return parts
+
+
 class OpenAITransport:
     """Streams one chat completion (server-sent events) per call.
     Satisfies tasks.text_backend.ChatTransport."""
@@ -49,7 +73,9 @@ class OpenAITransport:
     def __init__(self, options: OpenAIOptions) -> None:
         self.options = options
 
-    def complete(self, system: str, user: str) -> ProgressStream[str]:
+    def complete(
+        self, system: str, user: str, images: Sequence[Path] = ()
+    ) -> ProgressStream[str]:
         if self.options.api_key is None:
             raise ValueError(
                 "no OpenAI API key: set OPENAI_API_KEY or [backends.openai] api_key"
@@ -59,7 +85,7 @@ class OpenAITransport:
             "model": self.options.model,
             "messages": [
                 {"role": "system", "content": system},
-                {"role": "user", "content": user},
+                {"role": "user", "content": _user_content(user, images)},
             ],
             "stream": True,
         }

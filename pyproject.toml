@@ -24,6 +24,7 @@ rewrite = "glados.commands.rewrite:cli"
 summarize = "glados.commands.summarize:cli"
 expand = "glados.commands.expand:cli"
 translate = "glados.commands.translate:cli"
+describe = "glados.commands.describe:cli"
 # File utilities without the backend registry (docs/decisions/0003).
 multitool = "multitool.cli:cli"
 
@@ -52,6 +53,11 @@ ollama = "glados.plugins.ollama:__glados_plugin__"
 openai = "glados.plugins.openai:__glados_plugin__"
 
 [project.entry-points."glados.backends.translate"]
+llm = "glados.plugins.llm:__glados_plugin__"
+ollama = "glados.plugins.ollama:__glados_plugin__"
+openai = "glados.plugins.openai:__glados_plugin__"
+
+[project.entry-points."glados.backends.describe"]
 llm = "glados.plugins.llm:__glados_plugin__"
 ollama = "glados.plugins.ollama:__glados_plugin__"
 openai = "glados.plugins.openai:__glados_plugin__"

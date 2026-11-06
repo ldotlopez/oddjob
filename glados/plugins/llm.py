@@ -1,5 +1,6 @@
-"""`llm` CLI backend (https://llm.datasette.io): implements rewrite,
-summarize, expand by running `llm prompt` as a subprocess.
+"""`llm` CLI backend (https://llm.datasette.io): implements the text tasks
+(rewrite, summarize, expand, translate, describe) by running `llm prompt`
+as a subprocess.
 
 Global options (`[backends.llm]` in the config, or `-m/--model`): `model`
 (any model `llm models` lists; unset means llm's own default model) and
@@ -16,7 +17,8 @@ import shlex
 import shutil
 import subprocess
 import threading
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
+from pathlib import Path
 from typing import Any
 
 import pydantic
@@ -39,13 +41,15 @@ class LlmOptions(pydantic.BaseModel):
 
 class LlmCliTransport:
     """Runs `llm prompt -s <system>` with the user text on stdin (no argv
-    length limit) and streams its stdout. Satisfies
+    length limit) and each image as `-a PATH`, and streams its stdout. Satisfies
     tasks.text_backend.ChatTransport."""
 
     def __init__(self, options: LlmOptions) -> None:
         self.options = options
 
-    def complete(self, system: str, user: str) -> ProgressStream[str]:
+    def complete(
+        self, system: str, user: str, images: Sequence[Path] = ()
+    ) -> ProgressStream[str]:
         if shutil.which(self.options.binary) is None:
             raise FileNotFoundError(
                 f"llm binary not found on PATH: {self.options.binary}"
@@ -54,6 +58,8 @@ class LlmCliTransport:
         cmd: CliArgs = [self.options.binary, "prompt", "-s", system]
         if self.options.model:
             cmd += ["-m", self.options.model]
+        for image in images:
+            cmd += ["-a", str(image)]
 
         LOGGER.debug("running: %s", shlex.join(cmd))
         proc = subprocess.Popen(

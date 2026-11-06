@@ -3,8 +3,11 @@ integration test against a real endpoint (GLADOS_TEST_OPENAI_* settings)."""
 
 from __future__ import annotations
 
+import base64
 import json
+import tempfile
 import unittest
+from pathlib import Path
 from typing import Any
 from unittest import mock
 
@@ -18,7 +21,13 @@ from support import (
 )
 
 from glados.plugins.openai import OpenAIOptions, OpenAITransport, __glados_plugin__
-from glados.tasks.protocols import Expander, Rewriter, Summarizer, Translator
+from glados.tasks.protocols import (
+    Describer,
+    Expander,
+    Rewriter,
+    Summarizer,
+    Translator,
+)
 
 PING_SYSTEM = "Reply with exactly one word: pong. No punctuation."
 
@@ -91,6 +100,30 @@ class OpenAITransportTest(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, r"\(401\): Incorrect API key"):
             drain(self.transport(server.base_url).complete("s", "u"))
 
+    def test_images_become_data_uri_content_parts(self) -> None:
+        server = self.serve(sse(delta("ok")))
+        image = Path(self.enterContext(tempfile.TemporaryDirectory())) / "a.png"
+        image.write_bytes(b"png bytes")
+
+        drain(self.transport(server.base_url + "/v1").complete("s", "", [image]))
+
+        [request] = server.requests
+        encoded = base64.b64encode(b"png bytes").decode("ascii")
+        self.assertEqual(
+            request.body["messages"][1]["content"],
+            [
+                {
+                    "type": "image_url",
+                    "image_url": {"url": f"data:image/png;base64,{encoded}"},
+                }
+            ],
+        )
+
+    def test_a_non_image_attachment_is_an_error(self) -> None:
+        transport = self.transport("http://127.0.0.1:9/v1")
+        with self.assertRaisesRegex(ValueError, "not an image type"):
+            drain(transport.complete("s", "u", [Path("notes.txt")]))
+
     def test_response_without_stream_is_an_error(self) -> None:
         page = b"<!doctype html><title>Open WebUI</title>"
         server = self.serve(CannedResponse(200, "text/html", page))
@@ -135,6 +168,7 @@ class OpenAIPluginTest(unittest.TestCase):
                 ("summarize", Summarizer),
                 ("expand", Expander),
                 ("translate", Translator),
+                ("describe", Describer),
             ],
         )
         for _, protocol, backend in triples:

@@ -13,7 +13,14 @@ from __future__ import annotations
 
 import rich_click as click
 
-from glados.commands import expand, rewrite, summarize, transcribe, translate
+from glados.commands import (
+    describe,
+    expand,
+    rewrite,
+    summarize,
+    transcribe,
+    translate,
+)
 
 TASK_COMMANDS = [
     transcribe.cli,
@@ -21,13 +28,14 @@ TASK_COMMANDS = [
     summarize.cli,
     expand.cli,
     translate.cli,
+    describe.cli,
 ]
 
 
 @click.group()
 def cli() -> None:
     """Apply model-backed tasks to files: transcribe, rewrite, summarize,
-    expand, translate, ..."""
+    expand, translate, describe, ..."""
 
 
 for command in TASK_COMMANDS:

@@ -11,7 +11,13 @@ import pydantic
 from support import drain, recorded_argv, require_settings, write_executable
 
 from glados.plugins.llm import LlmCliTransport, LlmOptions, __glados_plugin__
-from glados.tasks.protocols import Expander, Rewriter, Summarizer, Translator
+from glados.tasks.protocols import (
+    Describer,
+    Expander,
+    Rewriter,
+    Summarizer,
+    Translator,
+)
 
 ECHO_LLM = """
 import json
@@ -79,6 +85,16 @@ class LlmTransportTest(unittest.TestCase):
 
         self.assertEqual(recorded_argv(binary), ["prompt", "-s", "system prompt"])
 
+    def test_images_are_attachments(self) -> None:
+        transport, binary = self.transport(ECHO_LLM)
+
+        drain(transport.complete("describe", "", [Path("/p/a.jpg"), Path("b.png")]))
+
+        self.assertEqual(
+            recorded_argv(binary),
+            ["prompt", "-s", "describe", "-a", "/p/a.jpg", "-a", "b.png"],
+        )
+
     def test_failure_reports_stderr(self) -> None:
         transport, _ = self.transport(FAILING_LLM)
 
@@ -103,6 +119,7 @@ class LlmPluginTest(unittest.TestCase):
                 ("summarize", Summarizer),
                 ("expand", Expander),
                 ("translate", Translator),
+                ("describe", Describer),
             ],
         )
         for _, protocol, backend in triples:

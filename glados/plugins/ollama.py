@@ -1,5 +1,5 @@
-"""Ollama native-API backend (`/api/chat`): implements rewrite, summarize,
-expand.
+"""Ollama native-API backend (`/api/chat`): implements the text tasks
+(rewrite, summarize, expand, translate, describe).
 
 Global options (`[backends.ollama]` in the config, or `-m/--model`): `model`,
 `base_url`, `options` (passed through as Ollama's model options, e.g.
@@ -10,9 +10,11 @@ authenticating proxy).
 
 from __future__ import annotations
 
+import base64
 import json
 import logging
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
+from pathlib import Path
 from typing import Any
 
 import pydantic
@@ -48,7 +50,9 @@ class OllamaTransport:
     def __init__(self, options: OllamaOptions) -> None:
         self.options = options
 
-    def complete(self, system: str, user: str) -> ProgressStream[str]:
+    def complete(
+        self, system: str, user: str, images: Sequence[Path] = ()
+    ) -> ProgressStream[str]:
         base_url = self.options.base_url.rstrip("/")
         body: dict[str, Any] = {
             "model": self.options.model,
@@ -58,6 +62,10 @@ class OllamaTransport:
             ],
             "stream": True,
         }
+        if images:
+            body["messages"][1]["images"] = [
+                base64.b64encode(image.read_bytes()).decode("ascii") for image in images
+            ]
         if self.options.options:
             body["options"] = self.options.options
         chunks: list[str] = []
