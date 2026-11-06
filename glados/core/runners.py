@@ -7,7 +7,9 @@ transcribe_sidecar.py other than the import path for ProgressEvent.
 
 from __future__ import annotations
 
+import logging
 import re
+import shlex
 import shutil
 import subprocess
 import threading
@@ -16,6 +18,8 @@ from pathlib import Path
 from glados.core.progress import ProgressEvent, ProgressStream
 
 type CliArgs = list[str]
+
+LOGGER = logging.getLogger(__name__)
 
 _TIMESTAMP_RE = re.compile(r"^(\d+):(\d+):(\d+)\.(\d+)$")
 
@@ -86,6 +90,7 @@ class FFMpegRunner:
             "-nostats",
             *args,
         ]
+        LOGGER.debug("running: %s", shlex.join(cmd))
 
         proc = subprocess.Popen(
             cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, bufsize=1

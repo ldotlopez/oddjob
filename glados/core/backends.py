@@ -10,6 +10,7 @@ docs/decisions/0001 for why, and how to change it.
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Mapping
 from importlib.metadata import entry_points
 from typing import Any
@@ -24,6 +25,8 @@ TASKS = ("transcribe", "rewrite", "summarize", "expand")
 PLUGINS_NAMESPACE = "glados.plugins"
 PLUGIN_ENTRY_POINT = "__glados_plugin__"
 _GROUP_PREFIX = "glados.backends."
+
+LOGGER = logging.getLogger(__name__)
 
 
 class BackendError(Exception):
@@ -73,8 +76,11 @@ def select(task: str, choice: str | None, cfg: Config) -> str:
     if name is not None:
         if name not in candidates:
             raise BackendError(_not_implemented(name, task, candidates))
+        source = "-b/environment" if choice else "config [tasks]"
+        LOGGER.debug("%s: backend %s (from %s)", task, name, source)
         return name
     if len(candidates) == 1:
+        LOGGER.debug("%s: backend %s (only implementor)", task, candidates[0])
         return candidates[0]
     if not candidates:
         raise BackendError(f"no backend implements {task}")
@@ -87,6 +93,7 @@ def select(task: str, choice: str | None, cfg: Config) -> str:
 def load[T](name: str, task: str, protocol: type[T], options: Mapping[str, Any]) -> T:
     """Import backend `name`, build it with `options` and return its object
     for `task`, checked against `protocol`."""
+    LOGGER.debug("loading backend %s with options %s", name, sorted(options))
     register = Register(ns=PLUGINS_NAMESPACE, entry_point=PLUGIN_ENTRY_POINT)
     try:
         register.register(name, options)

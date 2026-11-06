@@ -12,6 +12,7 @@ from glados.core.cli_common import (
     GladosContext,
     backend_option,
     common_file_options,
+    logging_options,
     model_option,
     pass_glados_context,
 )
@@ -46,6 +47,7 @@ class SummarizeStep:
 @model_option
 @backend_option("summarize")
 @common_file_options
+@logging_options
 @pass_glados_context
 def cli(
     ctx: GladosContext,

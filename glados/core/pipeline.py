@@ -9,6 +9,7 @@ transcribe (two steps); other tasks plug in their own step list instead
 
 from __future__ import annotations
 
+import logging
 import shutil
 from collections.abc import Callable, Sequence
 from pathlib import Path
@@ -17,6 +18,8 @@ from typing import Protocol, runtime_checkable
 from glados.core.progress import BaseProgressReporter, ProgressStream
 
 type DestinationFn = Callable[[Path], Path]
+
+LOGGER = logging.getLogger(__name__)
 
 
 @runtime_checkable
@@ -111,6 +114,7 @@ class Job:
         try:
             for step, description in self.steps:
                 current = self._consume(step.run(current), reporter, description)
+                LOGGER.debug("%s: produced %s", description, current)
                 intermediates.append(current)
 
             if (
@@ -120,6 +124,7 @@ class Job:
                     f"destination already exists, refusing to overwrite: {dest} (use -y/--overwrite)"
                 )
 
+            LOGGER.debug("moving %s to %s", current, dest)
             shutil.move(str(current), str(dest))
             moved = True
             return dest

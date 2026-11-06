@@ -27,6 +27,7 @@ from glados.core.cli_common import (
     GladosContext,
     backend_option,
     common_file_options,
+    logging_options,
     model_option,
     pass_glados_context,
 )
@@ -254,6 +255,7 @@ class TranscribeStep:
 )
 @backend_option("transcribe")
 @common_file_options
+@logging_options
 @pass_glados_context
 def cli(
     ctx: GladosContext,

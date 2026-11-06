@@ -9,8 +9,10 @@ backend is built.
 from __future__ import annotations
 
 import json
+import logging
 import os
 import re
+import shlex
 import shutil
 import subprocess
 import tempfile
@@ -25,6 +27,8 @@ from platformdirs import user_data_dir
 from glados.core.progress import ProgressEvent, ProgressStream
 from glados.core.runners import CliArgs
 from glados.tasks.protocols import Transcriber, TranscriptSegment
+
+LOGGER = logging.getLogger(__name__)
 
 DEFAULT_MODEL = Path(user_data_dir("whisper", appauthor=False)) / "default-model.bin"
 
@@ -61,6 +65,7 @@ class WhisperCliRunner:
             )
 
         cmd = [self.whisper_bin, "--print-progress", *args]
+        LOGGER.debug("running: %s", shlex.join(cmd))
 
         proc = subprocess.Popen(
             cmd, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True, bufsize=1

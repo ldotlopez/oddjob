@@ -7,13 +7,12 @@ backends, and the pipeline all speak.
 
 from __future__ import annotations
 
-import os
 import sys
 from collections.abc import Iterator
 from dataclasses import dataclass
 from typing import Protocol, Self, runtime_checkable
 
-from rich.console import Console
+from foundation.clilib import RICH_STDERR_ENABLED, get_stderr_console
 from rich.progress import (
     BarColumn,
     Progress,
@@ -22,8 +21,6 @@ from rich.progress import (
     TextColumn,
     TimeRemainingColumn,
 )
-
-NO_COLOR = "NO_COLOR" in os.environ
 
 
 @dataclass(slots=True)
@@ -66,14 +63,13 @@ class BaseProgressReporter(Protocol):
 
 class RichProgressReporter:
     def __init__(self) -> None:
-        console = Console(no_color=NO_COLOR, stderr=True)
         self._progress = Progress(
             SpinnerColumn(),
             TextColumn("[progress.description]{task.description}"),
             BarColumn(),
             TaskProgressColumn(),
             TimeRemainingColumn(),
-            console=console,
+            console=get_stderr_console(),
             transient=False,
         )
 
@@ -145,4 +141,6 @@ class PlainProgressReporter:
 
 
 def create_reporter() -> BaseProgressReporter:
-    return PlainProgressReporter() if NO_COLOR else RichProgressReporter()
+    """Rich bars when stderr is a rich-capable terminal (see
+    foundation.clilib), else plain percentage lines."""
+    return RichProgressReporter() if RICH_STDERR_ENABLED else PlainProgressReporter()
