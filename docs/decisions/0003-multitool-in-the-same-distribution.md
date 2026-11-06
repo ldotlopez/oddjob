@@ -32,6 +32,24 @@ none of them has interchangeable implementations, so the backend registry
   approval under the dependency policy.
 - multitool has no backends, entry-point groups or `[backends.*]` config.
 
+## Scope
+
+- Ported from ocdutils: `sidecars` (`scan`, `find`), `motionphotos` (`check`,
+  `join`, `split`, `strip`, `merge`), `jpgize`, `mp4ize`, `img-hash`,
+  `img-duplicates`, and `renamers` as `hash-rename`. The other names stay as
+  in ocdutils. `audio transcribe` is not ported: `glados transcribe` replaces
+  it.
+- Dependencies of the `multitool` extra: Pillow and pillow-heif only. The
+  average hash is implemented in multitool (no `imagehash`, so no
+  numpy/scipy), and file types come from stdlib `mimetypes` (no
+  `python-magic`). ImageMagick and `exiftool` stay as runtime binaries;
+  ffmpeg goes through `core/runners.py`.
+- `img-duplicates` compares hashes by Hamming distance (`--max-distance`,
+  small default) and reports connected components of near pairs as groups,
+  instead of ocdutils' exact hash equality.
+- Commands that change files (`jpgize`, `mp4ize`, `motionphotos`,
+  `hash-rename`) plan first and then apply, and take `--dry-run`.
+
 ## Consequences
 
 - One repository, one lockfile, no publishing step between the shared code

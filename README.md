@@ -157,6 +157,19 @@ backend, and [docs/decisions/](docs/decisions/) for recorded decisions.
     text files);
   - reject `-o/--output` unless the paths expand to exactly one file;
   - tests for the expansion, the per-task filter and the `-o` rule.
+- **multitool: the ocdutils file utilities as a second tool.** Same repository and
+  distribution, without the plugin system
+  ([decision 0003](docs/decisions/0003-multitool-in-the-same-distribution.md)):
+  - split `core/cli_common.py` into generic options and the backend-bound
+    `GladosContext`, so multitool imports only the backend-free part;
+  - add the `multitool` package, its `[project.scripts]` entry point and the
+    `multitool` extra (Pillow, pillow-heif);
+  - port `sidecars`, `motionphotos`, `jpgize`, `mp4ize`, `img-hash`,
+    `img-duplicates` (Hamming threshold) and `hash-rename`, with plan/apply and
+    `--dry-run` for the ones that change files, fixing the ocdutils bugs on the
+    way (inverted dry-run check in EXIF cloning, unchecked `convert` failures,
+    first-marker motion-photo split);
+  - tests per command; then describe both tools in `ARCHITECTURE.md` and here.
 - **whisper.cpp on the AMD Ryzen AI NPU.** whisper.cpp ≥ 1.9 can offload the encoder
   to the XDNA NPU via VitisAI (`-DWHISPER_VITISAI=1`); no glados change is needed,
   only the host setup:
