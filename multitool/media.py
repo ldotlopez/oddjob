@@ -1,4 +1,4 @@
-"""Which files are images or videos, and which ones each converter takes.
+"""Which files are images or videos, and which ones each converter or edit takes.
 
 Types come from the file name (filejobs.inputs.media_type_filter, stdlib
 `mimetypes`), never from the content.
@@ -33,3 +33,12 @@ def converts_to_jpeg(path: Path) -> bool:
 
 def converts_to_mp4(path: Path) -> bool:
     return is_video(path) and path.suffix.lower() != MP4_EXTENSION
+
+
+# `autocrop` writes NAME.<CROPPED_INFIX>.<ext>.
+CROPPED_INFIX = "cropped"
+
+
+def is_autocrop_input(path: Path) -> bool:
+    """Images, except earlier autocrop outputs (NAME.cropped.<ext>)."""
+    return is_image(path) and not path.stem.endswith(f".{CROPPED_INFIX}")

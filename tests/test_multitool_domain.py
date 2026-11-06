@@ -6,10 +6,14 @@ import os
 import tempfile
 import unittest
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from foundation.cache import UserCache
 
 from multitool import media, motionphotos, renamers, sidecars
+
+if TYPE_CHECKING:
+    import PIL.Image
 
 HAS_PILLOW = importlib.util.find_spec("PIL") is not None
 
@@ -31,6 +35,9 @@ class MediaTests(unittest.TestCase):
         self.assertFalse(media.converts_to_jpeg(Path("a.jpg")))
         self.assertTrue(media.converts_to_mp4(Path("a.mkv")))
         self.assertFalse(media.converts_to_mp4(Path("a.MP4")))
+        self.assertTrue(media.is_autocrop_input(Path("logo.png")))
+        self.assertFalse(media.is_autocrop_input(Path("logo.cropped.png")))
+        self.assertFalse(media.is_autocrop_input(Path("notes.txt")))
 
 
 class SidecarTests(unittest.TestCase):
@@ -194,6 +201,45 @@ class ImageHashTests(unittest.TestCase):
 
         with self.assertRaises(FileNotFoundError):
             imghash.decode_problem(self.tmp / "missing.png")
+
+
+@unittest.skipUnless(HAS_PILLOW, "needs the multitool extra (Pillow)")
+class ImageEditTests(unittest.TestCase):
+    @staticmethod
+    def encoded(image: "PIL.Image.Image", image_format: str, **params: object) -> bytes:
+        from io import BytesIO
+
+        output = BytesIO()
+        image.save(output, format=image_format, **params)
+        return output.getvalue()
+
+    def test_autocrop_keeps_only_the_opaque_box_format_and_exif(self) -> None:
+        from io import BytesIO
+
+        from PIL import Image
+
+        from multitool import imgedit
+
+        image = Image.new("RGBA", (40, 30), (0, 0, 0, 0))
+        image.paste((255, 0, 0, 255), (5, 10, 15, 25))
+        exif = Image.Exif()
+        exif[0x010E] = "a description"  # ImageDescription
+        content = self.encoded(image, "PNG", exif=exif)
+        with Image.open(BytesIO(imgedit.autocrop(content))) as cropped:
+            self.assertEqual((cropped.format, cropped.size), ("PNG", (10, 15)))
+            self.assertEqual(cropped.getexif()[0x010E], "a description")
+
+    def test_autocrop_needs_transparent_and_visible_pixels(self) -> None:
+        from PIL import Image
+
+        from multitool import imgedit
+
+        opaque = self.encoded(Image.new("RGB", (4, 4)), "PNG")
+        empty = self.encoded(Image.new("RGBA", (4, 4), (0, 0, 0, 0)), "PNG")
+        with self.assertRaisesRegex(ValueError, "no transparency"):
+            imgedit.autocrop(opaque)
+        with self.assertRaisesRegex(ValueError, "fully transparent"):
+            imgedit.autocrop(empty)
 
 
 if __name__ == "__main__":

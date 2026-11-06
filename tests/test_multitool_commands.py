@@ -207,5 +207,54 @@ class ImageCheckCommandTests(unittest.TestCase):
         self.assertNotIn("failed", result.stderr)
 
 
+class AutocropDryRunTests(unittest.TestCase):
+    def test_dry_run_prints_the_plan_and_skips_earlier_outputs(self) -> None:
+        tmp = Path(self.enterContext(tempfile.TemporaryDirectory()))
+        for name in ("logo.png", "logo.cropped.png", "notes.txt"):
+            (tmp / name).write_bytes(b"not decoded by -n")
+        result = CliRunner().invoke(cli, ["autocrop", "-n", str(tmp)])
+        self.assertEqual(result.exit_code, 0, result.output)
+        self.assertEqual(
+            result.stdout, f"{tmp / 'logo.png'} -> {tmp / 'logo.cropped.png'}\n"
+        )
+
+
+@unittest.skipUnless(HAS_PILLOW, "needs the multitool extra (Pillow)")
+class AutocropCommandTests(unittest.TestCase):
+    def setUp(self) -> None:
+        from PIL import Image
+
+        self.tmp = Path(self.enterContext(tempfile.TemporaryDirectory()))
+        logo = Image.new("RGBA", (20, 20), (0, 0, 0, 0))
+        logo.paste((0, 0, 255, 255), (2, 2, 6, 8))
+        logo.save(self.tmp / "logo.png")
+        Image.new("RGB", (4, 4)).save(self.tmp / "photo.jpg")
+        self.runner = CliRunner()
+        for name in ("filejobs", "multitool"):
+            logger = logging.getLogger(name)
+            self.addCleanup(logger.setLevel, logger.level)
+
+    def test_writes_the_cropped_image_silently(self) -> None:
+        from PIL import Image
+
+        with self.assertLogs("filejobs", "INFO") as logs:
+            result = self.runner.invoke(
+                cli, ["-v", "autocrop", str(self.tmp / "logo.png")]
+            )
+        self.assertEqual(result.exit_code, 0, result.output)
+        self.assertEqual(result.stdout, "")
+        cropped = self.tmp / "logo.cropped.png"
+        self.assertEqual(wrote(logs.records), [cropped])
+        with Image.open(cropped) as image:
+            self.assertEqual(image.size, (4, 6))
+
+    def test_an_image_without_transparency_fails_and_the_rest_runs(self) -> None:
+        result = self.runner.invoke(cli, ["autocrop", str(self.tmp)])
+        self.assertEqual(result.exit_code, 1, result.output)
+        self.assertIn("1 done, 1 failed", result.stderr)
+        self.assertTrue((self.tmp / "logo.cropped.png").exists())
+        self.assertFalse((self.tmp / "photo.cropped.jpg").exists())
+
+
 if __name__ == "__main__":
     unittest.main()

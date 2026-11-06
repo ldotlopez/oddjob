@@ -4,6 +4,7 @@ runs)."""
 
 from __future__ import annotations
 
+import importlib
 import shlex
 from collections.abc import Callable
 from pathlib import Path
@@ -23,16 +24,16 @@ from multitool.external import run_command_with_paths
 CACHE_APP = "multitool"
 
 
-def load_imghash() -> ModuleType:
-    """multitool.imghash, which needs the optional `multitool` extra."""
+def load_extra_module(name: str) -> ModuleType:
+    """multitool.<name>, a module that needs the optional `multitool` extra
+    (imghash, imgedit); a clean error if the extra is not installed."""
     try:
-        from multitool import imghash
+        return importlib.import_module(f"multitool.{name}")
     except ImportError as exc:
         raise click.ClickException(
             f"{exc.name} is missing: install the multitool extra"
             " (uv sync --extra multitool)"
         ) from exc
-    return imghash
 
 
 def hash_options[F: Callable[..., object]](func: F) -> F:
@@ -62,7 +63,7 @@ def hash_cache(no_cache: bool, expiration: float) -> UserCache | None:
 @hash_options
 def img_hash_cmd(paths: tuple[Path, ...], hash_size: int, no_cache: bool) -> None:
     """Print the average hash of each image in PATH..."""
-    imghash = load_imghash()
+    imghash = load_extra_module("imghash")
     hasher = imghash.ImageHasher(
         hash_size, hash_cache(no_cache, imghash.CACHE_EXPIRATION)
     )
@@ -84,7 +85,7 @@ def img_hash_cmd(paths: tuple[Path, ...], hash_size: int, no_cache: bool) -> Non
 def img_check_cmd(paths: tuple[Path, ...]) -> None:
     """Print each image in PATH... that cannot be fully decoded, with the
     reason; exit 1 if there was any."""
-    imghash = load_imghash()
+    imghash = load_extra_module("imghash")
     problems: list[tuple[Path, str]] = []
 
     def check(path: Path, _reporter: BaseProgressReporter) -> None:
@@ -124,7 +125,7 @@ def img_duplicates_cmd(
     command: str | None,
 ) -> None:
     """Find groups of near-duplicate images in PATH..."""
-    imghash = load_imghash()
+    imghash = load_extra_module("imghash")
     hasher = imghash.ImageHasher(
         hash_size, hash_cache(no_cache, imghash.CACHE_EXPIRATION)
     )
