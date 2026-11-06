@@ -1,7 +1,11 @@
 # glados
 
 - Implemented tasks: `transcribe` (backends `whisper`, `whisper_cpp`) and the text
-  tasks `rewrite`, `summarize`, `expand` (backends `openai`, `ollama`, `llm`).
+  tasks `rewrite`, `summarize`, `expand`, `translate`, `describe` (backends
+  `openai`, `ollama`, `llm`; `describe` takes images and needs a vision model).
+- multitool commands: `sidecars`, `motionphotos`, `jpgize`, `mp4ize`, `img-hash`,
+  `img-duplicates`, `img-check`, `autocrop`, `img-caption`, `hash-rename`,
+  `fix-extensions`, `srt-grep`.
 - Run tasks via `uv run glados <task> PATH...`; each task is also a standalone
   script (`uv run transcribe PATH...`) using the same click.Command.
 - Layout, shared by both tools (`docs/decisions/0005`): `<tool>/cli.py` is the
@@ -19,15 +23,18 @@
   part. multitool never imports `glados`, glados never imports multitool, and
   filejobs imports neither. `tests/test_boundaries.py` checks all three.
 - multitool's runtime binaries: ImageMagick (`magick`/`convert`), `exiftool`,
-  `ffmpeg`/`ffprobe`. Its image-hash code and tests need the extra:
-  `uv sync --extra multitool`.
+  `ffmpeg`/`ffprobe`. Its Pillow code (`imghash`, `imgedit`: `img-hash`,
+  `img-duplicates`, `img-check`, `autocrop`) and their tests need the extra:
+  `uv sync --extra multitool`; commands load it through `load_extra_module`.
 - Runtime needs `ffmpeg` and `ffprobe` on PATH, plus the selected transcribe
   backend's CLI: `whisper-cli` (`whisper_cpp`) or `whisper` from `openai-whisper`
   (`whisper`). Default models: `platformdirs.user_data_dir("whisper")/default-model.bin`
   for `whisper_cpp`, `turbo` for `whisper`; override with `-m`. Text backends need
   their service (OpenAI-compatible API, Ollama) or the `llm` CLI.
-- Text backends are only `tasks.text_backend.ChatTransport`s; `TextBackend` adapts a
-  transport to `Rewriter`/`Summarizer`/`Expander` and `text_plugin_triples()` is the
+- Text backends are only `tasks.text_backend.ChatTransport`s (`complete(system, user,
+  images=())`); `TextBackend` adapts a transport to every text task Protocol
+  (`Rewriter`, `Summarizer`, `Expander`, `Translator`, `Describer`) and
+  `text_plugin_triples()` is the
   plugin's return value. Prompts live in `Config.prompts` (`[prompts]`), owned by the
   tasks, never in a backend.
 - Backends live in `glados/plugins/<module>.py`; one module may provide several

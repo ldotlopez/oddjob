@@ -1,8 +1,8 @@
 # Plan: absorbing miscellaneous tools into glados and multitool
 
 Status: draft (2026-11-06). Prerequisites done (2.1, 2.3, 2.4; 2.2 needed
-no code); mediatools inventoried, destinations still to settle; no tool
-ported yet.
+no code); mediatools inventoried and ported: six tools, removebg left out by
+the user (section 1).
 
 ## Context
 
@@ -40,17 +40,18 @@ from it, so not listed: `sidecars`, `motionphotos`, `formats` (`jpgize`,
 (`glados transcribe`), and `texttransform` `rewrite`/`summarize` (glados'
 tasks; tone and language become `rewrite -i`).
 
-Destinations are proposals until settled with the user (section 3).
+Destinations of the ported rows were settled with the user; the not-absorbed
+rows stay proposals.
 
 | Tool | Source | Writes files? | Replaceable implementation? | External binaries / services | New Python deps | Destination | Done |
 |---|---|---|---|---|---|---|---|
-| `fix-extensions` | `mt/filesystemfixes.py` | renames (lowercase extension, `jpeg`→`jpg`, `mpeg`→`mpg`, `tif`→`tiff`) | no | — | — | multitool, rename shape | |
-| `photos-check` | `mt/photos-check.py` | only reports (corrupt or unknown-type images) | no | — | — (Pillow, `multitool` extra) | multitool check | |
-| `autocrop` | `mt/imgedit.py` | new file per input (crop to the alpha bbox) | no | — | — (Pillow) | multitool file producer | |
-| `removebg` | `mt/imgedit.py` | new file per input | yes (rembg models, remote APIs) | model download | `rembg` (onnxruntime) | glados task; autocrop stays the multitool step | |
-| `translate` | `mt/texttransform.py` | new file per input | yes (text backends) | text backend | — | glados text task, `infix_destination` | |
-| `describe-image` | `mt/generativeimages.py` | report; `-w` writes an EXIF comment in place | yes (OpenAI vision, LAVIS, Ollama) | backend; `exiftool` | — | split: glados task writes a sidecar, multitool writes the comment | |
-| `agrep` | `mt/audio.py` | only reports (grep over transcriptions) | only the transcription | — | — (no `pysrt`) | split: `glados transcribe`, then a multitool grep over `.srt` sidecars | |
+| `fix-extensions` | `mt/filesystemfixes.py` | renames (lowercase extension, `jpeg`→`jpg`, `mpeg`→`mpg`, `tif`→`tiff`) | no | — | — | multitool `fix-extensions`, rename shape | `7f25d23` |
+| `photos-check` | `mt/photos-check.py` | only reports (corrupt or unknown-type images) | no | — | — (Pillow, `multitool` extra) | multitool `img-check` (report on stdout) | `7b72810` |
+| `autocrop` | `mt/imgedit.py` | new file per input (crop to the alpha bbox) | no | — | — (Pillow) | multitool `autocrop`, file producer | `df3a757` |
+| `removebg` | `mt/imgedit.py` | new file per input | yes (rembg models, remote APIs) | model download | `rembg` (onnxruntime) | not absorbed (user decision; would need `rembg`) | — |
+| `translate` | `mt/texttransform.py` | new file per input | yes (text backends) | text backend | — | glados `translate`, `FILE.<language>.<ext>` | `61722e7` |
+| `describe-image` | `mt/generativeimages.py` | report; `-w` writes an EXIF comment in place | yes (OpenAI vision, LAVIS, Ollama) | backend; `exiftool` | — | split: glados `describe` (`a2f4466`, `0dd4e23`) + multitool `img-caption` | `58097ca` |
+| `agrep` | `mt/audio.py` | only reports (grep over transcriptions) | only the transcription | — | — (no `pysrt`) | multitool `srt-grep` over `glados transcribe -f srt` sidecars | `5c3c4fd` |
 | `create-image` | `mt/generativeimages.py` | one file from a prompt, no input file | yes | OpenAI | — | not absorbed: no command shape takes a prompt instead of `PATH...` | |
 | `emojize` | `mt/texttransform.py` | stdout only | yes | text backend | — | not absorbed: `rewrite -i` covers it | |
 | `embeddings` | `mt/embeddings.py` | an sqlite index | yes | OpenAI | `numpy`, `python-magic` | not absorbed: an index fits no command shape | |

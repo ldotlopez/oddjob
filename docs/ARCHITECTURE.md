@@ -19,14 +19,15 @@ filejobs/             backend-free core shared by both tools
   cli_options.py      backend-free click options, run_jobs/job_action, print_plan (-n), finish_batch
   inputs.py           PATH... expansion into input files, per-command file filters
   batch.py            run_batch: one action per input, failures logged and collected
-  pipeline.py         Job, ProgressStep Protocol, TextStep, BytesStep, destination policies, JOB_ERRORS
+  pipeline.py         Job, ProgressStep Protocol, TextStep, land_text_stream, BytesStep, destination policies, JOB_ERRORS
   progress.py         ProgressEvent/ProgressStream, rich and plain reporters
   runners.py          FFMpegRunner (ffmpeg/ffprobe subprocess with progress)
 glados/
   cli.py              entry point: `glados` group, one subcommand per task
-  commands/           one click command per task (transcribe, rewrite, summarize, expand)
+  commands/           one click command per task (transcribe, rewrite, summarize, expand, translate, describe)
   tasks/              task domain code: protocols.py (task Protocols), transcribe.py (steps, formatters),
-                      text_backend.py (ChatTransport Protocol; TextBackend: rewrite/summarize/expand over it)
+                      translate.py (language -> file name infix), describe.py (DescribeStep),
+                      text_backend.py (ChatTransport Protocol; TextBackend: every text task over it)
   core/               glados' backend machinery
     cli_common.py     GladosContext, backend/model options, glados' logging options
     config.py         Config model, config file loading and validation
@@ -39,10 +40,14 @@ glados/
 multitool/
   cli.py              entry point: `multitool` group
   commands/           one module per tool: sidecars, motionphotos, conversions (jpgize, mp4ize),
-                      imghash (img-hash, img-duplicates), renames (hash-rename)
-  sidecars.py, motionphotos.py, conversions.py, imghash.py, renamers.py
-                      domain code: grouping, motion-photo parsing, conversion steps, average hash,
-                      rename planning
+                      imghash (img-hash, img-duplicates, img-check), imgedit (autocrop),
+                      captions (img-caption), renames (hash-rename, fix-extensions),
+                      subtitles (srt-grep)
+  sidecars.py, motionphotos.py, conversions.py, imghash.py, imgedit.py, captions.py,
+  renamers.py, subtitles.py
+                      domain code: grouping, motion-photo parsing, conversion steps, average hash
+                      and decode checks, autocrop, caption planning and step, rename planning,
+                      SRT parsing and search
   media.py            which files are images/videos and which ones each converter takes
   external.py         ImageMagick and exiftool adapters, user commands
 tests/                unittest suite: one module per backend module or tool area; support.py: shared fakes
@@ -125,7 +130,7 @@ transcribe PATH...
   -> run_jobs: per input, run the Job and move its temp file to the destination
 ```
 
-## Data flow (rewrite, summarize, expand)
+## Data flow (rewrite, summarize, expand, translate, describe)
 
 ```
 rewrite PATH... -i INSTRUCTIONS
@@ -140,10 +145,28 @@ rewrite PATH... -i INSTRUCTIONS
 
 `summarize` and `expand` have the same shape (`--max-length` / `--target-length` fill
 the prompt's `{length}`; outputs `FILE.summary.<ext>`, `FILE.expanded.<ext>`). The LLM
-backends are only `ChatTransport`s (one system prompt, one user message, streamed
-reply); `tasks/text_backend.py` wraps a transport into one `TextBackend` that satisfies
-`Rewriter`, `Summarizer` and `Expander`, and `text_plugin_triples()` returns it under
-all three. Prompts belong to the tasks, not to the backends.
+backends are only `ChatTransport`s (one system prompt, one user message with optional
+images, streamed reply); `tasks/text_backend.py` wraps a transport into one
+`TextBackend` that satisfies `Rewriter`, `Summarizer`, `Expander`, `Translator` and
+`Describer`, and `text_plugin_triples()` returns it under
+all of them. Prompts belong to the tasks, not to the backends.
+
+`translate -l LANGUAGE` has the same shape too: the language fills `{language}` and,
+through `tasks/translate.language_infix`, names the output (`FILE.es.<ext>`).
+`describe` takes images instead of text:
+
+```
+describe PATH... -i INSTRUCTIONS
+  -> inputs = expand_inputs(PATH..., images)
+  -> prompt = config.prompts.render_describe(INSTRUCTIONS)
+  -> GladosContext.backend("describe", Describer, -b, {"model": -m}) -> TextBackend
+  -> Job([DescribeStep], dest = INPUT.description.txt or -o)
+       DescribeStep: transport.complete(prompt, "", images=[INPUT]) -> land_text_stream -> temp .txt
+  -> run_jobs
+```
+
+Each transport attaches the images its own way: openai as `image_url` data-URI
+content parts, ollama as base64 `images`, llm as `-a PATH`.
 
 Steps and backends yield `ProgressEvent`s; the final event has `done=True` and carries
 the result. `Job` feeds the events to a reporter from `progress.create_reporter()`.
@@ -157,15 +180,22 @@ filejobs: `Job` and `run_jobs` for every command that writes a file, plain
 functions under `run_batch` for reports, renames and checks, and `cli_options` for
 `PATH...`, `-y`, `-n` and logging (`logging_options_for("multitool")`).
 
-- Commands that change files (`jpgize`, `mp4ize`, `motionphotos`, `hash-rename`) plan
-  first (`plan_conversions`, `plan_merges`, `plan_rename`), then apply, so `-n` prints
-  the plan without touching anything or requiring the external tools.
+- Commands that change files (`jpgize`, `mp4ize`, `motionphotos`, `autocrop`,
+  `img-caption`, `hash-rename`, `fix-extensions`) plan first (`plan_conversions`,
+  `plan_merges`, `plan_captions`, `plan_rename`, `plan_extension_fix`, or a destination
+  per input), then apply, so `-n` prints the plan without touching anything or requiring
+  the external tools or the extra.
 - In-memory transforms (motion-photo join/split/strip) are `BytesStep`s; `jpgize` is
   `JpegConversionStep` (ImageMagick, then exiftool copies the tags except Orientation)
   and `mp4ize` is `Mp4RemuxStep` (ffmpeg through `filejobs/runners.py`, copying the video
   stream; the audio is copied or, failing that, re-encoded to AAC).
-- `img-hash`/`img-duplicates` need the `multitool` extra (Pillow, pillow-heif);
-  `multitool.imghash` is imported only when one of them runs.
+- `autocrop` is a `BytesStep` (Pillow); `img-caption` is `CaptionStep` (exiftool
+  writes XMP-dc:Description and EXIF:ImageDescription into a copy, landed in place).
+- `img-hash`, `img-duplicates`, `img-check` and `autocrop` need the `multitool` extra
+  (Pillow, pillow-heif); `multitool.imghash` and `multitool.imgedit` are imported
+  through `load_extra_module` only when one of them runs.
+- `img-check` and `srt-grep` are reports: the problems or matches on stdout, exit 1 if
+  there were any problems or no matches.
 
 Boundary ([decision 0006](decisions/0006-filejobs-package.md)): multitool imports
 nothing from glados, glados never imports multitool, and filejobs imports neither.

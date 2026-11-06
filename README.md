@@ -10,6 +10,8 @@ backends.
 | `rewrite`    | implemented     | text → `<name>.rewrite.<ext>`                    |
 | `summarize`  | implemented     | text → `<name>.summary.<ext>`                    |
 | `expand`     | implemented     | text → `<name>.expanded.<ext>`                   |
+| `translate`  | implemented     | text → `<name>.<language>.<ext>`                 |
+| `describe`   | implemented     | image → `<name>.description.txt` (needs a model that takes images) |
 
 Backends:
 
@@ -17,9 +19,11 @@ Backends:
 | :------------ | :---------------------------- | :------------------------------------------------- |
 | `whisper`     | transcribe                    | OpenAI's local `whisper` CLI (openai-whisper)      |
 | `whisper_cpp` | transcribe                    | local whisper.cpp `whisper-cli`                    |
-| `openai`      | rewrite, summarize, expand    | OpenAI Chat Completions API, or any compatible server |
-| `ollama`      | rewrite, summarize, expand    | Ollama's native API (`/api/chat`)                  |
-| `llm`         | rewrite, summarize, expand    | the [`llm`](https://llm.datasette.io) CLI          |
+| `openai`      | the text tasks¹               | OpenAI Chat Completions API, or any compatible server |
+| `ollama`      | the text tasks¹               | Ollama's native API (`/api/chat`)                  |
+| `llm`         | the text tasks¹               | the [`llm`](https://llm.datasette.io) CLI          |
+
+¹ rewrite, summarize, expand, translate and describe.
 
 ## Requirements
 
@@ -34,15 +38,18 @@ Backends:
   - `ollama`: a running Ollama server (default `http://localhost:11434`), plus an
     `api_key` if it needs one (ollama.com, or a server behind an authenticating proxy).
   - `llm`: `llm` on `PATH`, with its own keys and plugins configured.
+- `describe`: a backend model that takes images (e.g. `gpt-4.1-mini`, or an Ollama
+  vision model such as `llama3.2-vision` via `-m`).
 - For multitool: ImageMagick (`magick` or `convert`) and `exiftool` for `jpgize`,
-  `ffmpeg`/`ffprobe` for `mp4ize`, and the `multitool` extra (Pillow, pillow-heif) for
-  `img-hash` and `img-duplicates`.
+  `exiftool` for `img-caption`, `ffmpeg`/`ffprobe` for `mp4ize`, and the `multitool`
+  extra (Pillow, pillow-heif) for `img-hash`, `img-duplicates`, `img-check` and
+  `autocrop`.
 
 ## Install
 
 ```sh
 uv sync                       # glados
-uv sync --extra multitool     # also multitool's image hashing dependencies
+uv sync --extra multitool     # also multitool's Pillow-based image commands
 ```
 
 ## Usage
@@ -79,7 +86,9 @@ Common options:
 `transcribe` also takes `-l, --language` (default: auto-detect) and `-f, --format`
 (default: the `-o` extension if it is a known format, else `txt`). `rewrite` takes
 `-i, --instructions`; `summarize` takes `--max-length` and `expand`
-`--target-length`, both approximate word counts.
+`--target-length`, both approximate word counts. `translate` needs `-l, --language`
+(e.g. `es`, `Brazilian Portuguese`), which also names its output; `describe` takes
+`-i, --instructions` (e.g. `in Spanish`).
 
 ## Configuration
 
@@ -121,9 +130,10 @@ binary = "llm"
 summarize = "Summarize the text the user sends as bullet points. {length}"
 ```
 
-`[prompts]` overrides the default prompt of `rewrite`, `summarize` or `expand`. Each
-may use only its own placeholder: `{instructions}` in `rewrite`, `{length}` in
-`summarize` and `expand`; a literal brace is `{{` or `}}`.
+`[prompts]` overrides the default prompt of `rewrite`, `summarize`, `expand`,
+`translate` or `describe`. Each may use only its own placeholder: `{instructions}` in
+`rewrite` and `describe`, `{length}` in `summarize` and `expand`, `{language}` in
+`translate`; a literal brace is `{{` or `}}`.
 
 Backend selection: `-b`, then `GLADOS_<TASK>_BACKEND`, then `[tasks]`, then the only
 installed backend; with several backends installed for a task (both whisper ones for
@@ -153,7 +163,12 @@ File utilities without backends or config, run as `multitool <command>`:
 | `mp4ize PATH...`            | remux videos into MP4 without re-encoding the video (`--rm`: remove sources) |
 | `img-hash PATH...`          | print each image's average hash (cached; `--no-cache`)                |
 | `img-duplicates PATH...`    | groups of near-duplicate images (`--max-distance`, `-x CMD` per group) |
+| `img-check PATH...`         | list the images that cannot be fully decoded, with the reason (exit 1 if any) |
+| `autocrop PATH...`          | crop images to their non-transparent pixels → `NAME.cropped.<ext>`     |
+| `img-caption PATH...`       | write each `NAME.description.txt` (from `glados describe`) into the image's XMP and EXIF description |
 | `hash-rename PATH...`       | rename each file to `<digest of its content>.<ext>` (`--algo`)        |
+| `fix-extensions PATH...`    | lowercase extensions; `jpeg` → `jpg`, `mpeg` → `mpg`, `tif` → `tiff`  |
+| `srt-grep PATTERN PATH...`  | cues containing PATTERN in `.srt` files (a media file means its `NAME.srt`; exit 1 if none) |
 
 ```sh
 uv run multitool jpgize -n ~/Pictures/import     # print the planned conversions
@@ -161,8 +176,12 @@ uv run multitool motionphotos merge --rm ~/DCIM
 uv run multitool img-duplicates ~/Pictures -x "echo"
 ```
 
-`jpgize`, `mp4ize`, `motionphotos merge` and `hash-rename` take `-n/--dry-run`; commands
-that would replace an existing file need `-y/--overwrite`. Commands taking `PATH...`
+Commands that change files (`jpgize`, `mp4ize`, `motionphotos merge`, `autocrop`,
+`img-caption`, `hash-rename`, `fix-extensions`) take `-n/--dry-run`; commands that would
+replace an existing file need `-y/--overwrite`, and `img-caption` always does (it
+writes in place). `img-hash`, `img-duplicates`, `img-check` and `autocrop` need the
+`multitool` extra (`uv sync --extra multitool`). `img-caption` pairs with
+`glados describe`, and `srt-grep` with `glados transcribe -f srt`. Commands taking `PATH...`
 keep going when one input fails (exit 1 at the end); on success, commands that write
 files print nothing (`-v` logs `wrote <dest>` for each). Logging options (`-v`, `-q`, `--log-level`, `MULTITOOL_LOG_LEVEL`) go before the
 command: `multitool -v jpgize ...`.
