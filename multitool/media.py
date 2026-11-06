@@ -1,12 +1,14 @@
 """Which files are images or videos, and which ones each converter takes.
 
-Types come from the file name (stdlib `mimetypes`), never from the content.
+Types come from the file name (glados.core.inputs.media_type_filter, stdlib
+`mimetypes`), never from the content.
 """
 
 from __future__ import annotations
 
-import mimetypes
 from pathlib import Path
+
+from glados.core.inputs import media_type_filter
 
 # Converted to JPEG by `jpgize`.
 JPEG_SOURCE_EXTENSIONS = frozenset({".heic", ".heif", ".webp", ".png"})
@@ -17,21 +19,12 @@ EXTRA_VIDEO_EXTENSIONS = frozenset({".3gp", ".mts", ".m2ts"})
 JPEG_EXTENSIONS = frozenset({".jpg", ".jpeg"})
 MP4_EXTENSION = ".mp4"
 
-
-def media_type(path: Path) -> str | None:
-    return mimetypes.guess_type(path.name, strict=False)[0]
-
-
-def is_image(path: Path) -> bool:
-    mime = media_type(path)
-    return mime is not None and mime.startswith("image/")
+is_image = media_type_filter("image/")
+has_video_type = media_type_filter("video/")
 
 
 def is_video(path: Path) -> bool:
-    if path.suffix.lower() in EXTRA_VIDEO_EXTENSIONS:
-        return True
-    mime = media_type(path)
-    return mime is not None and mime.startswith("video/")
+    return path.suffix.lower() in EXTRA_VIDEO_EXTENSIONS or has_video_type(path)
 
 
 def converts_to_jpeg(path: Path) -> bool:
