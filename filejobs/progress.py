@@ -18,6 +18,7 @@ from rich.progress import (
     BarColumn,
     Progress,
     SpinnerColumn,
+    TaskID,
     TaskProgressColumn,
     TextColumn,
     TimeRemainingColumn,
@@ -69,6 +70,9 @@ class BaseProgressReporter(Protocol):
 
 
 class RichProgressReporter:
+    """Rich bars on stderr. The Protocol's ids are plain ints, so the other
+    reporters need no rich import; they become rich's TaskID only here."""
+
     def __init__(self) -> None:
         self._progress = Progress(
             SpinnerColumn(),
@@ -81,11 +85,12 @@ class RichProgressReporter:
         )
 
     def __enter__(self) -> Self:
-        self._progress.__enter__()
+        # All that Progress's own context manager does.
+        self._progress.start()
         return self
 
     def __exit__(self, *exc_info: object) -> None:
-        self._progress.__exit__(*exc_info)
+        self._progress.stop()
 
     def add_task(self, description: str, total: float | None) -> int:
         return self._progress.add_task(description, total=total)
@@ -93,19 +98,19 @@ class RichProgressReporter:
     def update(
         self, task_id: int, completed: float, total: float | None = None
     ) -> None:
-        kwargs: dict[str, float] = {"completed": completed}
-        if total is not None:
-            kwargs["total"] = total
-        self._progress.update(task_id, **kwargs)
+        # rich leaves the total unchanged when it is None.
+        self._progress.update(TaskID(task_id), completed=completed, total=total)
 
     def complete(self, task_id: int) -> None:
         # Progress.tasks is a list; ids stop matching positions once a task
         # has been removed.
         task = next(task for task in self._progress.tasks if task.id == task_id)
-        self._progress.update(task_id, completed=task.total if task.total else 100)
+        self._progress.update(
+            TaskID(task_id), completed=task.total if task.total else 100
+        )
 
     def remove(self, task_id: int) -> None:
-        self._progress.remove_task(task_id)
+        self._progress.remove_task(TaskID(task_id))
 
 
 class PlainProgressReporter:
