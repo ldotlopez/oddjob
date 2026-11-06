@@ -11,6 +11,7 @@ import rich_click as click
 from click.testing import CliRunner
 from support import NullReporter
 
+from glados.commands import rewrite, transcribe
 from glados.core.batch import run_batch
 from glados.core.cli_options import job_action, run_jobs
 from glados.core.inputs import (
@@ -27,7 +28,6 @@ from glados.core.pipeline import (
     suffix_destination,
 )
 from glados.core.progress import BaseProgressReporter
-from glados.tasks import rewrite, transcribe
 
 
 def make_tmp(test: unittest.TestCase) -> Path:

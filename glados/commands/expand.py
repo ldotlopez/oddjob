@@ -1,5 +1,5 @@
-"""Expand task: text file -> expanded text via an Expander backend. Same
-shape as tasks/rewrite.py; the prompt comes from `[prompts] expand`."""
+"""Expand command: text file -> expanded text via an Expander backend. Same
+shape as commands/rewrite.py; the prompt comes from `[prompts] expand`."""
 
 from __future__ import annotations
 

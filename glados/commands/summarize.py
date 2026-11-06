@@ -1,5 +1,5 @@
-"""Summarize task: text file -> summary via a Summarizer backend. Same
-shape as tasks/rewrite.py; the prompt comes from `[prompts] summarize`."""
+"""Summarize command: text file -> summary via a Summarizer backend. Same
+shape as commands/rewrite.py; the prompt comes from `[prompts] summarize`."""
 
 from __future__ import annotations
 

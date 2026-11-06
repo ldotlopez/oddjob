@@ -1,6 +1,6 @@
-"""Rewrite task: text file -> rewritten text file via a Rewriter backend.
+"""Rewrite command: text file -> rewritten text file via a Rewriter backend.
 
-A single core.pipeline.TextStep driving the backend selected by
+No task module of its own: a single core.pipeline.TextStep driving the backend selected by
 core/backends.py, with the system prompt rendered from `[prompts] rewrite`
 in the config. The same click.Command is the `glados rewrite` subcommand and
 the standalone `rewrite` tool. Lands at infix_destination("rewrite"), so

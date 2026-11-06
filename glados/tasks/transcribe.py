@@ -1,13 +1,10 @@
-"""Transcribe task: video/audio -> subtitle/text sidecar via a Transcriber
-backend.
+"""Transcribe task: the steps from video/audio to a subtitle/text sidecar.
 
-FORMATTERS and AudioExtractor are transcribe-specific and stay here; the
-subprocess-runner primitives they're built on (FFMpegRunner) live in
-core/runners.py since those are reusable outside this task.
-
-The Transcriber backend is selected and loaded by core/backends.py;
--m/--model overrides its global `model` option, while --language and
---format are per-run arguments.
+AudioExtractor feeds TranscribeStep, which drives a Transcriber backend and
+renders its segments with one of FORMATTERS. The subprocess-runner
+primitives they're built on (FFMpegRunner) live in core/runners.py since
+those are reusable outside this task. The command is
+glados/commands/transcribe.py.
 """
 
 from __future__ import annotations
@@ -21,26 +18,6 @@ from collections.abc import Callable
 from dataclasses import replace
 from pathlib import Path
 
-import rich_click as click
-
-from glados.core.cli_common import (
-    GladosContext,
-    backend_option,
-    logging_options,
-    model_option,
-    pass_glados_context,
-)
-from glados.core.cli_options import (
-    check_single_output,
-    common_file_options,
-    dry_run_option,
-    job_action,
-    paths_argument,
-    print_plan,
-    run_jobs,
-)
-from glados.core.inputs import expand_inputs, media_type_filter
-from glados.core.pipeline import Job, override_destination, suffix_destination
 from glados.core.progress import ProgressEvent, ProgressStream
 from glados.core.runners import CliArgs, FFMpegRunner
 from glados.tasks.protocols import Transcriber, TranscriptSegment
@@ -139,19 +116,6 @@ FORMATTERS: dict[str, SegmentFormatter] = {
 }
 
 
-def resolve_output_format(requested: str | None, output: Path | None) -> str:
-    """The -f/--format value if given; otherwise the -o/--output extension
-    when it names a known format (so `-o talk.srt` writes SRT); otherwise
-    DEFAULT_OUTPUT_FORMAT."""
-    if requested is not None:
-        return requested
-    if output is not None:
-        extension = output.suffix.removeprefix(".").lower()
-        if extension in FORMATTERS:
-            return extension
-    return DEFAULT_OUTPUT_FORMAT
-
-
 # --------------------------------------------------------------------------
 # Pipeline steps
 # --------------------------------------------------------------------------
@@ -246,77 +210,3 @@ class TranscribeStep:
             raise
 
         yield replace(final_event, result=output_path)
-
-
-# --------------------------------------------------------------------------
-# CLI wiring
-# --------------------------------------------------------------------------
-#
-# This same click.Command object is both `glados transcribe ...`
-# (cli.py adds it to the group) and the standalone `transcribe ...` tool
-# (pyproject.toml points [project.scripts] straight at it) — no separate
-# argparse-style add_subparser()/main() split needed.
-
-
-@click.command("transcribe")
-@paths_argument
-@model_option
-@click.option(
-    "-l",
-    "--language",
-    default=None,
-    help="audio language code, e.g. en, es (default: auto-detect)",
-)
-@click.option(
-    "-f",
-    "--format",
-    "output_format",
-    type=click.Choice(sorted(FORMATTERS)),
-    default=None,
-    help=(
-        "output format (default: the -o extension if it is a known format,"
-        f" else {DEFAULT_OUTPUT_FORMAT})"
-    ),
-)
-@backend_option("transcribe")
-@common_file_options
-@dry_run_option
-@logging_options
-@pass_glados_context
-def cli(
-    ctx: GladosContext,
-    paths: tuple[Path, ...],
-    model: str | None,
-    language: str | None,
-    output_format: str | None,
-    backend: str | None,
-    output: Path | None,
-    overwrite: bool,
-    dry_run: bool,
-) -> None:
-    """Extract audio and transcribe each input in PATH... to a plain-text or subtitle sidecar."""
-    inputs = expand_inputs(paths, media_type_filter("audio/", "video/"))
-    check_single_output(output, inputs)
-    output_format = resolve_output_format(output_format, output)
-    dest_fn = override_destination(output, suffix_destination(output_format))
-    if dry_run:
-        print_plan(inputs, dest_fn)
-        return
-    transcriber = ctx.backend("transcribe", Transcriber, backend, {"model": model})
-    job = Job(
-        steps=[
-            (AudioExtractor(), "Extracting audio"),
-            (
-                TranscribeStep(
-                    transcriber, language=language, output_format=output_format
-                ),
-                "Transcribing",
-            ),
-        ],
-        dest_fn=dest_fn,
-    )
-    run_jobs(inputs, job_action(job, overwrite), "Transcribing")
-
-
-if __name__ == "__main__":
-    cli()

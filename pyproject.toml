@@ -19,10 +19,10 @@ dependencies = [
 # migration — both point at the exact same click.Command object.
 [project.scripts]
 glados = "glados.cli:cli"
-transcribe = "glados.tasks.transcribe:cli"
-rewrite = "glados.tasks.rewrite:cli"
-summarize = "glados.tasks.summarize:cli"
-expand = "glados.tasks.expand:cli"
+transcribe = "glados.commands.transcribe:cli"
+rewrite = "glados.commands.rewrite:cli"
+summarize = "glados.commands.summarize:cli"
+expand = "glados.commands.expand:cli"
 # File utilities without the backend registry (docs/decisions/0003).
 multitool = "multitool.cli:cli"
 
