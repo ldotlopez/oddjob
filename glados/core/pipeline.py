@@ -4,18 +4,21 @@ progress, and land the final result at a computed destination path.
 This is the task-agnostic remainder of transcribe_sidecar.py's
 TranscriptionJob — the extractor/transcriber split there was specific to
 transcribe (two steps); other tasks plug in their own step list instead
-(text tasks will use exactly one step).
+(text tasks use exactly one, TextStep).
 """
 
 from __future__ import annotations
 
 import logging
+import os
 import shutil
+import tempfile
 from collections.abc import Callable, Sequence
+from dataclasses import replace
 from pathlib import Path
 from typing import Protocol, runtime_checkable
 
-from glados.core.progress import BaseProgressReporter, ProgressStream
+from glados.core.progress import BaseProgressReporter, ProgressEvent, ProgressStream
 
 type DestinationFn = Callable[[Path], Path]
 
@@ -62,6 +65,47 @@ def override_destination(
         return explicit if explicit is not None else default_fn(input_path)
 
     return dest_fn
+
+
+type TextTransform = Callable[[str], ProgressStream[str]]
+
+
+class TextStep:
+    """Reads `input_path` as UTF-8 text, runs `transform` on it and writes
+    the result to a temp file with the input's suffix. Satisfies
+    ProgressStep[Path]; the single step of every text task."""
+
+    def __init__(self, transform: TextTransform) -> None:
+        self.transform = transform
+
+    def run(self, input_path: Path) -> ProgressStream[Path]:
+        events = self.transform(input_path.read_text(encoding="utf-8"))
+        final_event: ProgressEvent[str] | None = None
+        try:
+            for event in events:
+                if event.done:
+                    final_event = event
+                else:
+                    yield event
+        except BaseException:
+            events.close()
+            raise
+
+        if final_event is None or not final_event.result:
+            raise RuntimeError("backend ended without producing any text")
+
+        file_descriptor, output_path_str = tempfile.mkstemp(
+            prefix="glados-text-", suffix=input_path.suffix
+        )
+        os.close(file_descriptor)
+        output_path = Path(output_path_str)
+        try:
+            output_path.write_text(final_event.result, encoding="utf-8")
+        except BaseException:
+            output_path.unlink(missing_ok=True)
+            raise
+
+        yield replace(final_event, result=output_path)
 
 
 class Job:

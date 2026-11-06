@@ -260,7 +260,7 @@ class TranscribeStep:
 def cli(
     ctx: GladosContext,
     input_path: Path,
-    model: Path | None,
+    model: str | None,
     language: str | None,
     output_format: str,
     backend: str | None,

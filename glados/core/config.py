@@ -1,8 +1,8 @@
 """User configuration: an optional TOML file in the user config directory.
 
 glados runs without it; every backend option has a default. The file can
-select a backend per task (`[tasks]`) and give a backend's global options
-(`[backends.<name>]`). `${VAR}` placeholders are expanded from the
+select a backend per task (`[tasks]`), give a backend's global options
+(`[backends.<name>]`) and override the text tasks' prompts (`[prompts]`). `${VAR}` placeholders are expanded from the
 environment before parsing; write a literal `$` as `$$`.
 """
 
@@ -11,7 +11,7 @@ from __future__ import annotations
 import os
 import tomllib
 from pathlib import Path
-from string import Template
+from string import Formatter, Template
 from typing import Any
 
 import pydantic
@@ -22,15 +22,84 @@ class ConfigError(Exception):
     """The configuration file is unreadable or invalid."""
 
 
+_PROMPT_PLACEHOLDERS = {
+    "rewrite": "instructions",
+    "summarize": "length",
+    "expand": "length",
+}
+
+
+class Prompts(pydantic.BaseModel):
+    """System prompt templates for the text tasks, the same for every
+    backend. Each may use only its own `str.format` placeholder:
+    `{instructions}` in rewrite, `{length}` in summarize and expand. Write
+    them with plain braces, not `${...}` (that is environment expansion);
+    a literal brace is `{{` or `}}`."""
+
+    model_config = pydantic.ConfigDict(extra="forbid", frozen=True)
+
+    rewrite: str = (
+        "Rewrite the text the user sends. {instructions}"
+        " Reply with the rewritten text only, in the same language,"
+        " with no preamble or commentary."
+    )
+    summarize: str = (
+        "Summarize the text the user sends. {length}"
+        " Reply with the summary only, in the same language,"
+        " with no preamble or commentary."
+    )
+    expand: str = (
+        "Expand the text the user sends with more detail, explanation and"
+        " examples, without changing its meaning. {length}"
+        " Reply with the expanded text only, in the same language,"
+        " with no preamble or commentary."
+    )
+
+    @pydantic.field_validator("rewrite", "summarize", "expand")
+    @classmethod
+    def _check_placeholders(cls, value: str, info: pydantic.ValidationInfo) -> str:
+        allowed = _PROMPT_PLACEHOLDERS[info.field_name]
+        try:
+            names = {
+                name for _, name, _, _ in Formatter().parse(value) if name is not None
+            }
+        except ValueError as exc:
+            raise ValueError(f"invalid template: {exc}") from exc
+        unknown = names - {allowed}
+        if unknown:
+            raise ValueError(
+                f"unknown placeholder(s) {', '.join(sorted(unknown))}"
+                f" (allowed: {{{allowed}}})"
+            )
+        return value
+
+    def render_rewrite(self, instructions: str | None) -> str:
+        return self.rewrite.format(instructions=instructions or DEFAULT_INSTRUCTIONS)
+
+    def render_summarize(self, max_words: int | None) -> str:
+        return self.summarize.format(length=_length_sentence(max_words))
+
+    def render_expand(self, target_words: int | None) -> str:
+        return self.expand.format(length=_length_sentence(target_words))
+
+
+DEFAULT_INSTRUCTIONS = "Improve clarity and correctness without changing the meaning."
+
+
+def _length_sentence(words: int | None) -> str:
+    return f"Keep it to about {words} words." if words else ""
+
+
 class Config(pydantic.BaseModel):
     """`tasks` maps a task name to the backend that runs it; `backends`
     maps a backend name to its global options, validated by the backend
-    itself when it loads."""
+    itself when it loads; `prompts` holds the text tasks' prompts."""
 
     model_config = pydantic.ConfigDict(extra="forbid", frozen=True)
 
     tasks: dict[str, str] = {}
     backends: dict[str, dict[str, Any]] = {}
+    prompts: Prompts = Prompts()
 
 
 def config_path() -> Path:

@@ -1,6 +1,5 @@
-"""Summarize task — signatures and CLI shape only; no backend implements
-Summarizer yet. Same shape as tasks/rewrite.py — see its module docstring
-for the discovery/backend-resolution pattern."""
+"""Summarize task: text file -> summary via a Summarizer backend. Same
+shape as tasks/rewrite.py; the prompt comes from `[prompts] summarize`."""
 
 from __future__ import annotations
 
@@ -16,33 +15,19 @@ from glados.core.cli_common import (
     model_option,
     pass_glados_context,
 )
-from glados.core.pipeline import Job, infix_destination, override_destination
-from glados.core.progress import ProgressStream
+from glados.core.pipeline import Job, TextStep, infix_destination, override_destination
 from glados.tasks.protocols import Summarizer
 
 DEFAULT_INFIX = "summary"
-
-
-class SummarizeStep:
-    """Will read `input_path`'s text, drive a Summarizer backend, and
-    write the result to a temp file. Not implemented yet."""
-
-    def __init__(self, backend: Summarizer, max_length: int | None) -> None:
-        self.backend = backend
-        self.max_length = max_length
-
-    def run(self, input_path: Path) -> ProgressStream[Path]:
-        raise NotImplementedError("SummarizeStep is not implemented yet")
-        yield  # pragma: no cover
 
 
 @click.command("summarize")
 @click.argument("input_path", type=click.Path(path_type=Path))
 @click.option(
     "--max-length",
-    type=int,
+    type=click.IntRange(min=1),
     default=None,
-    help="approximate cap on summary length (unit is backend-defined)",
+    help="approximate cap on summary length, in words",
 )
 @model_option
 @backend_option("summarize")
@@ -53,15 +38,21 @@ def cli(
     ctx: GladosContext,
     input_path: Path,
     max_length: int | None,
-    model: Path | None,
+    model: str | None,
     backend: str | None,
     output: Path | None,
     overwrite: bool,
 ) -> None:
-    """Summarize INPUT_PATH. Not yet implemented."""
-    backend_instance = ctx.backend("summarize", Summarizer, backend, {"model": model})
+    """Summarize INPUT_PATH."""
+    prompt = ctx.config().prompts.render_summarize(max_length)
+    summarizer = ctx.backend("summarize", Summarizer, backend, {"model": model})
     job = Job(
-        steps=[(SummarizeStep(backend_instance, max_length), "Summarizing")],
+        steps=[
+            (
+                TextStep(lambda text: summarizer.summarize(text, prompt=prompt)),
+                "Summarizing",
+            )
+        ],
         dest_fn=override_destination(output, infix_destination(DEFAULT_INFIX)),
     )
     ctx.run_job(job, input_path, overwrite)

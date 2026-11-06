@@ -10,6 +10,7 @@ dependencies = [
     "foundation",
     "pydantic>=2.14.3",
     "python-dotenv>=1.2.4",
+    "requests>=2.34.2",
 ]
 
 # `glados <task> ...` is the multi-command entry point; each task is also
@@ -29,6 +30,21 @@ expand = "glados.tasks.expand:cli"
 # `glados.plugins.<name>:__glados_plugin__`. Run `uv sync` after editing.
 [project.entry-points."glados.backends.transcribe"]
 whisper = "glados.plugins.whisper:__glados_plugin__"
+
+[project.entry-points."glados.backends.rewrite"]
+llm = "glados.plugins.llm:__glados_plugin__"
+ollama = "glados.plugins.ollama:__glados_plugin__"
+openai = "glados.plugins.openai:__glados_plugin__"
+
+[project.entry-points."glados.backends.summarize"]
+llm = "glados.plugins.llm:__glados_plugin__"
+ollama = "glados.plugins.ollama:__glados_plugin__"
+openai = "glados.plugins.openai:__glados_plugin__"
+
+[project.entry-points."glados.backends.expand"]
+llm = "glados.plugins.llm:__glados_plugin__"
+ollama = "glados.plugins.ollama:__glados_plugin__"
+openai = "glados.plugins.openai:__glados_plugin__"
 
 # [build-system]
 # requires = ["hatchling"]

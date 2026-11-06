@@ -48,8 +48,11 @@ class GladosContext:
             LOGGER.debug(
                 "config: %s (%s)", path, "found" if path.is_file() else "not found"
             )
-            cfg = load_config(path)
-            check_config(cfg)
+            try:
+                cfg = load_config(path)
+                check_config(cfg)
+            except (ConfigError, BackendError) as exc:
+                raise click.ClickException(str(exc)) from exc
             self._config = cfg
         return self._config
 
@@ -63,7 +66,7 @@ class GladosContext:
         """The backend object for `task`: see core.backends.resolve."""
         try:
             return resolve(task, protocol, choice, self.config(), overrides)
-        except (ConfigError, BackendError) as exc:
+        except BackendError as exc:
             raise click.ClickException(str(exc)) from exc
 
     def run_job(self, job: Job, input_path: Path, overwrite: bool) -> None:
@@ -153,7 +156,6 @@ def model_option[F: Callable[..., object]](func: F) -> F:
     return click.option(
         "-m",
         "--model",
-        type=click.Path(path_type=Path),
         default=None,
         help="model file/name, overriding [backends.<name>] model",
     )(func)

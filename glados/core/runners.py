@@ -14,6 +14,7 @@ import shutil
 import subprocess
 import threading
 from pathlib import Path
+from typing import IO
 
 from glados.core.progress import ProgressEvent, ProgressStream
 
@@ -32,7 +33,7 @@ def _parse_ffmpeg_timestamp(ts: str) -> float | None:
     return int(hours) * 3600 + int(minutes) * 60 + int(seconds) + float(f"0.{fraction}")
 
 
-def _drain(stream, sink: list[str]) -> None:
+def drain_stream(stream: IO[str], sink: list[str]) -> None:
     """Read a subprocess stream to completion in a background thread so it
     never blocks while the main thread reads the other stream."""
     sink.extend(stream)
@@ -97,7 +98,7 @@ class FFMpegRunner:
         )
         stderr_lines: list[str] = []
         stderr_thread = threading.Thread(
-            target=_drain, args=(proc.stderr, stderr_lines)
+            target=drain_stream, args=(proc.stderr, stderr_lines)
         )
         stderr_thread.start()
 
