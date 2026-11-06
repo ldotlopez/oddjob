@@ -4,7 +4,7 @@ CLI toolkit that applies model backends to files, one task per command.
 
 | Task         | Status          | Input → output                                   |
 | :----------- | :-------------- | :----------------------------------------------- |
-| `transcribe` | implemented     | video/audio → `srt`, `vtt`, `txt`, `json`, `csv`, `lrc` |
+| `transcribe` | implemented     | video/audio → `txt`, `srt`, `vtt`, `json`, `csv`, `lrc` |
 | `rewrite`    | implemented     | text → `<name>.rewrite.<ext>`                    |
 | `summarize`  | implemented     | text → `<name>.summary.<ext>`                    |
 | `expand`     | implemented     | text → `<name>.expanded.<ext>`                   |
@@ -44,9 +44,9 @@ uv sync
 Every task runs as `glados <task> FILE ...` or as its own command (`transcribe FILE ...`).
 
 ```sh
-uv run transcribe talk.mp4                    # -> talk.srt (backend from [tasks])
+uv run transcribe talk.mp4                    # -> talk.txt (backend from [tasks])
 uv run glados transcribe -b whisper talk.mp4 -f vtt -l en -m small
-uv run transcribe -b whisper_cpp talk.mp4 -m ~/models/ggml-small.bin -o subs/talk.srt -y
+uv run transcribe -b whisper_cpp talk.mp4 -m ~/models/ggml-small.bin -o subs/talk.srt -y   # SRT, from -o
 uv run rewrite -b ollama notes.md -i "more formal tone"   # -> notes.rewrite.md
 uv run glados summarize -b openai report.txt --max-length 200
 uv run expand -b llm -m gpt-4o-mini outline.md --target-length 800
@@ -64,8 +64,9 @@ Common options:
 | `--log-level SPEC`      | e.g. `debug` or `glados.core:debug,*:info` (also `GLADOS_LOG_LEVEL`) |
 
 `transcribe` also takes `-l, --language` (default: auto-detect) and `-f, --format`
-(default: `srt`). `rewrite` takes `-i, --instructions`; `summarize` takes
-`--max-length` and `expand` `--target-length`, both approximate word counts.
+(default: the `-o` extension if it is a known format, else `txt`). `rewrite` takes
+`-i, --instructions`; `summarize` takes `--max-length` and `expand`
+`--target-length`, both approximate word counts.
 
 ## Configuration
 
