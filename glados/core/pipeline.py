@@ -9,6 +9,7 @@ transcribe (two steps); other tasks plug in their own step list instead
 
 from __future__ import annotations
 
+import errno
 import logging
 import os
 import shutil
@@ -95,10 +96,34 @@ def check_destination(dest: Path, overwrite: bool) -> None:
 
 def move_to_destination(produced: Path, dest: Path, overwrite: bool) -> None:
     """Move a finished temp file into place, re-checking the destination
-    right before the move to avoid a race."""
+    right before the move to avoid a race. The destination is replaced
+    atomically, also when `produced` is on another filesystem."""
     check_destination(dest, overwrite)
     LOGGER.debug("moving %s to %s", produced, dest)
-    shutil.move(str(produced), str(dest))
+    try:
+        produced.replace(dest)
+    except OSError as exc:
+        if exc.errno != errno.EXDEV:
+            raise
+        copy_into_place(produced, dest)
+        produced.unlink()
+
+
+def copy_into_place(source: Path, dest: Path) -> None:
+    """Copy `source` to a temp file next to `dest`, then rename it over
+    `dest`: a reader never sees a partial `dest`, and an interrupted copy
+    leaves the old one intact."""
+    file_descriptor, staged_str = tempfile.mkstemp(
+        prefix=f".{dest.name}.", suffix=".part", dir=dest.parent
+    )
+    os.close(file_descriptor)
+    staged = Path(staged_str)
+    try:
+        shutil.copy2(source, staged)
+        staged.replace(dest)
+    except BaseException:
+        staged.unlink(missing_ok=True)
+        raise
 
 
 type TextTransform = Callable[[str], ProgressStream[str]]

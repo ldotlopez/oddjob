@@ -152,6 +152,48 @@ class BytesStepAndRunJobsTests(unittest.TestCase):
         self.assertFalse(produced.exists())
 
 
+SHARED_MEMORY = Path("/dev/shm")
+
+
+def other_filesystem(path: Path) -> Path | None:
+    """A writable directory on another filesystem than `path`, if any."""
+    usable = SHARED_MEMORY.is_dir() and os.access(SHARED_MEMORY, os.W_OK)
+    if usable and SHARED_MEMORY.stat().st_dev != path.stat().st_dev:
+        return SHARED_MEMORY
+    return None
+
+
+class CrossFilesystemMoveTests(unittest.TestCase):
+    """move_to_destination between the temp dir and another filesystem."""
+
+    def setUp(self) -> None:
+        self.tmp = make_tmp(self)
+        other = other_filesystem(self.tmp)
+        if other is None:
+            self.skipTest("no second writable filesystem")
+        self.dest_dir = Path(self.enterContext(tempfile.TemporaryDirectory(dir=other)))
+
+    def test_replaces_destination_and_removes_source(self) -> None:
+        produced, dest = self.tmp / "new", self.dest_dir / "dest"
+        produced.write_text("new")
+        os.utime(produced, (1_000_000, 1_000_000))
+        dest.write_text("old")
+        move_to_destination(produced, dest, overwrite=True)
+        self.assertEqual(dest.read_text(), "new")
+        self.assertEqual(dest.stat().st_mtime, 1_000_000)
+        self.assertFalse(produced.exists())
+        self.assertEqual(list(self.dest_dir.iterdir()), [dest])
+
+    def test_failed_copy_keeps_destination_and_leaves_no_temp_file(self) -> None:
+        produced, dest = self.tmp / "unreadable", self.dest_dir / "dest"
+        produced.mkdir()  # renaming works, copying it as a file does not
+        dest.write_text("old")
+        with self.assertRaises(OSError):
+            move_to_destination(produced, dest, overwrite=True)
+        self.assertEqual(dest.read_text(), "old")
+        self.assertEqual(list(self.dest_dir.iterdir()), [dest])
+
+
 class MultipleInputTaskTests(unittest.TestCase):
     """-o is rejected with several inputs before any backend is touched."""
 
