@@ -9,14 +9,14 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
 
-from glados.core.pipeline import (
+from filejobs.pipeline import (
     Job,
     ProgressStep,
     suffix_destination,
     temp_output_path,
 )
-from glados.core.progress import BaseProgressReporter, ProgressEvent, ProgressStream
-from glados.core.runners import FFMpegRunner
+from filejobs.progress import BaseProgressReporter, ProgressEvent, ProgressStream
+from filejobs.runners import FFMpegRunner
 from multitool.external import ExifTool, ImageMagick
 
 LOGGER = logging.getLogger(__name__)

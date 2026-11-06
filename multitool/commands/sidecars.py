@@ -6,8 +6,8 @@ from pathlib import Path
 
 import rich_click as click
 
-from glados.core.cli_options import paths_argument
-from glados.core.inputs import accept_all, expand_inputs
+from filejobs.cli_options import paths_argument
+from filejobs.inputs import accept_all, expand_inputs
 from multitool import sidecars
 
 

@@ -1,6 +1,6 @@
 """Rewrite command: text file -> rewritten text file via a Rewriter backend.
 
-No task module of its own: a single core.pipeline.TextStep driving the backend selected by
+No task module of its own: a single filejobs.pipeline.TextStep driving the backend selected by
 core/backends.py, with the system prompt rendered from `[prompts] rewrite`
 in the config. The same click.Command is the `glados rewrite` subcommand and
 the standalone `rewrite` tool. Lands at infix_destination("rewrite"), so
@@ -14,14 +14,7 @@ from pathlib import Path
 
 import rich_click as click
 
-from glados.core.cli_common import (
-    GladosContext,
-    backend_option,
-    logging_options,
-    model_option,
-    pass_glados_context,
-)
-from glados.core.cli_options import (
+from filejobs.cli_options import (
     check_single_output,
     common_file_options,
     dry_run_option,
@@ -30,8 +23,15 @@ from glados.core.cli_options import (
     print_plan,
     run_jobs,
 )
-from glados.core.inputs import expand_inputs, text_inputs_except_outputs
-from glados.core.pipeline import Job, TextStep, infix_destination, override_destination
+from filejobs.inputs import expand_inputs, text_inputs_except_outputs
+from filejobs.pipeline import Job, TextStep, infix_destination, override_destination
+from glados.core.cli_common import (
+    GladosContext,
+    backend_option,
+    logging_options,
+    model_option,
+    pass_glados_context,
+)
 from glados.tasks.protocols import Rewriter
 
 DEFAULT_INFIX = "rewrite"

@@ -2,7 +2,7 @@
 
 AudioExtractor feeds TranscribeStep, which drives a Transcriber backend and
 renders its segments with one of FORMATTERS. The subprocess-runner
-primitives they're built on (FFMpegRunner) live in core/runners.py since
+primitives they're built on (FFMpegRunner) live in filejobs/runners.py since
 those are reusable outside this task. The command is
 glados/commands/transcribe.py.
 """
@@ -18,8 +18,8 @@ from collections.abc import Callable
 from dataclasses import replace
 from pathlib import Path
 
-from glados.core.progress import ProgressEvent, ProgressStream
-from glados.core.runners import CliArgs, FFMpegRunner
+from filejobs.progress import ProgressEvent, ProgressStream
+from filejobs.runners import CliArgs, FFMpegRunner
 from glados.tasks.protocols import Transcriber, TranscriptSegment
 
 DEFAULT_OUTPUT_FORMAT = "txt"
@@ -165,7 +165,7 @@ class AudioExtractor:
 class TranscribeStep:
     """Drives a Transcriber backend, then renders the result into the
     requested output format and writes it to a temp file. Satisfies
-    ProgressStep[Path] — plugs directly into core.pipeline.Job."""
+    ProgressStep[Path] — plugs directly into filejobs.pipeline.Job."""
 
     def __init__(
         self, backend: Transcriber, language: str | None, output_format: str

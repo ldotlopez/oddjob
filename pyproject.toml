@@ -68,7 +68,7 @@ package = true
 
 # Two top-level packages in one distribution (docs/decisions/0003).
 [tool.setuptools.packages.find]
-include = ["glados*", "multitool*"]
+include = ["glados*", "multitool*", "filejobs*"]
 
 [tool.uv.sources]
 foundation = { git = "https://github.com/ldotlopez/foundation.git", branch = "main" }

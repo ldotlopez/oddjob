@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from typing import Protocol
 
-from glados.core.progress import ProgressStream
+from filejobs.progress import ProgressStream
 from glados.tasks.protocols import Expander, Rewriter, Summarizer
 
 

@@ -29,8 +29,8 @@ from typing import Any
 import pydantic
 from platformdirs import user_data_dir
 
-from glados.core.progress import ProgressEvent, ProgressStream
-from glados.core.runners import CliArgs
+from filejobs.progress import ProgressEvent, ProgressStream
+from filejobs.runners import CliArgs
 from glados.tasks.protocols import Transcriber, TranscriptSegment
 
 LOGGER = logging.getLogger(__name__)

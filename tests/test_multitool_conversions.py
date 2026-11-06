@@ -8,7 +8,7 @@ from pathlib import Path
 
 from support import NullReporter, recorded_argv, write_executable
 
-from glados.core.runners import FFMpegRunner
+from filejobs.runners import FFMpegRunner
 from multitool.conversions import (
     JpegConversionStep,
     Mp4RemuxStep,

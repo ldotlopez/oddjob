@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import BinaryIO
 
-from glados.core.pipeline import move_to_destination
+from filejobs.pipeline import move_to_destination
 
 CHUNK_SIZE = 1024 * 1024
 DEFAULT_ALGORITHM = "crc32"

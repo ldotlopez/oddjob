@@ -18,8 +18,8 @@ from dataclasses import dataclass
 import rich_click as click
 from dotenv import load_dotenv
 
+from filejobs.cli_options import logging_options_for
 from glados.core.backends import BackendError, check_config, resolve
-from glados.core.cli_options import logging_options_for
 from glados.core.config import Config, ConfigError, config_path, load_config
 
 APP_LOGGER = "glados"

@@ -21,9 +21,9 @@ from typing import Any
 
 import pydantic
 
-from glados.core.progress import ProgressEvent, ProgressStream
-from glados.core.runners import CliArgs, drain_stream
-from glados.core.text_backend import text_plugin_triples
+from filejobs.progress import ProgressEvent, ProgressStream
+from filejobs.runners import CliArgs, drain_stream
+from glados.tasks.text_backend import text_plugin_triples
 
 LOGGER = logging.getLogger(__name__)
 
@@ -40,7 +40,7 @@ class LlmOptions(pydantic.BaseModel):
 class LlmCliTransport:
     """Runs `llm prompt -s <system>` with the user text on stdin (no argv
     length limit) and streams its stdout. Satisfies
-    core.text_backend.ChatTransport."""
+    tasks.text_backend.ChatTransport."""
 
     def __init__(self, options: LlmOptions) -> None:
         self.options = options
@@ -107,6 +107,6 @@ def __glados_plugin__(
     backend: str, options: Mapping[str, Any]
 ) -> list[tuple[str, type, object]]:
     """Build the transport with its global options; one triple per text
-    task (see core/text_backend.py). This module provides only the
+    task (see tasks/text_backend.py). This module provides only the
     `llm` backend, so `backend` is not consulted."""
     return text_plugin_triples(LlmCliTransport(LlmOptions.model_validate(options)))

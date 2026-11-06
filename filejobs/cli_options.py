@@ -1,7 +1,7 @@
 """Click options and job runners with no backend knowledge.
 
 Shared by glados' task commands and by multitool; nothing here imports the
-backend registry or the glados config (those live in core/cli_common.py).
+backend registry or the glados config (those live in glados/core/cli_common.py).
 """
 
 from __future__ import annotations
@@ -14,9 +14,9 @@ import rich_click as click
 from foundation.clilib import click_logging_options
 from foundation.loglib import setup_logger_from_click
 
-from glados.core.batch import BatchReport, run_batch
-from glados.core.pipeline import JOB_ERRORS, DestinationFn, Job
-from glados.core.progress import BaseProgressReporter, create_reporter
+from filejobs.batch import BatchReport, run_batch
+from filejobs.pipeline import JOB_ERRORS, DestinationFn, Job
+from filejobs.progress import BaseProgressReporter, create_reporter
 
 type Decorator[F] = Callable[[F], F]
 
@@ -61,7 +61,7 @@ def dry_run_option[F: Callable[..., object]](func: F) -> F:
 
 
 def paths_argument[F: Callable[..., object]](func: F) -> F:
-    """PATH...: one or more existing files or directories (see core/inputs.py)."""
+    """PATH...: one or more existing files or directories (see filejobs/inputs.py)."""
     return click.argument(
         "paths",
         nargs=-1,
@@ -106,7 +106,7 @@ def check_single_output(output: Path | None, inputs: Sequence[Path]) -> None:
 
 def finish_batch(*reports: BatchReport) -> None:
     """Print the summary of batch runs; exit 1 if any input failed. Each
-    failure was already logged when it happened (core/batch.py)."""
+    failure was already logged when it happened (filejobs/batch.py)."""
     succeeded = sum(report.succeeded for report in reports)
     failed = sum(len(report.failures) for report in reports)
     if failed:

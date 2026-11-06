@@ -1,6 +1,6 @@
 """Which files are images or videos, and which ones each converter takes.
 
-Types come from the file name (glados.core.inputs.media_type_filter, stdlib
+Types come from the file name (filejobs.inputs.media_type_filter, stdlib
 `mimetypes`), never from the content.
 """
 
@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from glados.core.inputs import media_type_filter
+from filejobs.inputs import media_type_filter
 
 # Converted to JPEG by `jpgize`.
 JPEG_SOURCE_EXTENSIONS = frozenset({".heic", ".heif", ".webp", ".png"})

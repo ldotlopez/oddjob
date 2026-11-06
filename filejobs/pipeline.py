@@ -20,7 +20,7 @@ from dataclasses import replace
 from pathlib import Path
 from typing import Protocol, runtime_checkable
 
-from glados.core.progress import BaseProgressReporter, ProgressEvent, ProgressStream
+from filejobs.progress import BaseProgressReporter, ProgressEvent, ProgressStream
 
 type DestinationFn = Callable[[Path], Path]
 
@@ -153,7 +153,7 @@ class TextStep:
         if final_event is None or not final_event.result:
             raise RuntimeError("backend ended without producing any text")
 
-        output_path = temp_output_path("glados-text-", input_path.suffix)
+        output_path = temp_output_path("filejobs-text-", input_path.suffix)
         try:
             output_path.write_text(final_event.result, encoding="utf-8")
         except BaseException:
@@ -179,7 +179,7 @@ class BytesStep:
     def run(self, input_path: Path) -> ProgressStream[Path]:
         content = self.transform(input_path.read_bytes())
         output_path = temp_output_path(
-            "glados-bytes-", self.suffix or input_path.suffix
+            "filejobs-bytes-", self.suffix or input_path.suffix
         )
         try:
             output_path.write_bytes(content)

@@ -7,16 +7,16 @@ from pathlib import Path
 
 import rich_click as click
 
-from glados.core.cli_options import (
+from filejobs.cli_options import (
     dry_run_option,
     overwrite_option,
     paths_argument,
     run_jobs,
 )
-from glados.core.inputs import expand_inputs
-from glados.core.pipeline import ProgressStep
-from glados.core.progress import BaseProgressReporter
-from glados.core.runners import FFMpegRunner
+from filejobs.inputs import expand_inputs
+from filejobs.pipeline import ProgressStep
+from filejobs.progress import BaseProgressReporter
+from filejobs.runners import FFMpegRunner
 from multitool import media
 from multitool.conversions import (
     Conversion,

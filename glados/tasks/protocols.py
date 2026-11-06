@@ -5,7 +5,7 @@ implements, under that task's Protocol (see plugins/whisper.py).
 
 Transcriber is implemented by plugins/whisper.py; Rewriter, Summarizer and
 Expander by plugins/openai.py, plugins/ollama.py and plugins/llm.py, all
-through core/text_backend.py.
+through tasks/text_backend.py.
 """
 
 from __future__ import annotations
@@ -14,7 +14,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol, runtime_checkable
 
-from glados.core.progress import ProgressStream
+from filejobs.progress import ProgressStream
 
 
 @dataclass(slots=True)
@@ -37,7 +37,7 @@ class Transcriber(Protocol):
 #
 # Kept as three distinct Protocols rather than one generic "text
 # transform" so each task checks its backend against exactly what it
-# calls, even though one backend class (core.text_backend.TextBackend)
+# calls, even though one backend class (tasks.text_backend.TextBackend)
 # satisfies all three. `prompt` is the task's system prompt, already
 # rendered from `[prompts]` in the config (core.config.Prompts); the
 # backend sends it as-is with `text` as the user message.

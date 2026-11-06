@@ -11,11 +11,11 @@ from types import ModuleType
 import rich_click as click
 from foundation.cache import UserCache
 
-from glados.core.batch import run_batch
-from glados.core.cli_options import finish_batch, paths_argument
-from glados.core.inputs import expand_inputs
-from glados.core.pipeline import JOB_ERRORS
-from glados.core.progress import BaseProgressReporter
+from filejobs.batch import run_batch
+from filejobs.cli_options import finish_batch, paths_argument
+from filejobs.inputs import expand_inputs
+from filejobs.pipeline import JOB_ERRORS
+from filejobs.progress import BaseProgressReporter
 from multitool import media
 from multitool.external import run_command_with_paths
 

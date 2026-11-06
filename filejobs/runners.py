@@ -16,7 +16,7 @@ import threading
 from pathlib import Path
 from typing import IO
 
-from glados.core.progress import ProgressEvent, ProgressStream
+from filejobs.progress import ProgressEvent, ProgressStream
 
 type CliArgs = list[str]
 

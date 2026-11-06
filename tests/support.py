@@ -23,7 +23,7 @@ from typing import Any, Self
 
 from dotenv import dotenv_values
 
-from glados.core.progress import ProgressEvent, ProgressStream
+from filejobs.progress import ProgressEvent, ProgressStream
 
 INTEGRATION_ENV = Path(__file__).with_name("integration.env")
 SETTING_PREFIX = "GLADOS_TEST_"

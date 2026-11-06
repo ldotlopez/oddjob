@@ -13,8 +13,8 @@ from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 from typing import Self
 
-from glados.core.pipeline import JOB_ERRORS
-from glados.core.progress import BaseProgressReporter, create_reporter
+from filejobs.pipeline import JOB_ERRORS
+from filejobs.progress import BaseProgressReporter, create_reporter
 
 LOGGER = logging.getLogger(__name__)
 

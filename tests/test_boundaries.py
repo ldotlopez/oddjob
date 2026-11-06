@@ -1,11 +1,12 @@
 """Import boundaries of the repository.
 
-- multitool uses only glados' backend-free core, and glados never imports
-  multitool (decision 0003).
+- filejobs, the backend-free core, imports neither tool; multitool imports
+  nothing from glados, and glados never imports multitool (decision 0003).
 - Both tools share one layout: `<tool>/cli.py` holds the click group,
   `<tool>/commands/<command>.py` one click command each, and every other
   module is domain or core code with no CLI. So click is imported only
-  there and in core's shared CLI plumbing (`core/cli_*.py`).
+  there and in the shared CLI plumbing (`filejobs/cli_*.py`,
+  `glados/core/cli_*.py`).
 """
 
 import ast
@@ -14,18 +15,10 @@ from collections.abc import Iterator
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-PACKAGES = ("glados", "multitool")
+PACKAGES = ("filejobs", "glados", "multitool")
 
-# Backend-bound modules multitool must not import.
-FORBIDDEN_FOR_MULTITOOL = (
-    "glados.commands",
-    "glados.core.backends",
-    "glados.core.config",
-    "glados.core.cli_common",
-    "glados.core.text_backend",
-    "glados.plugins",
-    "glados.tasks",
-)
+# Packages whose modules may import click: plumbing named `cli_*.py`.
+CLI_PLUMBING = (Path("filejobs"), Path("glados/core"))
 
 CLICK_MODULES = ("click", "rich_click")
 
@@ -63,17 +56,20 @@ def violations(package: str, forbidden: tuple[str, ...]) -> list[str]:
 
 
 def may_import_click(relative: Path) -> bool:
-    """Entry points, command modules and core's shared CLI plumbing."""
+    """Entry points, command modules and the shared CLI plumbing."""
     return (
         relative.name == "cli.py"
         or "commands" in relative.parts[:-1]
-        or (relative.parent == Path("glados/core") and relative.stem.startswith("cli_"))
+        or (relative.parent in CLI_PLUMBING and relative.stem.startswith("cli_"))
     )
 
 
 class BoundaryTests(unittest.TestCase):
-    def test_multitool_imports_only_the_backend_free_core(self) -> None:
-        self.assertEqual(violations("multitool", FORBIDDEN_FOR_MULTITOOL), [])
+    def test_filejobs_imports_neither_tool(self) -> None:
+        self.assertEqual(violations("filejobs", ("glados", "multitool")), [])
+
+    def test_multitool_never_imports_glados(self) -> None:
+        self.assertEqual(violations("multitool", ("glados",)), [])
 
     def test_glados_never_imports_multitool(self) -> None:
         self.assertEqual(violations("glados", ("multitool",)), [])

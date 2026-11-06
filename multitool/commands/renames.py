@@ -6,15 +6,15 @@ from pathlib import Path
 
 import rich_click as click
 
-from glados.core.batch import run_batch
-from glados.core.cli_options import (
+from filejobs.batch import run_batch
+from filejobs.cli_options import (
     dry_run_option,
     finish_batch,
     overwrite_option,
     paths_argument,
 )
-from glados.core.inputs import accept_all, expand_inputs
-from glados.core.progress import BaseProgressReporter
+from filejobs.inputs import accept_all, expand_inputs
+from filejobs.progress import BaseProgressReporter
 from multitool import renamers
 
 

@@ -11,23 +11,23 @@ import rich_click as click
 from click.testing import CliRunner
 from support import NullReporter
 
-from glados.commands import rewrite, transcribe
-from glados.core.batch import run_batch
-from glados.core.cli_options import job_action, run_jobs
-from glados.core.inputs import (
+from filejobs.batch import run_batch
+from filejobs.cli_options import job_action, run_jobs
+from filejobs.inputs import (
     accept_all,
     expand_inputs,
     media_type_filter,
     text_inputs_except_outputs,
 )
-from glados.core.pipeline import (
+from filejobs.pipeline import (
     BytesStep,
     Job,
     check_destination,
     move_to_destination,
     suffix_destination,
 )
-from glados.core.progress import BaseProgressReporter
+from filejobs.progress import BaseProgressReporter
+from glados.commands import rewrite, transcribe
 
 
 def make_tmp(test: unittest.TestCase) -> Path:
@@ -84,7 +84,7 @@ class RunBatchTests(unittest.TestCase):
                 raise ValueError("bad item")
             seen.append(item)
 
-        with self.assertLogs("glados.core.batch", level="ERROR"):
+        with self.assertLogs("filejobs.batch", level="ERROR"):
             report = run_batch([1, 2, 3], action, description="Testing")
         self.assertEqual(seen, [1, 3])
         self.assertEqual(report.succeeded, 2)

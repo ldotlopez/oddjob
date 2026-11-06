@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import rich_click as click
 
-from glados.core.cli_options import logging_options_for
+from filejobs.cli_options import logging_options_for
 from multitool.commands.conversions import jpgize_cmd, mp4ize_cmd
 from multitool.commands.imghash import img_duplicates_cmd, img_hash_cmd
 from multitool.commands.motionphotos import motionphotos_cmd
