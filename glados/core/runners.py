@@ -1,6 +1,6 @@
 """Generic subprocess runners: no knowledge of this project's tasks.
 
-Reusable as-is anywhere a caller wants ffmpeg or whisper-cli driven with
+Reusable as-is anywhere a caller wants ffmpeg driven with
 arbitrary arguments while getting a ProgressStream back. Unchanged from
 transcribe_sidecar.py other than the import path for ProgressEvent.
 """
@@ -123,61 +123,3 @@ class FFMpegRunner:
         yield ProgressEvent(
             completed=duration if duration else completed, total=duration, done=True
         )
-
-
-class WhisperCliRunner:
-    """Runs whisper-cli with arbitrary arguments, yielding ProgressEvent
-    parsed from `--print-progress` output.
-
-    `--print-progress` is added here; everything else about the invocation
-    (model, language, output format/prefix, input file) is the caller's.
-    """
-
-    _PROGRESS_RE = re.compile(r"progress\s*=\s*(\d+)%")
-
-    def __init__(self, whisper_bin: str = "whisper-cli") -> None:
-        # Deliberately no shutil.which() check here — unlike FFMpegRunner,
-        # this runner backs a Transcriber registered via
-        # foundation.plugin.Register, whose entry point may run at process
-        # import time regardless of whether transcribe is even used this
-        # invocation (see backends/whisper_backend.py's register()).
-        # Failing fast here would make the binary's absence surface as a
-        # silently-swallowed PluginError in discovery instead of a clear
-        # error when someone actually tries to transcribe — so the check
-        # is deferred to run(), the same reasoning as the model-path check
-        # in WhisperCliBackend.transcribe().
-        self.whisper_bin = whisper_bin
-
-    def run(self, args: CliArgs) -> ProgressStream:
-        if shutil.which(self.whisper_bin) is None:
-            raise FileNotFoundError(
-                f"whisper binary not found on PATH: {self.whisper_bin}"
-            )
-
-        cmd = [self.whisper_bin, "--print-progress", *args]
-
-        proc = subprocess.Popen(
-            cmd, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True, bufsize=1
-        )
-        stderr_lines: list[str] = []
-        completed = 0.0
-        try:
-            assert proc.stderr is not None
-            for line in proc.stderr:
-                stderr_lines.append(line)
-                match = self._PROGRESS_RE.search(line)
-                if match:
-                    completed = float(match.group(1))
-                    yield ProgressEvent(completed=completed, total=100)
-        except GeneratorExit:
-            proc.terminate()
-            raise
-        finally:
-            if proc.stderr:
-                proc.stderr.close()
-            proc.wait()
-
-        if proc.returncode != 0:
-            raise RuntimeError(f"whisper-cli failed: {''.join(stderr_lines).strip()}")
-
-        yield ProgressEvent(completed=100, total=100, done=True)

@@ -8,7 +8,6 @@ from pathlib import Path
 
 import rich_click as click
 
-from glados.core.backend_discovery import backends_for
 from glados.core.cli_common import (
     GladosContext,
     backend_option,
@@ -36,13 +35,6 @@ class ExpandStep:
         yield  # pragma: no cover
 
 
-# Discovered via foundation.plugin.Register — empty today since no backend
-# implements Expander yet (see core/backend_discovery.py). Once one does,
-# this dict populates automatically; no code here needs to change.
-_DEFAULT_BACKENDS: dict[str, Expander] = backends_for(Expander)
-DEFAULT_BACKEND: str | None = None
-
-
 @click.command("expand")
 @click.argument("input_path", type=click.Path(path_type=Path))
 @click.option(
@@ -52,7 +44,7 @@ DEFAULT_BACKEND: str | None = None
     help="approximate target length (unit is backend-defined)",
 )
 @model_option
-@backend_option(_DEFAULT_BACKENDS, DEFAULT_BACKEND)
+@backend_option("expand")
 @common_file_options
 @pass_glados_context
 def cli(
@@ -65,9 +57,7 @@ def cli(
     overwrite: bool,
 ) -> None:
     """Expand INPUT_PATH. Not yet implemented."""
-    if not _DEFAULT_BACKENDS:
-        raise click.ClickException("expand task has no backend implemented yet")
-    backend_instance = _DEFAULT_BACKENDS[backend]
+    backend_instance = ctx.backend("expand", Expander, backend, {"model": model})
     job = Job(
         steps=[(ExpandStep(backend_instance, target_length), "Expanding")],
         dest_fn=override_destination(output, infix_destination(DEFAULT_INFIX)),

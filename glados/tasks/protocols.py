@@ -1,10 +1,10 @@
 """Protocol contracts between backends and tasks — one Protocol per task,
-matching backends structurally (no inheritance required). Each backend
-module's entry point registers its object under every Protocol it
-satisfies (see backends/whisper_backend.py's register()).
+matching backends structurally (no inheritance required). Each backend's
+`__glados_plugin__` entry point returns its object once per task it
+implements, under that task's Protocol (see plugins/whisper.py).
 
 TranscriptSegment/Transcriber are implemented today (tasks/transcribe.py,
-backends/whisper_backend.py). Rewriter/Summarizer/Expander below are
+plugins/whisper.py). Rewriter/Summarizer/Expander below are
 drafted as signatures only — no backend implements them yet; see
 tasks/rewrite.py, tasks/summarize.py, tasks/expand.py for the stub steps
 and CLI wiring that will grow around them.
@@ -38,8 +38,8 @@ class Transcriber(Protocol):
 # --------------------------------------------------------------------------
 #
 # Kept as three distinct Protocols rather than one generic "text
-# transform" so Register.get_by_protocol(Summarizer) answers "what
-# backend can summarize" precisely — even though the shapes are
+# transform" so each task checks its backend against exactly what it
+# calls — even though the shapes are
 # structurally similar and a single backend class (e.g. the OpenAI-
 # compatible client) is expected to satisfy all three at once.
 

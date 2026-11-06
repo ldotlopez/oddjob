@@ -12,22 +12,48 @@ commands never have to special-case which way they were invoked.
 from __future__ import annotations
 
 import functools
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
 
 import rich_click as click
+from dotenv import load_dotenv
 
+from glados.core.backends import BackendError, check_config, resolve
+from glados.core.config import Config, ConfigError, config_path, load_config
 from glados.core.pipeline import Job
 from glados.core.progress import create_reporter
 
 
 @dataclass(slots=True)
 class GladosContext:
-    """Holds the one piece of behavior every task command needs once its
-    Job is built: run it, report progress, and turn the pipeline's
-    exceptions into a clean error message + exit code — instead of every
-    task module repeating the same try/except/print block."""
+    """What every task command needs: the configuration (loaded once, on
+    first use, never at import), the backend for its task, and running its
+    Job with progress reporting. Errors become a clean message + exit
+    code instead of every task repeating the same try/except block."""
+
+    _config: Config | None = None
+
+    def config(self) -> Config:
+        if self._config is None:
+            load_dotenv()
+            cfg = load_config(config_path())
+            check_config(cfg)
+            self._config = cfg
+        return self._config
+
+    def backend[T](
+        self,
+        task: str,
+        protocol: type[T],
+        choice: str | None,
+        overrides: Mapping[str, object],
+    ) -> T:
+        """The backend object for `task`: see core.backends.resolve."""
+        try:
+            return resolve(task, protocol, choice, self.config(), overrides)
+        except (ConfigError, BackendError) as exc:
+            raise click.ClickException(str(exc)) from exc
 
     def run_job(self, job: Job, input_path: Path, overwrite: bool) -> None:
         try:
@@ -67,22 +93,20 @@ def common_file_options[F: Callable[..., object]](func: F) -> F:
     return wrapper  # type: ignore[return-value]
 
 
-def backend_option[F: Callable[..., object]](
-    backends: dict[str, object], default: str | None
-) -> Callable[[F], F]:
-    """-b/--backend, with choices/default sourced from the calling task's
-    own BACKENDS registry — the option's shape is shared even though its
-    registry contents (and whether it's non-empty yet) aren't."""
+def backend_option[F: Callable[..., object]](task: str) -> Callable[[F], F]:
+    """-b/--backend, also read from GLADOS_<TASK>_BACKEND. Validated when
+    the command runs, against the backends installed for `task`."""
+    envvar = f"GLADOS_{task.upper()}_BACKEND"
 
     def decorator(func: F) -> F:
         option = click.option(
             "-b",
             "--backend",
-            type=click.Choice(sorted(backends)) if backends else str,
-            default=default,
-            help=f"backend to use (default: {default})"
-            if default
-            else "backend to use (none implemented yet)",
+            default=None,
+            envvar=envvar,
+            show_envvar=True,
+            help=f"backend to use (default: [tasks] {task} in the config,"
+            " or the only one installed)",
         )
         return option(func)  # type: ignore[return-value]
 
@@ -90,12 +114,12 @@ def backend_option[F: Callable[..., object]](
 
 
 def model_option[F: Callable[..., object]](func: F) -> F:
-    """-m/--model — shape (an optional model file/name) is shared even
-    though what it means varies per backend."""
+    """-m/--model: overrides the backend's global `model` option. A
+    backend without one rejects it when it loads."""
     return click.option(
         "-m",
         "--model",
         type=click.Path(path_type=Path),
         default=None,
-        help="model file/name for backends that use one",
+        help="model file/name, overriding [backends.<name>] model",
     )(func)

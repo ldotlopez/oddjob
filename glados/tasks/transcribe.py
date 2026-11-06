@@ -5,17 +5,9 @@ FORMATTERS and AudioExtractor are transcribe-specific and stay here; the
 subprocess-runner primitives they're built on (FFMpegRunner) live in
 core/runners.py since those are reusable outside this task.
 
-Backend resolution has two paths, because foundation.plugin.Register's
-entry points are called with no arguments (see BaseRegister.register) —
-per-invocation configuration like -m/--model can't flow through
-registration itself:
-  - No -m/--model given: use the Register-discovered default instance
-    (backends_for(Transcriber)) — whatever model that backend's own
-    register() configured it with.
-  - -m/--model given: bypass Register for that one call and construct
-    the backend class directly with the requested model. _DIRECT_FACTORIES
-    is the (small, manually maintained) map from backend name to
-    constructor needed only for this override path.
+The Transcriber backend is selected and loaded by core/backends.py;
+-m/--model overrides its global `model` option, while --language and
+--format are per-run arguments.
 """
 
 from __future__ import annotations
@@ -31,8 +23,6 @@ from pathlib import Path
 
 import rich_click as click
 
-from glados.backends.whisper_backend import WhisperCliBackend
-from glados.core.backend_discovery import backends_for
 from glados.core.cli_common import (
     GladosContext,
     backend_option,
@@ -236,34 +226,6 @@ class TranscribeStep:
 
 
 # --------------------------------------------------------------------------
-# Backend resolution
-# --------------------------------------------------------------------------
-
-_DEFAULT_BACKENDS: dict[str, Transcriber] = backends_for(Transcriber)
-DEFAULT_BACKEND = "whisper" if "whisper" in _DEFAULT_BACKENDS else None
-
-# See this module's docstring — only needed for the -m/--model override path.
-_DIRECT_FACTORIES: dict[str, Callable[[Path], Transcriber]] = {
-    "whisper": lambda model: WhisperCliBackend(model=model),
-}
-
-
-def _resolve_backend(name: str, model: Path | None) -> Transcriber:
-    if model is not None:
-        try:
-            factory = _DIRECT_FACTORIES[name]
-        except KeyError:
-            raise ValueError(
-                f"backend {name!r} has no direct constructor for -m/--model overrides"
-            ) from None
-        return factory(model)
-    try:
-        return _DEFAULT_BACKENDS[name]
-    except KeyError:
-        raise ValueError(f"unknown or unavailable backend: {name}") from None
-
-
-# --------------------------------------------------------------------------
 # CLI wiring
 # --------------------------------------------------------------------------
 #
@@ -290,7 +252,7 @@ def _resolve_backend(name: str, model: Path | None) -> Transcriber:
     default=DEFAULT_OUTPUT_FORMAT,
     help=f"output format (default: {DEFAULT_OUTPUT_FORMAT})",
 )
-@backend_option(_DEFAULT_BACKENDS, DEFAULT_BACKEND)
+@backend_option("transcribe")
 @common_file_options
 @pass_glados_context
 def cli(
@@ -299,21 +261,18 @@ def cli(
     model: Path | None,
     language: str | None,
     output_format: str,
-    backend: str,
+    backend: str | None,
     output: Path | None,
     overwrite: bool,
 ) -> None:
     """Extract audio and transcribe INPUT_PATH to a subtitle/text sidecar."""
-    try:
-        backend_instance = _resolve_backend(backend, model)
-    except ValueError as exc:
-        raise click.ClickException(str(exc)) from exc
+    transcriber = ctx.backend("transcribe", Transcriber, backend, {"model": model})
     job = Job(
         steps=[
             (AudioExtractor(), "Extracting audio"),
             (
                 TranscribeStep(
-                    backend_instance, language=language, output_format=output_format
+                    transcriber, language=language, output_format=output_format
                 ),
                 "Transcribing",
             ),

@@ -5,10 +5,8 @@ added here as a subcommand AND installed on its own as a standalone tool
 (see pyproject.toml's [project.scripts]) — no separate wiring needed for
 either mode.
 
-Backend discovery is handled by foundation.plugin.Register, wrapped in
-core/backend_discovery.py — see that module and tasks/transcribe.py's
-docstring for how per-invocation overrides (-m/--model) interact with a
-plugin system whose entry points take no arguments.
+Backends are selected and loaded per command by core/backends.py; nothing
+is imported or configured when this module is imported.
 """
 
 from __future__ import annotations
