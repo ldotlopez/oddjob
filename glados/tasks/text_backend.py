@@ -1,9 +1,9 @@
-"""The text tasks (rewrite, summarize, expand) on top of a chat transport.
+"""The text tasks (rewrite, summarize, expand, translate) on top of a chat transport.
 
 Each LLM backend in glados/plugins only knows how to send one system prompt
 plus one user message and stream the reply (ChatTransport). TextBackend turns
-any such transport into an object satisfying Rewriter, Summarizer and
-Expander, so the prompts stay task-owned (core.config.Prompts) and the
+any such transport into an object satisfying Rewriter, Summarizer,
+Expander and Translator, so the prompts stay task-owned (core.config.Prompts) and the
 backends stay plain transports.
 """
 
@@ -12,7 +12,7 @@ from __future__ import annotations
 from typing import Protocol
 
 from filejobs.progress import ProgressStream
-from glados.tasks.protocols import Expander, Rewriter, Summarizer
+from glados.tasks.protocols import Expander, Rewriter, Summarizer, Translator
 
 
 class ChatTransport(Protocol):
@@ -25,7 +25,7 @@ class ChatTransport(Protocol):
 
 
 class TextBackend:
-    """Satisfies Rewriter, Summarizer and Expander with one transport."""
+    """Satisfies every text task Protocol with one transport."""
 
     def __init__(self, transport: ChatTransport) -> None:
         self.transport = transport
@@ -39,6 +39,9 @@ class TextBackend:
     def expand(self, text: str, *, prompt: str) -> ProgressStream[str]:
         return self.transport.complete(prompt, text)
 
+    def translate(self, text: str, *, prompt: str) -> ProgressStream[str]:
+        return self.transport.complete(prompt, text)
+
 
 def text_plugin_triples(transport: ChatTransport) -> list[tuple[str, type, object]]:
     """The `__glados_plugin__` result for a backend implementing every text
@@ -48,4 +51,5 @@ def text_plugin_triples(transport: ChatTransport) -> list[tuple[str, type, objec
         ("rewrite", Rewriter, backend),
         ("summarize", Summarizer, backend),
         ("expand", Expander, backend),
+        ("translate", Translator, backend),
     ]

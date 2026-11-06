@@ -11,7 +11,7 @@ import pydantic
 from support import drain, recorded_argv, require_settings, write_executable
 
 from glados.plugins.llm import LlmCliTransport, LlmOptions, __glados_plugin__
-from glados.tasks.protocols import Expander, Rewriter, Summarizer
+from glados.tasks.protocols import Expander, Rewriter, Summarizer, Translator
 
 ECHO_LLM = """
 import json
@@ -98,7 +98,12 @@ class LlmPluginTest(unittest.TestCase):
 
         self.assertEqual(
             [(task, protocol) for task, protocol, _ in triples],
-            [("rewrite", Rewriter), ("summarize", Summarizer), ("expand", Expander)],
+            [
+                ("rewrite", Rewriter),
+                ("summarize", Summarizer),
+                ("expand", Expander),
+                ("translate", Translator),
+            ],
         )
         for _, protocol, backend in triples:
             self.assertIsInstance(backend, protocol)

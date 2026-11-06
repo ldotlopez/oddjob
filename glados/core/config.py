@@ -26,13 +26,15 @@ _PROMPT_PLACEHOLDERS = {
     "rewrite": "instructions",
     "summarize": "length",
     "expand": "length",
+    "translate": "language",
 }
 
 
 class Prompts(pydantic.BaseModel):
     """System prompt templates for the text tasks, the same for every
     backend. Each may use only its own `str.format` placeholder:
-    `{instructions}` in rewrite, `{length}` in summarize and expand. Write
+    `{instructions}` in rewrite, `{length}` in summarize and expand,
+    `{language}` in translate. Write
     them with plain braces, not `${...}` (that is environment expansion);
     a literal brace is `{{` or `}}`."""
 
@@ -54,8 +56,13 @@ class Prompts(pydantic.BaseModel):
         " Reply with the expanded text only, in the same language,"
         " with no preamble or commentary."
     )
+    translate: str = (
+        "Translate the text the user sends into {language}, keeping its"
+        " meaning, tone and formatting. Reply with the translation only,"
+        " with no preamble or commentary."
+    )
 
-    @pydantic.field_validator("rewrite", "summarize", "expand")
+    @pydantic.field_validator("rewrite", "summarize", "expand", "translate")
     @classmethod
     def _check_placeholders(cls, value: str, info: pydantic.ValidationInfo) -> str:
         allowed = _PROMPT_PLACEHOLDERS[info.field_name]
@@ -81,6 +88,9 @@ class Prompts(pydantic.BaseModel):
 
     def render_expand(self, target_words: int | None) -> str:
         return self.expand.format(length=_length_sentence(target_words))
+
+    def render_translate(self, language: str) -> str:
+        return self.translate.format(language=language)
 
 
 DEFAULT_INSTRUCTIONS = "Improve clarity and correctness without changing the meaning."

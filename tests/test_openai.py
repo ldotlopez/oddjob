@@ -18,7 +18,7 @@ from support import (
 )
 
 from glados.plugins.openai import OpenAIOptions, OpenAITransport, __glados_plugin__
-from glados.tasks.protocols import Expander, Rewriter, Summarizer
+from glados.tasks.protocols import Expander, Rewriter, Summarizer, Translator
 
 PING_SYSTEM = "Reply with exactly one word: pong. No punctuation."
 
@@ -130,7 +130,12 @@ class OpenAIPluginTest(unittest.TestCase):
 
         self.assertEqual(
             [(task, protocol) for task, protocol, _ in triples],
-            [("rewrite", Rewriter), ("summarize", Summarizer), ("expand", Expander)],
+            [
+                ("rewrite", Rewriter),
+                ("summarize", Summarizer),
+                ("expand", Expander),
+                ("translate", Translator),
+            ],
         )
         for _, protocol, backend in triples:
             self.assertIsInstance(backend, protocol)

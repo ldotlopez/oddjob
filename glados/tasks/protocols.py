@@ -35,10 +35,10 @@ class Transcriber(Protocol):
 # Text tasks
 # --------------------------------------------------------------------------
 #
-# Kept as three distinct Protocols rather than one generic "text
+# Kept as distinct Protocols rather than one generic "text
 # transform" so each task checks its backend against exactly what it
 # calls, even though one backend class (tasks.text_backend.TextBackend)
-# satisfies all three. `prompt` is the task's system prompt, already
+# satisfies them all. `prompt` is the task's system prompt, already
 # rendered from `[prompts]` in the config (core.config.Prompts); the
 # backend sends it as-is with `text` as the user message.
 
@@ -56,3 +56,8 @@ class Summarizer(Protocol):
 @runtime_checkable
 class Expander(Protocol):
     def expand(self, text: str, *, prompt: str) -> ProgressStream[str]: ...
+
+
+@runtime_checkable
+class Translator(Protocol):
+    def translate(self, text: str, *, prompt: str) -> ProgressStream[str]: ...
