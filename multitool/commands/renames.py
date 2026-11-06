@@ -1,12 +1,14 @@
-"""`multitool hash-rename`: plan every rename first, then apply them."""
+"""`multitool hash-rename` and `fix-extensions`: plan every rename first, then
+apply them."""
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from pathlib import Path
 
 import rich_click as click
 
-from filejobs.batch import run_batch
+from filejobs.batch import BatchReport, run_batch
 from filejobs.cli_options import (
     dry_run_option,
     finish_batch,
@@ -16,6 +18,31 @@ from filejobs.cli_options import (
 from filejobs.inputs import accept_all, expand_inputs
 from filejobs.progress import BaseProgressReporter
 from multitool import renamers
+
+
+def rename_planned(
+    planned: Sequence[renamers.Rename],
+    overwrite: bool,
+    dry_run: bool,
+    *earlier: BatchReport,
+) -> None:
+    """Print the plan (-n), or apply it; then the summary of every batch."""
+    if dry_run:
+        for rename in planned:
+            click.echo(rename.describe())
+        finish_batch(*earlier)
+        return
+
+    def apply(rename: renamers.Rename, _reporter: BaseProgressReporter) -> None:
+        renamers.apply_rename(rename, overwrite)
+
+    renaming = run_batch(
+        planned,
+        apply,
+        description="Renaming",
+        label=lambda rename: str(rename.source),
+    )
+    finish_batch(*earlier, renaming)
 
 
 @click.command("hash-rename")
@@ -40,19 +67,19 @@ def hash_rename_cmd(
             planned.append(rename)
 
     hashing = run_batch(expand_inputs(paths, accept_all), plan, description="Hashing")
-    if dry_run:
-        for rename in planned:
-            click.echo(rename.describe())
-        finish_batch(hashing)
-        return
+    rename_planned(planned, overwrite, dry_run, hashing)
 
-    def apply(rename: renamers.Rename, _reporter: BaseProgressReporter) -> None:
-        renamers.apply_rename(rename, overwrite)
 
-    renaming = run_batch(
-        planned,
-        apply,
-        description="Renaming",
-        label=lambda rename: str(rename.source),
-    )
-    finish_batch(hashing, renaming)
+@click.command("fix-extensions")
+@paths_argument
+@overwrite_option
+@dry_run_option
+def fix_extensions_cmd(paths: tuple[Path, ...], overwrite: bool, dry_run: bool) -> None:
+    """Lowercase each file's extension in PATH... and normalize jpeg -> jpg,
+    mpeg -> mpg, tif -> tiff."""
+    planned = [
+        rename
+        for path in expand_inputs(paths, accept_all)
+        if (rename := renamers.plan_extension_fix(path)) is not None
+    ]
+    rename_planned(planned, overwrite, dry_run)

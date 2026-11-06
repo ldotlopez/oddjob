@@ -1,4 +1,5 @@
-"""hash-rename: name each file after a digest of its content."""
+"""Renames: hash-rename names each file after a digest of its content,
+fix-extensions normalizes extensions."""
 
 from __future__ import annotations
 
@@ -12,6 +13,8 @@ from filejobs.pipeline import move_to_destination
 
 CHUNK_SIZE = 1024 * 1024
 DEFAULT_ALGORITHM = "crc32"
+# Applied after lowercasing; keys and values without the dot.
+EXTENSION_FIXES = {"jpeg": "jpg", "mpeg": "mpg", "tif": "tiff"}
 
 
 def digest_algorithms() -> list[str]:
@@ -48,6 +51,23 @@ class Rename:
 def plan_rename(source: Path, digest: str) -> Rename | None:
     """The rename to `<digest><suffix>`, or None if already named so."""
     destination = source.with_name(f"{digest}{source.suffix}")
+    if destination == source:
+        return None
+    return Rename(source=source, destination=destination)
+
+
+def fixed_extension(source: Path) -> Path:
+    """`source` with its extension lowercased, then mapped through
+    EXTENSION_FIXES (`IMG.JPEG` -> `IMG.jpg`). No extension: unchanged."""
+    if not source.suffix:
+        return source
+    extension = source.suffix.removeprefix(".").lower()
+    return source.with_suffix(f".{EXTENSION_FIXES.get(extension, extension)}")
+
+
+def plan_extension_fix(source: Path) -> Rename | None:
+    """The rename to the fixed extension, or None if it is already fixed."""
+    destination = fixed_extension(source)
     if destination == source:
         return None
     return Rename(source=source, destination=destination)

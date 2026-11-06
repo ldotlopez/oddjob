@@ -107,6 +107,27 @@ class RenamerTests(unittest.TestCase):
         renamers.apply_rename(rename, overwrite=False)  # type: ignore[arg-type]
         self.assertEqual((tmp / "abc.txt").read_text(), "content")
 
+    def test_fixed_extension(self) -> None:
+        cases = {
+            "d/IMG.JPEG": "d/IMG.jpg",
+            "a.Jpg": "a.jpg",
+            "clip.MPEG": "clip.mpg",
+            "scan.tif": "scan.tiff",
+            "x.tar.GZ": "x.tar.gz",
+            "README": "README",
+            ".bashrc": ".bashrc",
+        }
+        for source, expected in cases.items():
+            with self.subTest(source=source):
+                self.assertEqual(renamers.fixed_extension(Path(source)), Path(expected))
+
+    def test_plan_extension_fix(self) -> None:
+        self.assertIsNone(renamers.plan_extension_fix(Path("a.jpg")))
+        self.assertEqual(
+            renamers.plan_extension_fix(Path("a.JPEG")),
+            renamers.Rename(source=Path("a.JPEG"), destination=Path("a.jpg")),
+        )
+
 
 @unittest.skipUnless(HAS_PILLOW, "needs the multitool extra (Pillow)")
 class ImageHashTests(unittest.TestCase):

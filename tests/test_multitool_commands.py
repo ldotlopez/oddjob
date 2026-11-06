@@ -50,6 +50,33 @@ class CommandTests(unittest.TestCase):
         self.assertIn(renamers.file_digest(self.tmp / "b.txt", "crc32") + ".txt", names)
         self.assertNotIn("c.dat", names)
 
+    def test_fix_extensions_dry_run_changes_nothing(self) -> None:
+        (self.tmp / "a.JPEG").write_bytes(b"a")
+        (self.tmp / "b.jpg").write_bytes(b"b")
+        result = self.runner.invoke(cli, ["fix-extensions", "-n", str(self.tmp)])
+        self.assertEqual(result.exit_code, 0, result.output)
+        self.assertEqual(
+            result.stdout, f"mv {self.tmp / 'a.JPEG'} {self.tmp / 'a.jpg'}\n"
+        )
+        self.assertEqual(
+            sorted(p.name for p in self.tmp.iterdir()), ["a.JPEG", "b.jpg"]
+        )
+
+    def test_fix_extensions_is_silent_and_skips_taken_names(self) -> None:
+        (self.tmp / "a.TIF").write_bytes(b"new")
+        (self.tmp / "b.Jpeg").write_bytes(b"b")
+        (self.tmp / "a.tiff").write_bytes(b"old")
+        failed = self.runner.invoke(cli, ["fix-extensions", str(self.tmp)])
+        self.assertEqual(failed.exit_code, 1, failed.output)
+        self.assertEqual(failed.stdout, "")
+        self.assertIn("1 done, 1 failed", failed.stderr)
+        names = sorted(p.name for p in self.tmp.iterdir())
+        self.assertEqual(names, ["a.TIF", "a.tiff", "b.jpg"])
+        replaced = self.runner.invoke(cli, ["fix-extensions", "-y", str(self.tmp)])
+        self.assertEqual(replaced.exit_code, 0, replaced.output)
+        self.assertEqual(replaced.stdout, "")
+        self.assertEqual((self.tmp / "a.tiff").read_bytes(), b"new")
+
     def test_motionphotos_merge_keeps_video_unless_rm(self) -> None:
         (self.tmp / "a.jpg").write_bytes(JPEG)
         (self.tmp / "a.mp4").write_bytes(MP4)

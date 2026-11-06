@@ -15,7 +15,7 @@ from filejobs.cli_options import logging_options_for
 from multitool.commands.conversions import jpgize_cmd, mp4ize_cmd
 from multitool.commands.imghash import img_duplicates_cmd, img_hash_cmd
 from multitool.commands.motionphotos import motionphotos_cmd
-from multitool.commands.renames import hash_rename_cmd
+from multitool.commands.renames import fix_extensions_cmd, hash_rename_cmd
 from multitool.commands.sidecars import sidecars_cmd
 
 APP_LOGGER = "multitool"
@@ -28,6 +28,7 @@ COMMANDS = [
     img_hash_cmd,
     img_duplicates_cmd,
     hash_rename_cmd,
+    fix_extensions_cmd,
 ]
 
 
