@@ -1,6 +1,8 @@
 # Plan: absorbing miscellaneous tools into glados and multitool
 
-Status: draft (2026-11-06). Prerequisites not started; no tool ported yet.
+Status: draft (2026-11-06). Prerequisites done (2.1, 2.3, 2.4; 2.2 needed
+no code); mediatools inventoried, destinations still to settle; no tool
+ported yet.
 
 ## Context
 
@@ -31,9 +33,28 @@ to fix first, and the open decisions.
 One row per candidate tool; columns as defined in the skill's "Intake"
 step. New Python dependencies need approval before porting starts.
 
+Source of this round: `ocdutils/mediatools/` (`mt` below). Already absorbed
+from it, so not listed: `sidecars`, `motionphotos`, `formats` (`jpgize`,
+`mp4ize`), `mediahash` (`img-hash`), `crc32-rename` (`hash-rename`),
+`find-duplicates` with averagehash (`img-duplicates`), `audio transcribe`
+(`glados transcribe`), and `texttransform` `rewrite`/`summarize` (glados'
+tasks; tone and language become `rewrite -i`).
+
+Destinations are proposals until settled with the user (section 3).
+
 | Tool | Source | Writes files? | Replaceable implementation? | External binaries / services | New Python deps | Destination | Done |
 |---|---|---|---|---|---|---|---|
-|  |  |  |  |  |  |  |  |
+| `fix-extensions` | `mt/filesystemfixes.py` | renames (lowercase extension, `jpeg`→`jpg`, `mpeg`→`mpg`, `tif`→`tiff`) | no | — | — | multitool, rename shape | |
+| `photos-check` | `mt/photos-check.py` | only reports (corrupt or unknown-type images) | no | — | — (Pillow, `multitool` extra) | multitool check | |
+| `autocrop` | `mt/imgedit.py` | new file per input (crop to the alpha bbox) | no | — | — (Pillow) | multitool file producer | |
+| `removebg` | `mt/imgedit.py` | new file per input | yes (rembg models, remote APIs) | model download | `rembg` (onnxruntime) | glados task; autocrop stays the multitool step | |
+| `translate` | `mt/texttransform.py` | new file per input | yes (text backends) | text backend | — | glados text task, `infix_destination` | |
+| `describe-image` | `mt/generativeimages.py` | report; `-w` writes an EXIF comment in place | yes (OpenAI vision, LAVIS, Ollama) | backend; `exiftool` | — | split: glados task writes a sidecar, multitool writes the comment | |
+| `agrep` | `mt/audio.py` | only reports (grep over transcriptions) | only the transcription | — | — (no `pysrt`) | split: `glados transcribe`, then a multitool grep over `.srt` sidecars | |
+| `create-image` | `mt/generativeimages.py` | one file from a prompt, no input file | yes | OpenAI | — | not absorbed: no command shape takes a prompt instead of `PATH...` | |
+| `emojize` | `mt/texttransform.py` | stdout only | yes | text backend | — | not absorbed: `rewrite -i` covers it | |
+| `embeddings` | `mt/embeddings.py` | an sqlite index | yes | OpenAI | `numpy`, `python-magic` | not absorbed: an index fits no command shape | |
+| `cv2histogram` | `mt/backends/cv2histogram.py` | — | second `img-duplicates` method | — | `opencv` | not absorbed: decision 0003 chose the average hash | |
 
 ## 2. Prerequisites (fix before the first port)
 
@@ -42,7 +63,12 @@ independent, keeps behavior unchanged unless it says otherwise, and ends
 with `uv run ruff check . && uv run python -m unittest discover -s tests`
 green.
 
-### 2.1 Silent on success (decision 0007)
+### 2.1 Silent on success (decision 0007): done (`6b7e9d9`)
+
+Done. `foundation.loglib` applies a bare `--log-level` level only to the
+app logger (`*` resolves to it), so `logging_options_for` copies the app
+level to `filejobs` and then applies the spec again, letting an explicit
+`filejobs:<level>` rule win.
 
 Problem: the tools should print nothing on success unless `-v` is given,
 but they don't follow that convention:
@@ -115,7 +141,7 @@ Docs to propose after the code change (each needs approval):
   following the app's verbosity).
 - `.claude/rules/glados.md`: the console and logging bullet.
 
-### 2.2 Two dry-run formats
+### 2.2 Two dry-run formats: done (no code change)
 
 Problem: glados' tasks print `input -> destination` through
 `cli_options.print_plan`. multitool's commands print each planned
@@ -132,7 +158,9 @@ skill repeats it for porters.
 
 Verify: nothing to run.
 
-### 2.3 Docstrings that point at code that no longer exists
+### 2.3 Docstrings that point at code that no longer exists: done (`381073e`)
+
+Done, plus one comment the list missed (`glados/tasks/transcribe.py`).
 
 Problem: these refer to `transcribe_sidecar.py`, the pre-glados script,
 which is not in the repository:
@@ -158,7 +186,10 @@ and comments only.
 Verify: no reference to `transcribe_sidecar` is left in `filejobs/`,
 `glados/` or `multitool/`. Search those three directories for `*.py` only.
 
-### 2.4 rich's `TaskID` in `RichProgressReporter`
+### 2.4 rich's `TaskID` in `RichProgressReporter`: done (`903e659`)
+
+Done; the README roadmap line is in the uncommitted README of the main
+checkout and is left to the user.
 
 Problem: this is the README roadmap note, which is still uncommitted.
 `BaseProgressReporter` uses plain `int` task ids, so the plain reporter,

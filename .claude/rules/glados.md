@@ -59,7 +59,9 @@
 - Console and logging come from `foundation`: progress reporters use
   `foundation.clilib.get_stderr_console()`/`RICH_STDERR_ENABLED`; every task command
   takes `--log-level`/`-v`/`-q` via `cli_common.logging_options`, which sets up the
-  `glados` logger with `foundation.loglib` (`GLADOS_LOG_LEVEL` when no flag is given).
+  `glados` logger with `foundation.loglib` (`GLADOS_LOG_LEVEL` when no flag is given)
+  and gives the `filejobs` logger the same level. Silent on success (decision 0007):
+  `wrote <dest>` and plain progress are INFO, shown with `-v`.
   Modules log through `logging.getLogger(__name__)`.
 - Tests: `uv run python -m unittest discover -s tests` (stdlib unittest; see
   `docs/ARCHITECTURE.md`, "Tests"). Unit tests use fake executables and

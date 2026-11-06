@@ -73,7 +73,7 @@ Common options:
 | `-n, --dry-run`         | print `input -> destination` per input; resolve no backend, write nothing |
 | `-b, --backend NAME`    | backend for this task (also `GLADOS_<TASK>_BACKEND`)        |
 | `-m, --model MODEL`     | overrides the backend's `model` option (name or path)       |
-| `-v` / `-q`             | more / less logging (repeatable)                            |
+| `-v` / `-q`             | more / less logging (repeatable); `-v` shows progress lines and `wrote <dest>` |
 | `--log-level SPEC`      | e.g. `debug` or `glados.core:debug,*:info` (also `GLADOS_LOG_LEVEL`) |
 
 `transcribe` also takes `-l, --language` (default: auto-detect) and `-f, --format`
@@ -134,8 +134,9 @@ for `whisper_cpp`.
 `whisper` used to name the whisper.cpp backend; that one is now `whisper_cpp`. Move
 existing `[backends.whisper]` settings for whisper.cpp to `[backends.whisper_cpp]`.
 
-Progress is drawn as rich bars on a terminal and as plain percentage lines otherwise
-(piped stderr, `TERM=dumb`, `RICH_DISABLED=1`).
+Commands print nothing on success. Progress is drawn as transient rich bars on a
+terminal; otherwise (piped stderr, `TERM=dumb`, `RICH_DISABLED=1`) it is logged as
+percentage lines at INFO, shown with `-v`.
 
 ## multitool
 
@@ -162,8 +163,8 @@ uv run multitool img-duplicates ~/Pictures -x "echo"
 
 `jpgize`, `mp4ize`, `motionphotos merge` and `hash-rename` take `-n/--dry-run`; commands
 that would replace an existing file need `-y/--overwrite`. Commands taking `PATH...`
-keep going when one input fails (exit 1 at the end); `jpgize`, `mp4ize` and `merge`
-print `Wrote <dest>` for each written file. Logging options (`-v`, `-q`, `--log-level`, `MULTITOOL_LOG_LEVEL`) go before the
+keep going when one input fails (exit 1 at the end); on success, commands that write
+files print nothing (`-v` logs `wrote <dest>` for each). Logging options (`-v`, `-q`, `--log-level`, `MULTITOOL_LOG_LEVEL`) go before the
 command: `multitool -v jpgize ...`.
 
 ## Development

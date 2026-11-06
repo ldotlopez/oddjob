@@ -96,7 +96,8 @@ an input that fails with one of `pipeline.JOB_ERRORS` (`OSError`, `RuntimeError`
 `ValueError`, `SubprocessError`) is logged and recorded, and the remaining inputs still
 run. Anything else is a bug and propagates. `finish_batch` prints `N done, M failed`
 and exits 1 if any input failed. `run_jobs` wraps both for commands that write files
-and prints `Wrote <dest>` for each result.
+and logs `wrote <dest>` at INFO for each result; on success nothing is printed
+([decision 0007](decisions/0007-silent-on-success.md)).
 
 `-n/--dry-run` (every command that changes files) prints the plan and returns before
 any tool or backend is resolved: `input -> destination` for glados' tasks
@@ -231,10 +232,14 @@ backends. A missing file is an empty config.
 Both come from `foundation`:
 
 - `progress.py` draws through `foundation.clilib.get_stderr_console()` and picks the
-  rich or plain reporter from `RICH_STDERR_ENABLED`.
+  rich or plain reporter from `RICH_STDERR_ENABLED`. Rich bars are transient; the plain
+  reporter logs its lines at INFO on `filejobs.progress`, so they show only with `-v`.
 - `cli_common.logging_options` adds `--log-level`/`-v`/`-q` to every task command and
   calls `foundation.loglib.setup_logger_from_click("glados", ...)`. Without flags the
   level comes from `GLADOS_LOG_LEVEL`, else `warning`. It is
   `cli_options.logging_options_for("glados")`; multitool's group uses
-  `logging_options_for("multitool")` (`MULTITOOL_LOG_LEVEL`). Modules log via
+  `logging_options_for("multitool")` (`MULTITOOL_LOG_LEVEL`). The shared `filejobs`
+  logger gets the app logger's level, so `-v` and a bare `--log-level info` reach it
+  (a bare level alone would only set the app logger); an explicit `filejobs:<level>`
+  rule in `--log-level` wins. Modules log via
   `logging.getLogger(__name__)`; log records and progress bars share the stderr console.
