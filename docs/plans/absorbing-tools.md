@@ -42,31 +42,78 @@ independent, keeps behavior unchanged unless it says otherwise, and ends
 with `uv run ruff check . && uv run python -m unittest discover -s tests`
 green.
 
-### 2.1 Single-file commands print nothing on success
+### 2.1 Silent on success (decision 0007)
 
-Problem: 0004 says every command that writes a file prints `Wrote <dest>`.
-`run_jobs` does, but `filejobs/cli_options.run_single_job` does not. The
-commands that write a file through it are silent on success:
+Problem: the tools should print nothing on success unless `-v` is given,
+but they don't follow that convention:
 
-- `motionphotos join` (`multitool/commands/motionphotos.py`, one call);
-- `motionphotos split` (two calls, one per destination: image, then video);
-- `motionphotos strip` (one call, possibly in place with `-y`).
+- `run_jobs` prints `Wrote <dest>` for every written file (0004), covering
+  `transcribe`, `rewrite`, `summarize`, `expand`, `jpgize`, `mp4ize` and
+  `motionphotos merge`. `run_single_job` (`motionphotos join`, `split`,
+  `strip`) is silent, so the two shapes also disagree with each other.
+- Progress ignores verbosity. Rich bars are not transient, so a finished
+  batch leaves its overall bar and a single job its step bars. Off a
+  terminal, `PlainProgressReporter` `print`s `starting`, every 10% and
+  `done` for every task, which is hundreds of lines for a directory.
+- `-v` cannot reveal any of it from the shared code:
+  `logging_options_for(app_logger)` sets only the app logger's level
+  (`glados` or `multitool`), and `filejobs.*` stays at `warning`.
 
-A new single-file command would inherit the silence. The `absorb-tool`
-skill already describes the fixed behavior.
+Implements decision 0007 (accepted; 0004 partly superseded by it).
 
-Change: `run_single_job` keeps the path `job.run` returns, prints
-`Wrote <dest>` after the reporter context closes (so the line does not mix
-with a live progress bar), and returns it. Failures stay a
-`ClickException`, and nothing is printed for them. `split` then prints two
-lines, which is correct since it writes two files. The callers need no
-change.
+Change, all in `filejobs/`:
 
-Verify: in `tests/test_multitool_commands.py`, the existing
-`test_motionphotos_join_and_split` and `test_strip_in_place_needs_overwrite`
-also assert `Wrote <dest>` in the output: once for `join`, once per
-destination for `split`, and for `strip -y`, but not for the refused
-`strip` without `-y`.
+1. `cli_options.py`: add `LOGGER = logging.getLogger(__name__)`.
+   - `run_jobs` logs `wrote %s` at INFO inside its per-item wrapper, when
+     each file lands, and drops the `written` list and the `click.echo`
+     loop.
+   - `run_single_job` logs the same after the Job returns.
+   - `finish_batch` is unchanged: summary on stderr and exit 1, only on
+     failure.
+2. `cli_options.logging_options_for`: after `setup_logger_from_click`, give
+   `logging.getLogger("filejobs")` the app logger's effective level, unless
+   `--log-level` was given, in which case its rules decide per logger (for
+   example `--log-level 'multitool:info,filejobs:debug'`). When
+   implementing, confirm in `foundation.loglib` what a bare level in
+   `--log-level` applies to (`*`), so that `--log-level info` alone also
+   reaches `filejobs`.
+3. `progress.py`:
+   - `RichProgressReporter` uses `Progress(..., transient=True)`.
+   - `PlainProgressReporter` sends its lines to
+     `logging.getLogger(__name__).info(...)` instead of
+     `print(..., file=sys.stderr)`, with the same text and the same
+     10% throttle; `sys` is no longer needed.
+
+None of the callers in `glados/commands/` or `multitool/commands/` change.
+
+Verify:
+
+- `tests/test_filejobs.py`: in `test_run_jobs_continues_and_exits_1_on_failure`,
+  `Wrote` is no longer in the output, `assertLogs("filejobs", "INFO")` holds
+  `wrote <tmp>/b.out`, and the summary and exit 1 are unchanged.
+- A new test: with `PlainProgressReporter`, a task's lines arrive as INFO
+  records on `filejobs.progress` and nothing is written to stderr directly.
+- A new test: a `CliRunner` command decorated with
+  `logging_options_for("multitool")` and run with `-v` leaves the
+  `filejobs` logger at INFO; run without flags, it stays at WARNING.
+- `tests/test_multitool_commands.py`:
+  - `merge` (line 48) and `test_jpgize_prints_what_it_wrote` (line 119;
+    rename it to `..._logs_what_it_wrote`) assert the file exists, the
+    `wrote` log record is present, and stdout is empty;
+  - `join`, `split` (two records) and `strip -y` assert the `wrote` records;
+  - the refused `strip` without `-y` logs none.
+- A manual check on a terminal: `multitool jpgize DIR` leaves nothing on
+  screen on success, and `multitool -v jpgize DIR | cat` shows the progress
+  and `wrote` lines on stderr.
+
+Docs to propose after the code change (each needs approval):
+
+- `README.md`: the `-v` row of the options table, and the multitool
+  paragraph that says `jpgize`, `mp4ize` and `merge` print `Wrote <dest>`.
+- `docs/ARCHITECTURE.md`: "Inputs" (`run_jobs` prints `Wrote`), and
+  "Console and logging" (transient bars, plain progress as INFO, `filejobs`
+  following the app's verbosity).
+- `.claude/rules/glados.md`: the console and logging bullet.
 
 ### 2.2 Two dry-run formats
 
@@ -153,9 +200,10 @@ stay green.
 
 ## 3. Decisions to take
 
+
 - **Record the classification as a decision?** The skill's "Classify" step
   (not absorbed / glados / multitool / filejobs, mixed tools split along the
-  model boundary) is new policy. It could become decision 0007, "Where a new
+  model boundary) is new policy. It could become decision 0008, "Where a new
   tool goes", extending 0003's scope section, which covered only the
   ocdutils ports.
 - **Which tools to absorb, and from where.** Section 1 stays empty until the

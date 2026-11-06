@@ -1,6 +1,6 @@
 ---
 name: absorb-tool
-description: Bring an outside tool (a script, an ocdutils leftover, a one-off utility) into this repository as a glados task (model/service-backed, with replaceable backends) or a multitool command (plain file utility), following decisions 0003-0006. Use whenever the user wants to port, absorb, migrate, add or "bring in" a tool, script or command to glados or multitool, asks where a new tool should go, or asks to add a new glados task or backend-backed command, even if they do not name this skill.
+description: Bring an outside tool (a script, an ocdutils leftover, a one-off utility) into this repository as a glados task (model/service-backed, with replaceable backends) or a multitool command (plain file utility), following decisions 0003-0007. Use whenever the user wants to port, absorb, migrate, add or "bring in" a tool, script or command to glados or multitool, asks where a new tool should go, or asks to add a new glados task or backend-backed command, even if they do not name this skill.
 ---
 
 # Absorb a tool into glados / multitool
@@ -29,6 +29,8 @@ been proposed (and edited only after approval).
 Before starting, read `README.md`, `docs/ARCHITECTURE.md` and
 `docs/decisions/` (project rule), and check
 `docs/plans/absorbing-tools.md` for open prerequisites and the inventory.
+The skill describes the state after those prerequisites (notably decision
+0007, silent on success); do not port a tool before they are done.
 
 ## Workflow
 
@@ -78,9 +80,15 @@ misdescribes (precedent: `renamers` → `hash-rename`).
 
 | Shape | When | Runs through | Output |
 |---|---|---|---|
-| File producer | one input → one output file (new or in place) | `Job` + `run_jobs` (`job_action(job, overwrite)` or a custom action returning the written path) | `Wrote <dest>` per file, `N done, M failed`, exit 1 on failure |
-| Single file | fixed explicit names (`join -i -v -o`) | `Job` + `run_single_job` | `Wrote <dest>`, clean `ClickException` on failure |
-| Report / rename / check | no file produced | plain function per item + `run_batch` + `finish_batch` | own output, then the summary |
+| File producer | one input → one output file (new or in place) | `Job` + `run_jobs` (`job_action(job, overwrite)` or a custom action returning the written path) | nothing on success (`wrote <dest>` at INFO, shown with `-v`); on failure `N done, M failed` on stderr, exit 1 |
+| Single file | fixed explicit names (`join -i -v -o`) | `Job` + `run_single_job` | nothing on success (`wrote <dest>` at INFO); clean `ClickException` on failure |
+| Report / rename / check | no file produced | plain function per item + `run_batch` + `finish_batch` | the report on stdout (what the command is for); summary on failure |
+
+Silent on success (decision 0007): stdout carries only what the command was
+asked for (reports, `-n` plans), never confirmations. Use `LOGGER.info` for
+anything else; never `click.echo` a success message. Progress needs nothing
+from the command: rich bars are transient, and off a terminal progress is
+INFO logging.
 
 Rules for every shape:
 
@@ -127,7 +135,8 @@ unittest discover -s tests` must be green. Each tool needs:
   `support.FakeHTTPServer`; never real services. glados backends are tested
   directly (options model, adapter, `__glados_plugin__`), not through the CLI.
 - **CLI tests** with `CliRunner`: `-n` prints the plan with no backend
-  configured and no binary; `Wrote <dest>`; exit 1 with `N done, M failed`
+  configured and no binary; on success empty stdout and a `wrote <dest>`
+  record (`assertLogs("filejobs", "INFO")`); exit 1 with `N done, M failed`
   when one input fails.
 - **Integration**: `*IntegrationTest` classes. glados reads `GLADOS_TEST_*`
   from `tests/integration.env` (git-ignored, secrets: never print or commit

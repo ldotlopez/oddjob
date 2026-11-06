@@ -44,6 +44,7 @@
 
 Tests: `test_multitool_domain.py` (planning, pure logic),
 `test_multitool_conversions.py`-style step tests against fake executables,
-`test_multitool_commands.py` (`CliRunner`: `-n`, `Wrote`, failure summary),
+`test_multitool_commands.py` (`CliRunner`: `-n`, silent success with a
+`wrote` log record, failure summary),
 and `test_multitool_integration.py` classes that skip when a binary is
 missing from PATH.

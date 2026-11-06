@@ -1,6 +1,6 @@
 # 0004. Every command that produces a file runs a Job; batches continue past failures
 
-Status: accepted (2026-11-06).
+Status: accepted (2026-11-06); partly superseded by 0007
 
 ## Context
 
