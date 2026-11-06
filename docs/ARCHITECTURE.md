@@ -1,8 +1,9 @@
 # Architecture
 
-glados is a set of file-in/file-out tasks. Each task is a click command that builds a
-`Job` from pipeline steps, gets a backend for its task Protocol, and runs the job with
-progress reporting.
+glados is a set of file-based tasks. Each task is a click command that builds a `Job`
+from pipeline steps, gets a backend for its task Protocol, and runs the job with
+progress reporting. A command is not limited to one input: it may take several files
+and directories (see [Inputs](#inputs)).
 
 ```
 glados/
@@ -39,6 +40,24 @@ tests/                unittest suite, one module per backend module; support.py:
 - **Adapters**: `core/runners.py` (ffmpeg) and the backends in `plugins/`: subprocesses
   (`whisper`, `whisper-cli`, `llm`) and HTTP (`openai`, `ollama`, via `requests`). They
   do the I/O and report progress as a `ProgressStream`.
+
+## Inputs
+
+A one-input, one-output command is not a design limit. A command may accept several
+`PATH` arguments, mixing files and directories:
+
+- A file argument is used as is.
+- A directory argument is walked recursively, and contributes the files that task
+  accepts (e.g. `transcribe` picks up the audio/video files of a directory tree).
+  Which files qualify is the task's decision, not core's.
+- The arguments are expanded into a list of input files first; then each input file
+  runs as its own `Job`, with its destination derived from that file (next to it).
+  `Job` stays the unit of one input file → one output file.
+- `-o/--output` names one destination, so it only applies when the arguments
+  expand to exactly one file.
+
+Status: specified, not implemented yet. Every command currently takes a single
+`FILE`.
 
 ## Data flow (transcribe)
 

@@ -143,6 +143,11 @@ backend, and [docs/decisions/](docs/decisions/) for recorded decisions.
 
 ## Roadmap
 
+- **Several inputs per command, recursive on directories.** Accept any mix of files
+  and directories (`uv run transcribe lectures/ extra.m4a`); directories are walked
+  recursively for the files the task handles, and each file gets its own output next
+  to it. `-o` stays limited to a single input. See
+  [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#inputs).
 - **whisper.cpp on the AMD Ryzen AI NPU.** whisper.cpp ≥ 1.9 can offload the encoder
   to the XDNA NPU via VitisAI (`-DWHISPER_VITISAI=1`); no glados change is needed,
   only the host setup:
