@@ -136,7 +136,8 @@ def _parse_whisper_cpp_json(json_path: Path) -> list[TranscriptSegment]:
 
 
 class WhisperCppBackend:
-    """whisper-cli with `-ojson -of PREFIX`, progress from `--print-progress`."""
+    """whisper-cli with `--output-json --output-file PREFIX`, progress from
+    `--print-progress`."""
 
     _PROGRESS_RE = re.compile(r"progress\s*=\s*(\d+)%")
 
@@ -160,18 +161,21 @@ class WhisperCppBackend:
         json_prefix.unlink()
         json_path = json_prefix.with_suffix(".json")
 
+        # Long options only: whisper-cli exits 0 on an unknown argument, so a
+        # misspelt short flag fails silently. Its default language is `en`,
+        # hence `auto` when none is given.
         args: CliArgs = [
             "--print-progress",
-            "-f",
+            "--file",
             str(audio_path),
-            "-ojson",
-            "-of",
+            "--output-json",
+            "--output-file",
             str(json_prefix),
-            "-m",
+            "--model",
             str(model),
+            "--language",
+            language or "auto",
         ]
-        if language:
-            args += ["-l", language]
 
         try:
             yield from _with_segments(

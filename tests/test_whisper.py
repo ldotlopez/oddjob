@@ -26,7 +26,11 @@ from pathlib import Path
 
 args = sys.argv[1:]
 Path(__file__).with_suffix(".argv").write_text(json.dumps(args))
-prefix = args[args.index("-of") + 1]
+if "--output-json" not in args:
+    # Like the real whisper-cli: usage on stderr, exit 0, no output.
+    print("error: unknown argument", file=sys.stderr)
+    sys.exit(0)
+prefix = args[args.index("--output-file") + 1]
 print("whisper_print_progress_callback: progress =  50%", file=sys.stderr)
 transcription = [
     {"offsets": {"from": 0, "to": 1500}, "text": " Hola mundo."},
@@ -81,19 +85,19 @@ class WhisperCppBackendTest(unittest.TestCase):
 
         argv = recorded_argv(binary)
         self.assertEqual(argv[0], "--print-progress")
-        self.assertEqual(argv[argv.index("-f") + 1], str(self.audio))
-        self.assertEqual(argv[argv.index("-m") + 1], str(self.model))
-        self.assertEqual(argv[argv.index("-l") + 1], "es")
-        self.assertIn("-ojson", argv)
-        json_output = Path(argv[argv.index("-of") + 1] + ".json")
+        self.assertEqual(argv[argv.index("--file") + 1], str(self.audio))
+        self.assertEqual(argv[argv.index("--model") + 1], str(self.model))
+        self.assertEqual(argv[argv.index("--language") + 1], "es")
+        json_output = Path(argv[argv.index("--output-file") + 1] + ".json")
         self.assertFalse(json_output.exists(), "temporary JSON output not removed")
 
-    def test_no_language_flag_when_autodetecting(self) -> None:
+    def test_autodetects_language_by_default(self) -> None:
         backend, binary = self.backend(FAKE_WHISPER)
 
         drain(backend.transcribe(self.audio, language=None))
 
-        self.assertNotIn("-l", recorded_argv(binary))
+        argv = recorded_argv(binary)
+        self.assertEqual(argv[argv.index("--language") + 1], "auto")
 
     def test_failure_reports_stderr(self) -> None:
         backend, _ = self.backend(FAILING_WHISPER)
