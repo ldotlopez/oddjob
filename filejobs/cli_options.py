@@ -7,6 +7,7 @@ backend registry or the glados config (those live in glados/core/cli_common.py).
 from __future__ import annotations
 
 import functools
+import logging
 from collections.abc import Callable, Sequence
 from pathlib import Path
 
@@ -19,6 +20,9 @@ from filejobs.pipeline import JOB_ERRORS, DestinationFn, Job
 from filejobs.progress import BaseProgressReporter, create_reporter
 
 type Decorator[F] = Callable[[F], F]
+
+LOGGER = logging.getLogger(__name__)
+SHARED_LOGGER = "filejobs"
 
 
 def output_option[F: Callable[..., object]](func: F) -> F:
@@ -74,7 +78,12 @@ def logging_options_for[F: Callable[..., object]](app_logger: str) -> Decorator[
     """--log-level, -v/--verbose and -q/--quiet from foundation.clilib, set up
     through foundation.loglib for the `app_logger` logger before the command
     runs. Without them the level comes from <APP_LOGGER>_LOG_LEVEL, else
-    warning."""
+    warning.
+
+    The shared `filejobs` logger follows the app logger's level, so -v also
+    shows its progress and `wrote` lines. A bare --log-level level applies
+    only to the app logger (foundation.loglib), so the spec is applied again
+    after copying the level: an explicit `filejobs:<level>` rule wins."""
 
     def decorator(func: F) -> F:
         @click_logging_options
@@ -86,9 +95,14 @@ def logging_options_for[F: Callable[..., object]](app_logger: str) -> Decorator[
             quiet: int,
             **kwargs: object,
         ) -> object:
-            setup_logger_from_click(
-                app_logger, log_level=log_level, verbose=verbose, quiet=quiet
-            )
+            def setup() -> logging.Logger:
+                return setup_logger_from_click(
+                    app_logger, log_level=log_level, verbose=verbose, quiet=quiet
+                )
+
+            logging.getLogger(SHARED_LOGGER).setLevel(setup().getEffectiveLevel())
+            if log_level is not None:
+                setup()
             return func(*args, **kwargs)
 
         return wrapper  # type: ignore[return-value]
@@ -138,16 +152,13 @@ def run_jobs[T](
     description: str,
     label: Callable[[T], str] = str,
 ) -> None:
-    """Run `action` on every item, print where each result landed, then the
-    batch summary. `action` returns the path it wrote."""
-    written: list[Path] = []
+    """Run `action` on every item, logging each path it wrote at INFO, then
+    the batch summary (only on failure, decision 0007)."""
 
     def run(item: T, reporter: BaseProgressReporter) -> None:
-        written.append(action(item, reporter))
+        LOGGER.info("wrote %s", action(item, reporter))
 
     report = run_batch(items, run, description=description, label=label)
-    for dest in written:
-        click.echo(f"Wrote {dest}")
     finish_batch(report)
 
 
@@ -155,6 +166,8 @@ def run_single_job(job: Job, input_path: Path, overwrite: bool) -> Path:
     """Run `job` on one input; a failure becomes a clean error message."""
     try:
         with create_reporter() as reporter:
-            return job.run(input_path, reporter, overwrite=overwrite)
+            dest = job.run(input_path, reporter, overwrite=overwrite)
     except JOB_ERRORS as exc:
         raise click.ClickException(str(exc)) from exc
+    LOGGER.info("wrote %s", dest)
+    return dest

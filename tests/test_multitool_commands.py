@@ -1,5 +1,6 @@
 """multitool commands through click's CliRunner."""
 
+import logging
 import tempfile
 import unittest
 from pathlib import Path
@@ -13,10 +14,23 @@ from multitool import motionphotos, renamers
 from multitool.cli import cli
 
 
+def wrote(records: list[logging.LogRecord]) -> list[Path]:
+    """The destinations of the `wrote <dest>` records captured by assertLogs."""
+    prefix = "wrote "
+    return [
+        Path(message.removeprefix(prefix))
+        for message in (record.getMessage() for record in records)
+        if message.startswith(prefix)
+    ]
+
+
 class CommandTests(unittest.TestCase):
     def setUp(self) -> None:
         self.tmp = Path(self.enterContext(tempfile.TemporaryDirectory()))
         self.runner = CliRunner()
+        for name in ("filejobs", "multitool"):  # -v changes them process-wide
+            logger = logging.getLogger(name)
+            self.addCleanup(logger.setLevel, logger.level)
 
     def test_hash_rename_dry_run_changes_nothing(self) -> None:
         file = self.tmp / "x.txt"
@@ -39,41 +53,52 @@ class CommandTests(unittest.TestCase):
     def test_motionphotos_merge_keeps_video_unless_rm(self) -> None:
         (self.tmp / "a.jpg").write_bytes(JPEG)
         (self.tmp / "a.mp4").write_bytes(MP4)
-        result = self.runner.invoke(cli, ["motionphotos", "merge", str(self.tmp)])
+        with self.assertLogs("filejobs", "INFO") as logs:
+            result = self.runner.invoke(
+                cli, ["-v", "motionphotos", "merge", str(self.tmp)]
+            )
         self.assertEqual(result.exit_code, 0, result.output)
         self.assertEqual(
             motionphotos.split((self.tmp / "a.jpg").read_bytes()), (JPEG, MP4)
         )
         self.assertTrue((self.tmp / "a.mp4").exists())
-        self.assertIn(f"Wrote {self.tmp / 'a.jpg'}", result.output)
+        self.assertEqual(wrote(logs.records), [self.tmp / "a.jpg"])
+        self.assertEqual(result.stdout, "")
 
     def test_motionphotos_join_and_split(self) -> None:
         (self.tmp / "still.jpg").write_bytes(JPEG)
         (self.tmp / "clip.mp4").write_bytes(MP4)
         joined = self.tmp / "joined.jpg"
-        join = self.runner.invoke(
-            cli,
-            [
-                "motionphotos", "join",
-                "-i", str(self.tmp / "still.jpg"),
-                "-v", str(self.tmp / "clip.mp4"),
-                "-o", str(joined),
-                "--rm",
-            ],
-        )  # fmt: skip
+        with self.assertLogs("filejobs", "INFO") as join_logs:
+            join = self.runner.invoke(
+                cli,
+                [
+                    "-v", "motionphotos", "join",
+                    "-i", str(self.tmp / "still.jpg"),
+                    "-v", str(self.tmp / "clip.mp4"),
+                    "-o", str(joined),
+                    "--rm",
+                ],
+            )  # fmt: skip
         self.assertEqual(join.exit_code, 0, join.output)
         self.assertFalse((self.tmp / "clip.mp4").exists())
-        split = self.runner.invoke(
-            cli,
-            [
-                "motionphotos", "split", str(joined),
-                "-i", str(self.tmp / "s.jpg"),
-                "-v", str(self.tmp / "s.mp4"),
-            ],
-        )  # fmt: skip
+        self.assertEqual(wrote(join_logs.records), [joined])
+        with self.assertLogs("filejobs", "INFO") as split_logs:
+            split = self.runner.invoke(
+                cli,
+                [
+                    "-v", "motionphotos", "split", str(joined),
+                    "-i", str(self.tmp / "s.jpg"),
+                    "-v", str(self.tmp / "s.mp4"),
+                ],
+            )  # fmt: skip
         self.assertEqual(split.exit_code, 0, split.output)
         self.assertEqual((self.tmp / "s.jpg").read_bytes(), JPEG)
         self.assertEqual((self.tmp / "s.mp4").read_bytes(), MP4)
+        self.assertEqual(
+            sorted(wrote(split_logs.records)), [self.tmp / "s.jpg", self.tmp / "s.mp4"]
+        )
+        self.assertEqual((join.stdout, split.stdout), ("", ""))
 
     def test_motionphotos_check_exit_status(self) -> None:
         (self.tmp / "still.jpg").write_bytes(JPEG)
@@ -86,11 +111,18 @@ class CommandTests(unittest.TestCase):
     def test_strip_in_place_needs_overwrite(self) -> None:
         file = self.tmp / "motion.jpg"
         file.write_bytes(motionphotos.join(JPEG, MP4))
-        refused = self.runner.invoke(cli, ["motionphotos", "strip", str(file)])
+        with self.assertNoLogs("filejobs", "INFO"):
+            refused = self.runner.invoke(
+                cli, ["-v", "motionphotos", "strip", str(file)]
+            )
         self.assertEqual(refused.exit_code, 1)
-        done = self.runner.invoke(cli, ["motionphotos", "strip", "-y", str(file)])
+        with self.assertLogs("filejobs", "INFO") as logs:
+            done = self.runner.invoke(
+                cli, ["-v", "motionphotos", "strip", "-y", str(file)]
+            )
         self.assertEqual(done.exit_code, 0, done.output)
         self.assertEqual(file.read_bytes(), JPEG)
+        self.assertEqual(wrote(logs.records), [file])
 
     def test_sidecars_scan_needs_two_extensions(self) -> None:
         result = self.runner.invoke(
@@ -106,17 +138,20 @@ class CommandTests(unittest.TestCase):
             f"convert {self.tmp / 'a.png'} -> {self.tmp / 'a.jpg'}", result.output
         )
 
-    def test_jpgize_prints_what_it_wrote(self) -> None:
+    def test_jpgize_logs_what_it_wrote(self) -> None:
         tools = self.tmp / "bin"
         tools.mkdir()
         for name in ("magick", "exiftool"):
             write_executable(tools, name, FAKE_WRITER)
         (self.tmp / "a.png").write_bytes(b"png")
-        result = self.runner.invoke(
-            cli, ["jpgize", str(self.tmp / "a.png")], env={"PATH": str(tools)}
-        )
+        with self.assertLogs("filejobs", "INFO") as logs:
+            result = self.runner.invoke(
+                cli, ["-v", "jpgize", str(self.tmp / "a.png")], env={"PATH": str(tools)}
+            )
         self.assertEqual(result.exit_code, 0, result.output)
-        self.assertIn(f"Wrote {self.tmp / 'a.jpg'}", result.output)
+        self.assertTrue((self.tmp / "a.jpg").exists())
+        self.assertEqual(wrote(logs.records), [self.tmp / "a.jpg"])
+        self.assertEqual(result.stdout, "")
 
 
 if __name__ == "__main__":

@@ -2,9 +2,12 @@
 multitool: input expansion, batch runs, BytesStep, run_jobs and the
 multiple-input task commands."""
 
+import logging
 import os
 import tempfile
 import unittest
+from contextlib import redirect_stderr
+from io import StringIO
 from pathlib import Path
 
 import rich_click as click
@@ -12,7 +15,7 @@ from click.testing import CliRunner
 from support import NullReporter
 
 from filejobs.batch import run_batch
-from filejobs.cli_options import job_action, run_jobs
+from filejobs.cli_options import job_action, logging_options_for, run_jobs
 from filejobs.inputs import (
     accept_all,
     expand_inputs,
@@ -26,7 +29,7 @@ from filejobs.pipeline import (
     move_to_destination,
     suffix_destination,
 )
-from filejobs.progress import BaseProgressReporter
+from filejobs.progress import BaseProgressReporter, PlainProgressReporter
 from glados.commands import rewrite, transcribe
 
 
@@ -136,10 +139,18 @@ class BytesStepAndRunJobsTests(unittest.TestCase):
         def command() -> None:
             run_jobs(self.inputs, job_action(self.job, overwrite=False), "Testing")
 
-        result = runner.invoke(command, [])
+        with self.assertLogs("filejobs", "INFO") as logs:
+            result = runner.invoke(command, [])
         self.assertEqual(result.exit_code, 1, result.output)
         self.assertEqual((self.tmp / "b.out").read_bytes(), b"B.DAT")
-        self.assertIn(f"Wrote {self.tmp / 'b.out'}", result.output)
+        wrote = [
+            record.getMessage()
+            for record in logs.records
+            if record.name == "filejobs.cli_options"
+        ]
+        self.assertEqual(wrote, [f"wrote {self.tmp / 'b.out'}"])
+        self.assertEqual(result.stdout, "")
+        self.assertIn("1 done, 1 failed", result.stderr)
 
     def test_destination_helpers(self) -> None:
         produced, dest = self.tmp / "new", self.tmp / "dest"
@@ -192,6 +203,60 @@ class CrossFilesystemMoveTests(unittest.TestCase):
             move_to_destination(produced, dest, overwrite=True)
         self.assertEqual(dest.read_text(), "old")
         self.assertEqual(list(self.dest_dir.iterdir()), [dest])
+
+
+class PlainProgressReporterTests(unittest.TestCase):
+    def test_lines_are_info_records_not_stderr_writes(self) -> None:
+        stderr = StringIO()
+        with (
+            self.assertLogs("filejobs.progress", "INFO") as logs,
+            redirect_stderr(stderr),
+            PlainProgressReporter() as reporter,
+        ):
+            task_id = reporter.add_task("Testing", total=4)
+            reporter.update(task_id, completed=2)
+            reporter.complete(task_id)
+        self.assertEqual(
+            [record.getMessage() for record in logs.records],
+            ["Testing: starting", "Testing: 50%", "Testing: done"],
+        )
+        self.assertEqual(stderr.getvalue(), "")
+
+
+class LoggingOptionsTests(unittest.TestCase):
+    """The shared filejobs logger follows the app logger's verbosity."""
+
+    def setUp(self) -> None:
+        for name in ("filejobs", "testapp"):
+            logger = logging.getLogger(name)
+            self.addCleanup(logger.setLevel, logger.level)
+
+        @click.command()
+        @logging_options_for("testapp")
+        def command() -> None:
+            pass
+
+        self.command = command
+
+    def filejobs_level(self, *args: str) -> int:
+        result = CliRunner().invoke(
+            self.command, list(args), env={"TESTAPP_LOG_LEVEL": None}
+        )
+        self.assertEqual(result.exit_code, 0, result.output)
+        return logging.getLogger("filejobs").level
+
+    def test_verbose_reaches_filejobs(self) -> None:
+        self.assertEqual(self.filejobs_level("-v"), logging.INFO)
+
+    def test_no_flags_keep_filejobs_at_warning(self) -> None:
+        self.assertEqual(self.filejobs_level(), logging.WARNING)
+
+    def test_a_bare_log_level_reaches_filejobs(self) -> None:
+        self.assertEqual(self.filejobs_level("--log-level", "info"), logging.INFO)
+
+    def test_an_explicit_filejobs_rule_wins(self) -> None:
+        level = self.filejobs_level("--log-level", "testapp:info,filejobs:debug")
+        self.assertEqual(level, logging.DEBUG)
 
 
 class MultipleInputTaskTests(unittest.TestCase):

@@ -7,7 +7,7 @@ backends, and the pipeline all speak.
 
 from __future__ import annotations
 
-import sys
+import logging
 from collections.abc import Iterator
 from dataclasses import dataclass
 from typing import Protocol, Self, runtime_checkable
@@ -21,6 +21,8 @@ from rich.progress import (
     TextColumn,
     TimeRemainingColumn,
 )
+
+LOGGER = logging.getLogger(__name__)
 
 
 @dataclass(slots=True)
@@ -74,7 +76,7 @@ class RichProgressReporter:
             TaskProgressColumn(),
             TimeRemainingColumn(),
             console=get_stderr_console(),
-            transient=False,
+            transient=True,
         )
 
     def __enter__(self) -> Self:
@@ -106,9 +108,10 @@ class RichProgressReporter:
 
 
 class PlainProgressReporter:
-    """No colors, no cursor control — just occasional plain-text percentage lines."""
+    """No colors, no cursor control: occasional percentage lines, logged at
+    INFO, so they show only with -v (decision 0007)."""
 
-    STEP = 10  # print at most every STEP percentage points
+    STEP = 10  # log at most every STEP percentage points
 
     def __init__(self) -> None:
         self._descriptions: dict[int, str] = {}
@@ -128,7 +131,7 @@ class PlainProgressReporter:
         self._descriptions[task_id] = description
         self._totals[task_id] = total
         self._last_printed[task_id] = -1
-        print(f"{description}: starting", file=sys.stderr)
+        LOGGER.info("%s: starting", description)
         return task_id
 
     def update(
@@ -142,11 +145,11 @@ class PlainProgressReporter:
         pct = int(min(100, (completed / task_total) * 100))
         last = self._last_printed[task_id]
         if pct >= last + self.STEP or pct == 100:
-            print(f"{self._descriptions[task_id]}: {pct}%", file=sys.stderr)
+            LOGGER.info("%s: %d%%", self._descriptions[task_id], pct)
             self._last_printed[task_id] = pct
 
     def complete(self, task_id: int) -> None:
-        print(f"{self._descriptions[task_id]}: done", file=sys.stderr)
+        LOGGER.info("%s: done", self._descriptions[task_id])
 
     def remove(self, task_id: int) -> None:
         """Plain lines cannot be taken back; just forget the task."""
@@ -157,5 +160,5 @@ class PlainProgressReporter:
 
 def create_reporter() -> BaseProgressReporter:
     """Rich bars when stderr is a rich-capable terminal (see
-    foundation.clilib), else plain percentage lines."""
+    foundation.clilib), else percentage lines logged at INFO."""
     return RichProgressReporter() if RICH_STDERR_ENABLED else PlainProgressReporter()
