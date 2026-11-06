@@ -1,0 +1,73 @@
+# Porting a glados task (or adding a backend)
+
+A new backend for an existing task needs only steps 6–7 and its tests.
+A new task needs everything, in this order.
+
+1. **Contract**: add a `Protocol` to `glados/tasks/protocols.py`
+   (`@runtime_checkable`). Per-run values are keyword method arguments;
+   backend settings are options. Return a `ProgressStream[T]` whose final
+   event (`done=True`) carries the result.
+
+2. **Domain**: add `glados/tasks/<task>.py` only if the task has logic
+   beyond wiring (steps, formatters, parsing), like `transcribe.py`
+   (`AudioExtractor`, `TranscribeStep`, `FORMATTERS`). A task that is a
+   single `TextStep` has no domain module.
+
+3. **Task registry**: add the name to `TASKS` in `glados/core/backends.py`.
+   It is a hardcoded tuple; the config check rejects unknown `[tasks]` keys.
+
+4. **Prompts (text tasks only)**: add a field and a `render_<task>()`
+   method to `Prompts` in `glados/core/config.py`, with its placeholder
+   validated like the existing ones (`_check_placeholders`). Prompts belong
+   to the task, never to a backend.
+
+5. **Text backends (text tasks only)**: add the method to
+   `glados/tasks/text_backend.TextBackend` and the triple to
+   `text_plugin_triples()`. `openai`, `ollama` and `llm` then implement the
+   task with no plugin change.
+
+6. **Backend (non-text task, or a new service)**:
+   `glados/plugins/<module>.py`, which holds only plugin code:
+   - a pydantic options model, `extra="forbid"`, defaults for everything;
+   - the adapter class: thin, does the I/O, reports progress as a
+     `ProgressStream`. Subprocess CLIs: long options only when the CLI
+     ignores unknown flags (see the `whisper-cli` note in
+     `.claude/rules/glados.md`);
+   - `__glados_plugin__(backend, options)`: builds only the named backend
+     (name → factory mapping), validates only its options, returns
+     `(task, Protocol, object)` triples, one per task. One module may hold
+     several variants (decision 0002).
+   Model defaults go through `platformdirs`; no env lookups or hardcoded
+   paths elsewhere.
+
+7. **Entry points**: in `pyproject.toml`,
+   `[project.entry-points."glados.backends.<task>"]` with
+   `<backend> = "glados.plugins.<module>:__glados_plugin__"`. A backend names
+   the same module in every group. Run `uv sync`.
+
+8. **Command**: `glados/commands/<task>.py`, decorator stack as in
+   `glados/commands/rewrite.py`:
+   `@click.command("<task>")`, `@paths_argument`, task options,
+   `@model_option`, `@backend_option("<task>")`, `@common_file_options`,
+   `@dry_run_option`, `@logging_options`, `@pass_glados_context`.
+   Body, in order:
+   1. `inputs = expand_inputs(paths, <filter>)`
+   2. `check_single_output(output, inputs)`
+   3. `dest_fn = override_destination(output, <suffix|infix>_destination(...))`
+   4. `if dry_run: print_plan(inputs, dest_fn); return`
+   5. render the prompt (text tasks), then
+      `ctx.backend("<task>", <Protocol>, backend, {"model": model})`
+   6. build the `Job` and `run_jobs(inputs, job_action(job, overwrite), "<Verb>ing")`
+   No logic beyond this wiring; anything more belongs in step 2.
+
+9. **Registration**: add the command to `TASK_COMMANDS` in `glados/cli.py`
+   and `<task> = "glados.commands.<task>:cli"` to `[project.scripts]`.
+   Run `uv sync`.
+
+10. **Runtime requirements**: new binaries or services go into the docs
+    proposal (README, `.claude/rules/glados.md` "Runtime needs").
+
+Tests: `tests/test_<backend module>.py` for the backend (options model,
+adapter against a fake executable or `FakeHTTPServer`, `__glados_plugin__`
+triples) plus an `*IntegrationTest` class reading `GLADOS_TEST_*`; CLI tests
+for `-n` with no backend configured.
