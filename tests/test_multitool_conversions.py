@@ -8,7 +8,9 @@ from pathlib import Path
 
 from support import NullReporter, recorded_argv, write_executable
 
+from filejobs.pipeline import Job
 from filejobs.runners import FFMpegRunner
+from multitool.captions import CaptionStep
 from multitool.conversions import (
     JpegConversionStep,
     Mp4RemuxStep,
@@ -106,6 +108,36 @@ class ConversionTests(unittest.TestCase):
         self.assertEqual(produced.read_bytes(), b"mp4")
         codecs = [call[call.index("-c:a") + 1] for call in recorded_argv(ffmpeg)]
         self.assertEqual(codecs, ["copy", "aac"])
+
+
+class CaptionStepTests(unittest.TestCase):
+    def test_writes_tags_into_a_copy_and_lands_in_place(self) -> None:
+        tmp = Path(self.enterContext(tempfile.TemporaryDirectory()))
+        exiftool = write_executable(tmp, "exiftool", FAKE_WRITER)
+        image = tmp / "a.jpg"
+        image.write_bytes(b"jpeg")
+        os.utime(image, (1_000_000, 1_000_000))
+        job = Job(
+            steps=[(CaptionStep(ExifTool(str(exiftool)), "un gato"), "Captioning")],
+            dest_fn=lambda _image: image,
+        )
+        with self.assertRaises(FileExistsError):
+            job.run(image, NullReporter())
+        self.assertEqual(image.read_bytes(), b"jpeg")
+
+        job.run(image, NullReporter(), overwrite=True)
+
+        argv = recorded_argv(exiftool)
+        self.assertEqual(
+            argv[:-1],
+            [
+                "-quiet", "-overwrite_original", "-charset", "exif=utf8",
+                "-XMP-dc:Description=un gato", "-EXIF:ImageDescription=un gato",
+            ],
+        )  # fmt: skip
+        self.assertNotEqual(Path(argv[-1]), image)
+        self.assertEqual(image.read_bytes(), b"converted")
+        self.assertEqual(image.stat().st_mtime, 1_000_000)
 
 
 if __name__ == "__main__":

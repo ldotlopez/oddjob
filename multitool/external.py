@@ -44,7 +44,7 @@ class ImageMagick:
 
 
 class ExifTool:
-    """Copies metadata between files with `exiftool`."""
+    """Copies and writes metadata with `exiftool`."""
 
     def __init__(self, binary: str | None = None) -> None:
         self.binary = binary or _require_binary("exiftool")
@@ -62,6 +62,22 @@ class ExifTool:
                 str(source),
                 "--Orientation",
                 str(destination),
+            ]
+        )
+
+    def set_description(self, path: Path, text: str) -> None:
+        """Set XMP-dc:Description and EXIF:ImageDescription of `path` to
+        `text`, in place."""
+        _run_tool(
+            [
+                self.binary,
+                "-quiet",
+                "-overwrite_original",
+                "-charset",
+                "exif=utf8",
+                f"-XMP-dc:Description={text}",
+                f"-EXIF:ImageDescription={text}",
+                str(path),
             ]
         )
 

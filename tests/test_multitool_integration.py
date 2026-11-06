@@ -145,5 +145,19 @@ class ImgDuplicatesIntegrationTest(IntegrationCase):
         self.assertNotIn(str(self.tmp / "b.png"), groups[0])
 
 
+@unittest.skipIf(
+    missing("magick", "convert") or missing("exiftool"),
+    "needs ImageMagick and exiftool",
+)
+class ImgCaptionIntegrationTest(IntegrationCase):
+    def test_sets_xmp_and_exif_descriptions(self) -> None:
+        image = self.tmp / "a.jpg"
+        magick("-size", "16x16", "xc:red", image)
+        (self.tmp / "a.description.txt").write_text("Un gato, señor", encoding="utf-8")
+        self.multitool("img-caption", "-y", self.tmp)
+        self.assertEqual(exif_tag(image, "XMP-dc:Description"), "Un gato, señor")
+        self.assertEqual(exif_tag(image, "EXIF:ImageDescription"), "Un gato, señor")
+
+
 if __name__ == "__main__":
     unittest.main()

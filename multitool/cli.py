@@ -12,6 +12,7 @@ from __future__ import annotations
 import rich_click as click
 
 from filejobs.cli_options import logging_options_for
+from multitool.commands.captions import img_caption_cmd
 from multitool.commands.conversions import jpgize_cmd, mp4ize_cmd
 from multitool.commands.imgedit import autocrop_cmd
 from multitool.commands.imghash import (
@@ -35,6 +36,7 @@ COMMANDS = [
     img_duplicates_cmd,
     img_check_cmd,
     autocrop_cmd,
+    img_caption_cmd,
     hash_rename_cmd,
     fix_extensions_cmd,
     srt_grep_cmd,

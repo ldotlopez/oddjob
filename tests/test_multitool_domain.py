@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING
 
 from foundation.cache import UserCache
 
-from multitool import media, motionphotos, renamers, sidecars, subtitles
+from multitool import captions, media, motionphotos, renamers, sidecars, subtitles
 
 if TYPE_CHECKING:
     import PIL.Image
@@ -134,6 +134,26 @@ class RenamerTests(unittest.TestCase):
             renamers.plan_extension_fix(Path("a.JPEG")),
             renamers.Rename(source=Path("a.JPEG"), destination=Path("a.jpg")),
         )
+
+
+class CaptionPlanTests(unittest.TestCase):
+    def test_images_without_sidecar_are_skipped_unless_named(self) -> None:
+        tmp = make_tmp(self)
+        described, bare, named = tmp / "a.jpg", tmp / "b.png", tmp / "c.jpg"
+        (tmp / "a.description.txt").write_text("a cat", encoding="utf-8")
+        planned = captions.plan_captions([described, bare, named], {named})
+        self.assertEqual([caption.image for caption in planned], [described, named])
+        self.assertEqual(planned[0].sidecar, tmp / "a.description.txt")
+        self.assertEqual(planned[0].text(), "a cat")
+        with self.assertRaises(FileNotFoundError):
+            planned[1].text()
+
+    def test_an_empty_description_is_an_error(self) -> None:
+        tmp = make_tmp(self)
+        (tmp / "a.description.txt").write_text(" \n", encoding="utf-8")
+        caption = captions.Caption(tmp / "a.jpg", tmp / "a.description.txt")
+        with self.assertRaisesRegex(ValueError, "empty description"):
+            caption.text()
 
 
 SRT = """\ufeff1

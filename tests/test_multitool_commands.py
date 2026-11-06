@@ -289,5 +289,40 @@ class SrtGrepCommandTests(unittest.TestCase):
         self.assertIn("1 done, 1 failed", result.stderr)
 
 
+class ImgCaptionCommandTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.tmp = Path(self.enterContext(tempfile.TemporaryDirectory()))
+        self.image = self.tmp / "a.jpg"
+        self.image.write_bytes(JPEG)
+        (self.tmp / "a.description.txt").write_text("a cat\n", encoding="utf-8")
+        (self.tmp / "b.jpg").write_bytes(JPEG)
+        self.bin = self.tmp / "bin"
+        self.bin.mkdir()
+        self.runner = CliRunner()
+
+    def test_dry_run_needs_no_exiftool(self) -> None:
+        result = self.runner.invoke(
+            cli, ["img-caption", "-n", str(self.tmp)], env={"PATH": str(self.bin)}
+        )
+        self.assertEqual(result.exit_code, 0, result.output)
+        self.assertEqual(
+            result.stdout,
+            f"caption {self.image} from {self.tmp / 'a.description.txt'}\n",
+        )
+
+    def test_in_place_needs_overwrite(self) -> None:
+        write_executable(self.bin, "exiftool", FAKE_WRITER)
+        env = {"PATH": str(self.bin)}
+        refused = self.runner.invoke(cli, ["img-caption", str(self.tmp)], env=env)
+        self.assertEqual(refused.exit_code, 1, refused.output)
+        self.assertIn("0 done, 1 failed", refused.stderr)
+        self.assertEqual(self.image.read_bytes(), JPEG)
+        done = self.runner.invoke(cli, ["img-caption", "-y", str(self.tmp)], env=env)
+        self.assertEqual(done.exit_code, 0, done.output)
+        self.assertEqual(done.stdout, "")
+        self.assertEqual(self.image.read_bytes(), b"converted")
+        self.assertEqual((self.tmp / "b.jpg").read_bytes(), JPEG)
+
+
 if __name__ == "__main__":
     unittest.main()
