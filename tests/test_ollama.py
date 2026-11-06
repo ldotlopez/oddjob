@@ -72,6 +72,22 @@ class OllamaTransportTest(unittest.TestCase):
             },
         )
 
+    def test_sends_bearer_token(self) -> None:
+        server = self.serve(ndjson(chunk("ok", done=True)))
+
+        drain(self.transport(server.base_url, api_key="ol-secret").complete("s", "u"))
+
+        self.assertEqual(
+            server.requests[0].headers["Authorization"], "Bearer ol-secret"
+        )
+
+    def test_no_authorization_without_api_key(self) -> None:
+        server = self.serve(ndjson(chunk("ok", done=True)))
+
+        drain(self.transport(server.base_url).complete("s", "u"))
+
+        self.assertNotIn("Authorization", server.requests[0].headers)
+
     def test_omits_empty_model_options(self) -> None:
         server = self.serve(ndjson(chunk("ok", done=True)))
 
@@ -121,6 +137,9 @@ class OllamaPluginTest(unittest.TestCase):
         with self.assertRaises(pydantic.ValidationError):
             __glados_plugin__("ollama", {"num_ctx": 8192})
 
+    def test_api_key_hidden_in_repr(self) -> None:
+        self.assertNotIn("ol-secret", repr(OllamaOptions(api_key="ol-secret")))
+
 
 class OllamaIntegrationTest(unittest.TestCase):
     @classmethod
@@ -134,6 +153,7 @@ class OllamaIntegrationTest(unittest.TestCase):
                 "GLADOS_TEST_OLLAMA_BASE_URL", OllamaOptions().base_url
             ),
             options={"temperature": 0},
+            api_key=self.settings.get("GLADOS_TEST_OLLAMA_API_KEY"),
         )
 
         _, result = drain(OllamaTransport(options).complete(PING_SYSTEM, "ping"))

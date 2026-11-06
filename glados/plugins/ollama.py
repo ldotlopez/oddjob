@@ -3,7 +3,9 @@ expand.
 
 Global options (`[backends.ollama]` in the config, or `-m/--model`): `model`,
 `base_url`, `options` (passed through as Ollama's model options, e.g.
-`num_ctx`, `temperature`) and `timeout` in seconds.
+`num_ctx`, `temperature`), `timeout` in seconds and `api_key` (optional; sent
+as `Authorization: Bearer <key>`, for ollama.com or a server behind an
+authenticating proxy).
 """
 
 from __future__ import annotations
@@ -29,6 +31,7 @@ class OllamaOptions(pydantic.BaseModel):
     base_url: str = "http://localhost:11434"
     options: dict[str, Any] = {}
     timeout: float = 600
+    api_key: pydantic.SecretStr | None = None
 
 
 def _error_message(response: requests.Response) -> str:
@@ -60,11 +63,17 @@ class OllamaTransport:
         chunks: list[str] = []
         received = 0
         url = f"{base_url}/api/chat"
+        headers = (
+            {"Authorization": f"Bearer {self.options.api_key.get_secret_value()}"}
+            if self.options.api_key
+            else {}
+        )
         LOGGER.debug("POST %s (model %s)", url, self.options.model)
         try:
             with requests.post(
                 url,
                 json=body,
+                headers=headers,
                 stream=True,
                 timeout=self.options.timeout,
             ) as response:
