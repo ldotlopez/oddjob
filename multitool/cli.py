@@ -1,7 +1,8 @@
 """`multitool` entry point: file utilities without the backend registry.
 
-One command module per tool lives in multitool/commands/; see
-docs/decisions/0003. Commands taking PATH... walk directories recursively,
+One command module per tool lives in multitool/commands/, sharing the
+backend-free core in filejobs/; see docs/decisions/0003, 0005 and 0006.
+Commands taking PATH... walk directories recursively,
 keep going when one input fails and exit 1 if any did. Commands that change
 files take -n/--dry-run.
 """

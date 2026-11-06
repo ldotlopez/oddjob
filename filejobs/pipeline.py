@@ -1,10 +1,10 @@
 """Generic orchestration: chain N ProgressStep[Path] stages, report their
 progress, and land the final result at a computed destination path.
 
-This is the task-agnostic remainder of transcribe_sidecar.py's
-TranscriptionJob — the extractor/transcriber split there was specific to
-transcribe (two steps); other tasks plug in their own step list instead
-(text tasks use exactly one, TextStep).
+Each command supplies its own step list: transcribe has two (extract the
+audio, then transcribe it), the text tasks one TextStep, and multitool's
+byte transforms one BytesStep. Every step writes a temp file; only the last
+one is moved to the destination.
 """
 
 from __future__ import annotations
@@ -193,8 +193,11 @@ class BytesStep:
 class Job:
     """Drives a fixed sequence of (step, description) pairs, each
     consuming the previous step's output path, and moves the final
-    result to `dest_fn(input_path)`. Overwrite/race-check behavior is
-    unchanged from transcribe_sidecar.py's TranscriptionJob.
+    result to `dest_fn(input_path)`. The destination is checked before
+    the first step, so an existing file fails fast without running any
+    step, and again right before the move, in case it appeared meanwhile;
+    either check passes when `overwrite` is set. Intermediate temp files
+    are removed whether or not the run succeeds.
     """
 
     def __init__(

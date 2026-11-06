@@ -1,8 +1,7 @@
 """Generic subprocess runners: no knowledge of this project's tasks.
 
-Reusable as-is anywhere a caller wants ffmpeg driven with
-arbitrary arguments while getting a ProgressStream back. Unchanged from
-transcribe_sidecar.py other than the import path for ProgressEvent.
+Drives ffmpeg with arbitrary arguments and turns its progress output into
+a ProgressStream, for glados' transcribe and multitool's conversions alike.
 """
 
 from __future__ import annotations

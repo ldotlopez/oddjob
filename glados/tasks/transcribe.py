@@ -26,7 +26,7 @@ DEFAULT_OUTPUT_FORMAT = "txt"
 
 
 # --------------------------------------------------------------------------
-# Format rendering (unchanged from transcribe_sidecar.py)
+# Format rendering: segments to srt, vtt, txt, json, csv or lrc text
 # --------------------------------------------------------------------------
 
 

@@ -1,8 +1,9 @@
 """Generic progress-reporting primitives shared by every task and backend.
 
-Lifted from transcribe_sidecar.py: nothing here knows about ffmpeg,
-whisper, or any particular task — it's the vocabulary that runners,
-backends, and the pipeline all speak.
+Nothing here knows about ffmpeg, whisper, or any particular task: it's the
+vocabulary that runners, backends, and the pipeline all speak. Rich bars are
+transient and plain progress is INFO logging, so a successful run leaves
+nothing behind unless -v is given (decision 0007).
 """
 
 from __future__ import annotations
