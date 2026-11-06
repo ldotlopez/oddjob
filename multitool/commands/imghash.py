@@ -1,5 +1,6 @@
-"""`multitool img-hash` and `multitool img-duplicates` (need the `multitool`
-extra; multitool.imghash is imported only when one of them runs)."""
+"""`multitool img-hash`, `img-duplicates` and `img-check` (need the
+`multitool` extra; multitool.imghash is imported only when one of them
+runs)."""
 
 from __future__ import annotations
 
@@ -76,6 +77,28 @@ def img_hash_cmd(paths: tuple[Path, ...], hash_size: int, no_cache: bool) -> Non
     for path, image_hash in results:
         click.echo(f"{path}: {image_hash}")
     finish_batch(report)
+
+
+@click.command("img-check")
+@paths_argument
+def img_check_cmd(paths: tuple[Path, ...]) -> None:
+    """Print each image in PATH... that cannot be fully decoded, with the
+    reason; exit 1 if there was any."""
+    imghash = load_imghash()
+    problems: list[tuple[Path, str]] = []
+
+    def check(path: Path, _reporter: BaseProgressReporter) -> None:
+        if (problem := imghash.decode_problem(path)) is not None:
+            problems.append((path, problem))
+
+    report = run_batch(
+        expand_inputs(paths, media.is_image), check, description="Checking"
+    )
+    for path, problem in problems:
+        click.echo(f"{path}: {problem}")
+    finish_batch(report)
+    if problems:
+        raise click.exceptions.Exit(1)
 
 
 @click.command("img-duplicates")

@@ -1,4 +1,4 @@
-"""Average hashes of images and near-duplicate groups.
+"""Average hashes of images, near-duplicate groups, and decode checks.
 
 Needs the `multitool` extra (Pillow, pillow-heif).
 """
@@ -10,13 +10,35 @@ from pathlib import Path
 
 import pillow_heif
 from foundation.cache import Cache, CacheMissError
-from PIL import Image
+from PIL import Image, UnidentifiedImageError
 
 DEFAULT_HASH_SIZE = 16  # 16x16 = 256-bit hash
 DEFAULT_MAX_DISTANCE = 8  # bits that may differ between duplicates
 
 # How long a cached hash stays valid; keys change with the file anyway.
 CACHE_EXPIRATION = 30 * 24 * 60 * 60
+
+# What Pillow raises for undecodable data (UnidentifiedImageError and
+# "image file is truncated" are OSErrors; some plugins raise the others).
+DECODE_ERRORS = (OSError, SyntaxError, ValueError, Image.DecompressionBombError)
+
+
+def decode_problem(path: Path) -> str | None:
+    """Why the image at `path` cannot be fully decoded, or None if it can.
+
+    Opening the file itself is not a decode problem: an unreadable file
+    raises OSError, so it stays an ordinary batch failure."""
+    pillow_heif.register_heif_opener()
+    with path.open("rb") as stream:
+        try:
+            with Image.open(stream) as image:
+                image.load()
+        except UnidentifiedImageError:
+            # Pillow's own message names the stream object, not the file.
+            return "cannot identify image file"
+        except DECODE_ERRORS as exc:
+            return str(exc) or type(exc).__name__
+    return None
 
 
 def average_hash(image: Image.Image, size: int) -> str:

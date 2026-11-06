@@ -175,6 +175,26 @@ class ImageHashTests(unittest.TestCase):
         with self.assertRaises(OSError):
             imghash.ImageHasher(16, cache=None).hash(image)
 
+    def test_decode_problem(self) -> None:
+        from multitool import imghash
+
+        whole = self.tmp / "a.jpg"
+        (self.tmp / "a_low.jpg").rename(whole)
+        truncated = self.tmp / "truncated.jpg"
+        truncated.write_bytes(whole.read_bytes()[: whole.stat().st_size // 2])
+        garbage = self.tmp / "garbage.png"
+        garbage.write_bytes(b"not an image")
+        self.assertIsNone(imghash.decode_problem(whole))
+        self.assertIsNone(imghash.decode_problem(self.tmp / "a.png"))
+        self.assertIn("truncated", (imghash.decode_problem(truncated) or "").lower())
+        self.assertIn("cannot identify", imghash.decode_problem(garbage) or "")
+
+    def test_an_unreadable_file_is_not_a_decode_problem(self) -> None:
+        from multitool import imghash
+
+        with self.assertRaises(FileNotFoundError):
+            imghash.decode_problem(self.tmp / "missing.png")
+
 
 if __name__ == "__main__":
     unittest.main()

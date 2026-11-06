@@ -8,7 +8,7 @@ from pathlib import Path
 from click.testing import CliRunner
 from support import write_executable
 from test_multitool_conversions import FAKE_WRITER
-from test_multitool_domain import JPEG, MP4
+from test_multitool_domain import HAS_PILLOW, JPEG, MP4
 
 from multitool import motionphotos, renamers
 from multitool.cli import cli
@@ -179,6 +179,32 @@ class CommandTests(unittest.TestCase):
         self.assertTrue((self.tmp / "a.jpg").exists())
         self.assertEqual(wrote(logs.records), [self.tmp / "a.jpg"])
         self.assertEqual(result.stdout, "")
+
+
+@unittest.skipUnless(HAS_PILLOW, "needs the multitool extra (Pillow)")
+class ImageCheckCommandTests(unittest.TestCase):
+    def setUp(self) -> None:
+        from PIL import Image
+
+        self.tmp = Path(self.enterContext(tempfile.TemporaryDirectory()))
+        Image.new("RGB", (16, 16), "red").save(self.tmp / "good.png")
+        self.runner = CliRunner()
+
+    def test_good_images_print_nothing(self) -> None:
+        result = self.runner.invoke(cli, ["img-check", str(self.tmp)])
+        self.assertEqual(result.exit_code, 0, result.output)
+        self.assertEqual(result.stdout, "")
+
+    def test_corrupt_images_are_listed_on_stdout_and_exit_1(self) -> None:
+        (self.tmp / "bad.jpg").write_bytes(b"not an image")
+        (self.tmp / "notes.txt").write_text("not checked")
+        result = self.runner.invoke(cli, ["img-check", str(self.tmp)])
+        self.assertEqual(result.exit_code, 1, result.output)
+        self.assertEqual(
+            result.stdout.splitlines(),
+            [f"{self.tmp / 'bad.jpg'}: cannot identify image file"],
+        )
+        self.assertNotIn("failed", result.stderr)
 
 
 if __name__ == "__main__":
