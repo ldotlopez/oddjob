@@ -2,9 +2,24 @@
 
 - Implemented tasks: `transcribe` (backends `whisper`, `whisper_cpp`) and the text
   tasks `rewrite`, `summarize`, `expand` (backends `openai`, `ollama`, `llm`).
-  `describe`/`tts` in the pyproject description don't exist.
-- Run tasks via `uv run glados <task> FILE ...`; each task is also a standalone
-  script (`uv run transcribe FILE`) using the same click.Command.
+- Run tasks via `uv run glados <task> PATH...`; each task is also a standalone
+  script (`uv run transcribe PATH...`) using the same click.Command.
+- Layout, shared by both tools (`docs/decisions/0005`): `<tool>/cli.py` is the
+  click group, `<tool>/commands/<command>.py` one click command each (wiring only),
+  domain modules hold the logic with no CLI (glados: `glados/tasks/`, only where a
+  task has logic beyond wiring). click may be imported only in `cli.py`,
+  `commands/` and `core/cli_*.py`; `tests/test_boundaries.py` fails otherwise.
+- Every command that writes a file runs a `Job` through `run_jobs`; reports,
+  renames and checks are plain functions under `run_batch` (`docs/decisions/0004`).
+- `multitool/` is a second tool in the same distribution (`docs/decisions/0003`),
+  with no backends or config. It may import only core's backend-free part
+  (`pipeline`, `progress`, `runners`, `inputs`, `batch`, `cli_options`), never
+  `core/backends.py`, `core/config.py`, `core/cli_common.py`,
+  `core/text_backend.py`, `glados.commands`, `glados.tasks` or `glados.plugins`;
+  glados never imports multitool. `tests/test_boundaries.py` checks both.
+- multitool's runtime binaries: ImageMagick (`magick`/`convert`), `exiftool`,
+  `ffmpeg`/`ffprobe`. Its image-hash code and tests need the extra:
+  `uv sync --extra multitool`.
 - Runtime needs `ffmpeg` and `ffprobe` on PATH, plus the selected transcribe
   backend's CLI: `whisper-cli` (`whisper_cpp`) or `whisper` from `openai-whisper`
   (`whisper`). Default models: `platformdirs.user_data_dir("whisper")/default-model.bin`
@@ -50,5 +65,7 @@
   `support.FakeHTTPServer`, never real services. Integration tests read
   `tests/integration.env` (git-ignored, holds secrets: never commit or print it) and
   skip when unconfigured. The `whisper` (OpenAI CLI) backend has no tests yet.
+  multitool's integration tests (`test_multitool_integration.py`) run the real
+  ImageMagick, exiftool and ffmpeg and skip when one is missing from PATH.
 - Call `whisper-cli` with long options only: it exits 0 on an unknown argument, so a
   wrong short flag fails silently. Its default language is `en`; pass `auto`.

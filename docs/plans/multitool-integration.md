@@ -1,6 +1,6 @@
 # Plan: finish integrating multitool into glados
 
-Status: proposed (2026-11-06). Branch `worktree-multitool-port`, after `53eeaa8`.
+Status: done (2026-11-06). Step 7 resolved by a shared command layout, decision 0005.
 
 ## Context
 

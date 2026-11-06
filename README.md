@@ -1,6 +1,8 @@
 # glados
 
-CLI toolkit that applies model backends to files, one task per command.
+CLI toolkit that applies model backends to files, one task per command. The same
+distribution also installs [`multitool`](#multitool), file utilities with no
+backends.
 
 | Task         | Status          | Input → output                                   |
 | :----------- | :-------------- | :----------------------------------------------- |
@@ -32,19 +34,29 @@ Backends:
   - `ollama`: a running Ollama server (default `http://localhost:11434`), plus an
     `api_key` if it needs one (ollama.com, or a server behind an authenticating proxy).
   - `llm`: `llm` on `PATH`, with its own keys and plugins configured.
+- For multitool: ImageMagick (`magick` or `convert`) and `exiftool` for `jpgize`,
+  `ffmpeg`/`ffprobe` for `mp4ize`, and the `multitool` extra (Pillow, pillow-heif) for
+  `img-hash` and `img-duplicates`.
 
 ## Install
 
 ```sh
-uv sync
+uv sync                       # glados
+uv sync --extra multitool     # also multitool's image hashing dependencies
 ```
 
 ## Usage
 
-Every task runs as `glados <task> FILE ...` or as its own command (`transcribe FILE ...`).
+Every task runs as `glados <task> PATH...` or as its own command (`transcribe PATH...`).
+`PATH` may be a file or a directory; directories are walked recursively for the files
+the task handles (audio/video for `transcribe`, text files for the others, skipping
+the task's own earlier outputs), and each file gets its own output next to it. If an
+input fails, the rest still run and the command exits 1 at the end.
 
 ```sh
 uv run transcribe talk.mp4                    # -> talk.txt (backend from [tasks])
+uv run transcribe lectures/ extra.m4a         # every audio/video file under lectures/, plus extra.m4a
+uv run rewrite -n notes/                      # print input -> destination, change nothing
 uv run glados transcribe -b whisper talk.mp4 -f vtt -l en -m small
 uv run transcribe -b whisper_cpp talk.mp4 -m ~/models/ggml-small.bin -o subs/talk.srt -y   # SRT, from -o
 uv run rewrite -b ollama notes.md -i "more formal tone"   # -> notes.rewrite.md
@@ -56,8 +68,9 @@ Common options:
 
 | Option                  | Meaning                                                     |
 | :---------------------- | :---------------------------------------------------------- |
-| `-o, --output FILE`     | explicit destination (default: derived from the input name) |
+| `-o, --output FILE`     | explicit destination, only with a single input file (default: derived from the input name) |
 | `-y, --overwrite`       | overwrite an existing destination                           |
+| `-n, --dry-run`         | print `input -> destination` per input; resolve no backend, write nothing |
 | `-b, --backend NAME`    | backend for this task (also `GLADOS_<TASK>_BACKEND`)        |
 | `-m, --model MODEL`     | overrides the backend's `model` option (name or path)       |
 | `-v` / `-q`             | more / less logging (repeatable)                            |
@@ -124,9 +137,39 @@ existing `[backends.whisper]` settings for whisper.cpp to `[backends.whisper_cpp
 Progress is drawn as rich bars on a terminal and as plain percentage lines otherwise
 (piped stderr, `TERM=dumb`, `RICH_DISABLED=1`).
 
+## multitool
+
+File utilities without backends or config, run as `multitool <command>`:
+
+| Command                     | What it does                                                          |
+| :-------------------------- | :-------------------------------------------------------------------- |
+| `sidecars scan PATH...`     | list groups of files sharing a name (`-e jpg -e mp4`: only groups with all of them) |
+| `sidecars find FILE`        | list the sidecar files of FILE                                        |
+| `motionphotos check FILE`   | exit 0 if FILE is a motion photo, 1 if not                            |
+| `motionphotos join/split/strip` | build a motion photo from a JPEG and an MP4, take one apart, or drop its video |
+| `motionphotos merge PATH...`| merge each `NAME.jpg` + `NAME.mp4` pair into `NAME.jpg` (`--rm`: remove the video) |
+| `jpgize PATH...`            | HEIC/HEIF/WebP/PNG → JPEG, upright, keeping metadata and timestamps (`--rm`: remove sources) |
+| `mp4ize PATH...`            | remux videos into MP4 without re-encoding the video (`--rm`: remove sources) |
+| `img-hash PATH...`          | print each image's average hash (cached; `--no-cache`)                |
+| `img-duplicates PATH...`    | groups of near-duplicate images (`--max-distance`, `-x CMD` per group) |
+| `hash-rename PATH...`       | rename each file to `<digest of its content>.<ext>` (`--algo`)        |
+
+```sh
+uv run multitool jpgize -n ~/Pictures/import     # print the planned conversions
+uv run multitool motionphotos merge --rm ~/DCIM
+uv run multitool img-duplicates ~/Pictures -x "echo"
+```
+
+`jpgize`, `mp4ize`, `motionphotos merge` and `hash-rename` take `-n/--dry-run`; commands
+that would replace an existing file need `-y/--overwrite`. Commands taking `PATH...`
+keep going when one input fails (exit 1 at the end); `jpgize`, `mp4ize` and `merge`
+print `Wrote <dest>` for each written file. Logging options (`-v`, `-q`, `--log-level`, `MULTITOOL_LOG_LEVEL`) go before the
+command: `multitool -v jpgize ...`.
+
 ## Development
 
 ```sh
+uv sync --extra multitool     # so the image-hash tests run
 uv run ruff check --fix . && uv run ruff format .
 uv run python -m unittest discover -s tests -v
 ```
@@ -136,40 +179,14 @@ Each backend also has an integration test against the real thing (`whisper-cli`,
 an Ollama server, an OpenAI-compatible API), skipped until it is configured: copy
 `tests/integration.env.example` to `tests/integration.env` (git-ignored, it holds
 secrets) and fill in the backends to test. `GLADOS_TEST_*` environment variables
-override the file.
+override the file. multitool's integration tests run the real ImageMagick, exiftool
+and ffmpeg, and skip when they are not on `PATH`.
 
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the module layout and how to add a
 backend, and [docs/decisions/](docs/decisions/) for recorded decisions.
 
 ## Roadmap
 
-- **Several inputs per command, recursive on directories.** Accept any mix of files
-  and directories (`uv run transcribe lectures/ extra.m4a`); directories are walked
-  recursively for the files the task handles, and each file gets its own output next
-  to it. `-o` stays limited to a single input. See
-  [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#inputs). Adapting the current code:
-  - task commands (`tasks/*.py`): replace the single `input_path` argument with
-    `PATH...` (files or directories, at least one);
-  - `core/`: expand the paths into input files (recursive walk, with a per-task
-    filter for which files qualify), and run one `Job` per file through
-    `GladosContext.run_job`;
-  - each task: declare its accepted files (`transcribe`: audio/video; text tasks:
-    text files);
-  - reject `-o/--output` unless the paths expand to exactly one file;
-  - tests for the expansion, the per-task filter and the `-o` rule.
-- **multitool: the ocdutils file utilities as a second tool.** Same repository and
-  distribution, without the plugin system
-  ([decision 0003](docs/decisions/0003-multitool-in-the-same-distribution.md)):
-  - split `core/cli_common.py` into generic options and the backend-bound
-    `GladosContext`, so multitool imports only the backend-free part;
-  - add the `multitool` package, its `[project.scripts]` entry point and the
-    `multitool` extra (Pillow, pillow-heif);
-  - port `sidecars`, `motionphotos`, `jpgize`, `mp4ize`, `img-hash`,
-    `img-duplicates` (Hamming threshold) and `hash-rename`, with plan/apply and
-    `--dry-run` for the ones that change files, fixing the ocdutils bugs on the
-    way (inverted dry-run check in EXIF cloning, unchecked `convert` failures,
-    first-marker motion-photo split);
-  - tests per command; then describe both tools in `ARCHITECTURE.md` and here.
 - **whisper.cpp on the AMD Ryzen AI NPU.** whisper.cpp ≥ 1.9 can offload the encoder
   to the XDNA NPU via VitisAI (`-DWHISPER_VITISAI=1`); no glados change is needed,
   only the host setup:

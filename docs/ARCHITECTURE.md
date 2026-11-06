@@ -1,19 +1,30 @@
 # Architecture
 
-glados is a set of file-based tasks. Each task is a click command that builds a `Job`
-from pipeline steps, gets a backend for its task Protocol, and runs the job with
-progress reporting. A command is not limited to one input: it may take several files
-and directories (see [Inputs](#inputs)).
+The repository holds two command-line tools in one distribution
+([decision 0003](decisions/0003-multitool-in-the-same-distribution.md)):
+
+- **glados**: file-based tasks backed by models. Each task is a click command that
+  builds a `Job` from pipeline steps, gets a backend for its task Protocol, and runs the
+  job over every input with progress reporting.
+- **multitool**: file utilities (sidecars, motion photos, conversions, image hashes,
+  renames) with no backends. It reuses glados' backend-free core (see
+  [multitool](#multitool)).
+
+Every command takes several files and directories (see [Inputs](#inputs)).
 
 ```
 glados/
   cli.py              entry point: `glados` group, one subcommand per task
-  tasks/              one module per task: steps + click command; protocols.py
+  commands/           one click command per task (transcribe, rewrite, summarize, expand)
+  tasks/              task domain code: protocols.py (task Protocols), transcribe.py (steps, formatters)
   core/               task-agnostic machinery
-    cli_common.py     GladosContext, shared click options (file, backend, model, logging)
+    cli_options.py    backend-free click options, run_jobs/job_action, print_plan (-n), finish_batch
+    cli_common.py     GladosContext, backend/model options, glados' logging options
+    inputs.py         PATH... expansion into input files, per-command file filters
+    batch.py          run_batch: one action per input, failures logged and collected
     config.py         Config model, config file loading and validation
     backends.py       backend discovery (entry-point metadata), selection, loading
-    pipeline.py       Job, ProgressStep Protocol, destination policies
+    pipeline.py       Job, ProgressStep Protocol, TextStep, BytesStep, destination policies, JOB_ERRORS
     progress.py       ProgressEvent/ProgressStream, rich and plain reporters
     runners.py        FFMpegRunner (ffmpeg/ffprobe subprocess with progress)
     text_backend.py   ChatTransport Protocol; TextBackend: rewrite/summarize/expand over it
@@ -22,18 +33,37 @@ glados/
     openai.py         openai (Chat Completions, any compatible server): text tasks
     ollama.py         ollama (native /api/chat): text tasks
     llm.py            llm (the llm CLI): text tasks
-tests/                unittest suite, one module per backend module; support.py: shared fakes
+multitool/
+  cli.py              entry point: `multitool` group
+  commands/           one module per tool: sidecars, motionphotos, conversions (jpgize, mp4ize),
+                      imghash (img-hash, img-duplicates), renames (hash-rename)
+  sidecars.py, motionphotos.py, conversions.py, imghash.py, renamers.py
+                      domain code: grouping, motion-photo parsing, conversion steps, average hash,
+                      rename planning
+  media.py            which files are images/videos and which ones each converter takes
+  external.py         ImageMagick and exiftool adapters, user commands
+tests/                unittest suite: one module per backend module or tool area; support.py: shared fakes
 ```
 
 ## Layers
 
-- **Entry points**: `glados/cli.py` and each task's `cli` command, both installed
-  through `[project.scripts]`, so a task is the same `click.Command` whether it runs as
-  `glados <task>` or standalone. Commands only parse options, ask `GladosContext` for
-  the backend and hand a `Job` to `GladosContext.run_job`.
+- **Entry points**: `<tool>/cli.py` (the click group) and `<tool>/commands/` (one click
+  command each), the same layout in both tools
+  ([decision 0005](decisions/0005-one-command-layout.md)). glados' task commands are
+  also installed on their own through `[project.scripts]`, so a task is the same
+  `click.Command` whether it runs as `glados <task>` or standalone. Commands only parse
+  options, expand inputs, wire adapters (glados: the backend, from `GladosContext`) and
+  hand the work to `run_jobs` or `run_batch`. click is imported only in `cli.py`,
+  `commands/` and `core/cli_*.py`; `tests/test_boundaries.py` enforces it.
+- **Domain** (`glados/tasks/`, multitool's top-level modules): steps, formatters,
+  parsing and planning, with no CLI. A command that only wires shared core pieces (the
+  text tasks: one `TextStep`) has no domain module.
 - **Core** (`core/`): orchestration with no task knowledge. `Job` chains
   `ProgressStep[Path]` steps, each consuming the previous step's output path, and moves
-  the last result to the destination; intermediates are deleted.
+  the last result to the destination; intermediates are deleted. Core has a
+  backend-free part (`pipeline`, `progress`, `runners`, `inputs`, `batch`,
+  `cli_options`), shared with multitool, and a backend part (`backends`, `config`,
+  `cli_common`, `text_backend`), used only by glados.
 - **Contracts** (`tasks/protocols.py`): one `Protocol` per task (`Transcriber`,
   `Rewriter`, `Summarizer`, `Expander`) plus `TranscriptSegment`. Backends satisfy them
   structurally.
@@ -43,44 +73,64 @@ tests/                unittest suite, one module per backend module; support.py:
 
 ## Inputs
 
-A one-input, one-output command is not a design limit. A command may accept several
-`PATH` arguments, mixing files and directories:
+Commands take `PATH...` (`cli_options.paths_argument`), mixing files and directories,
+expanded by `core/inputs.expand_inputs`:
 
 - A file argument is used as is.
-- A directory argument is walked recursively, and contributes the files that task
-  accepts (e.g. `transcribe` picks up the audio/video files of a directory tree).
-  Which files qualify is the task's decision, not core's.
-- The arguments are expanded into a list of input files first; then each input file
-  runs as its own `Job`, with its destination derived from that file (next to it).
-  `Job` stays the unit of one input file → one output file.
+- A directory argument is walked recursively, and contributes the files the command
+  accepts (`transcribe`: audio/video; the text tasks: text files except their own
+  earlier outputs, `<name>.<infix>.<ext>`, so a second run on a directory does not
+  process its results). Which files qualify is the command's decision, not core's.
+- Inputs keep argument order, each directory's files sorted, without duplicates.
+  Then each input runs as its own `Job`, with its destination derived from that file
+  (next to it). `Job` stays the unit of one input file → one output file.
 - `-o/--output` names one destination, so it only applies when the arguments
-  expand to exactly one file.
+  expand to exactly one file (`check_single_output`, a usage error otherwise).
 
-Status: specified, not implemented yet. Every command currently takes a single
-`FILE`.
+Failure policy (`core/batch.run_batch`, [decision 0004](decisions/0004-jobs-and-batches.md)):
+an input that fails with one of `pipeline.JOB_ERRORS` (`OSError`, `RuntimeError`,
+`ValueError`, `SubprocessError`) is logged and recorded, and the remaining inputs still
+run. Anything else is a bug and propagates. `finish_batch` prints `N done, M failed`
+and exits 1 if any input failed. `run_jobs` wraps both for commands that write files
+and prints `Wrote <dest>` for each result.
+
+`-n/--dry-run` (every command that changes files) prints the plan and returns before
+any tool or backend is resolved: `input -> destination` for glados' tasks
+(`print_plan`), each planned operation for multitool's.
+
+## Landing results
+
+Steps write temp files under `$TMPDIR`; `Job` moves the last one to the destination
+with `pipeline.move_to_destination`, re-checking the destination first (`-y` to
+replace it). On the same filesystem that is a rename. Across filesystems
+(`EXDEV`), the file is copied next to the destination and renamed over it, so an
+interrupted copy never leaves a truncated destination, also when replacing a file in
+place (`motionphotos merge`, `strip -y`).
 
 ## Data flow (transcribe)
 
 ```
-transcribe FILE
+transcribe PATH...
+  -> inputs = expand_inputs(PATH..., audio/video)
   -> GladosContext.backend("transcribe", Transcriber, -b, {"model": -m})
        config (lazy) -> backends.select -> backends.load -> e.g. WhisperCppBackend
-  -> Job([AudioExtractor, TranscribeStep], dest = FILE.<format> or -o)
+  -> Job([AudioExtractor, TranscribeStep], dest = INPUT.<format> or -o)
        AudioExtractor: ffmpeg -> temp mono 16 kHz WAV
        TranscribeStep: Transcriber.transcribe -> segments -> FORMATTERS[format] -> temp file
-  -> move temp file to destination
+  -> run_jobs: per input, run the Job and move its temp file to the destination
 ```
 
 ## Data flow (rewrite, summarize, expand)
 
 ```
-rewrite FILE -i INSTRUCTIONS
+rewrite PATH... -i INSTRUCTIONS
+  -> inputs = expand_inputs(PATH..., text files except *.rewrite.*)
   -> prompt = config.prompts.render_rewrite(INSTRUCTIONS)     ([prompts] or default)
   -> GladosContext.backend("rewrite", Rewriter, -b, {"model": -m}) -> TextBackend
   -> Job([TextStep(text -> Rewriter.rewrite(text, prompt=prompt))],
-         dest = FILE.rewrite.<ext> or -o)
+         dest = INPUT.rewrite.<ext> or -o)
        TextStep: read UTF-8 -> transport.complete(prompt, text) streams the reply -> temp file
-  -> move temp file to destination
+  -> run_jobs: per input, run the Job and move its temp file to the destination
 ```
 
 `summarize` and `expand` have the same shape (`--max-length` / `--target-length` fill
@@ -92,6 +142,30 @@ all three. Prompts belong to the tasks, not to the backends.
 
 Steps and backends yield `ProgressEvent`s; the final event has `done=True` and carries
 the result. `Job` feeds the events to a reporter from `progress.create_reporter()`.
+In a batch, `run_batch` shows one overall bar and hands each input a reporter that
+`remove()`s every step's bar once it completes.
+
+## multitool
+
+multitool has no backends, entry-point groups or config. Its commands use the
+backend-free core: `Job` and `run_jobs` for every command that writes a file, plain
+functions under `run_batch` for reports, renames and checks, and `cli_options` for
+`PATH...`, `-y`, `-n` and logging (`logging_options_for("multitool")`).
+
+- Commands that change files (`jpgize`, `mp4ize`, `motionphotos`, `hash-rename`) plan
+  first (`plan_conversions`, `plan_merges`, `plan_rename`), then apply, so `-n` prints
+  the plan without touching anything or requiring the external tools.
+- In-memory transforms (motion-photo join/split/strip) are `BytesStep`s; `jpgize` is
+  `JpegConversionStep` (ImageMagick, then exiftool copies the tags except Orientation)
+  and `mp4ize` is `Mp4RemuxStep` (ffmpeg through `core/runners.py`, copying the video
+  stream; the audio is copied or, failing that, re-encoded to AAC).
+- `img-hash`/`img-duplicates` need the `multitool` extra (Pillow, pillow-heif);
+  `multitool.imghash` is imported only when one of them runs.
+
+Boundary ([decision 0003](decisions/0003-multitool-in-the-same-distribution.md)):
+multitool imports only core's backend-free part, never `glados.commands`,
+`glados.tasks`, `glados.plugins` or core's backend part, and glados never imports
+multitool. `tests/test_boundaries.py` checks both directions.
 
 ## Backends
 
@@ -131,6 +205,13 @@ Tests exercise backends directly (options model, transport/backend object,
   read `GLADOS_TEST_*` settings from `tests/integration.env` (git-ignored; template in
   `integration.env.example`), overridden by the environment, and skip their class when
   the backend's enabling setting is empty.
+- **multitool** is tested through its domain modules, its conversion steps against fake
+  executables, and its commands through click's `CliRunner`. Its integration tests
+  (`tests/test_multitool_integration.py`) run the real ImageMagick, exiftool and
+  ffmpeg and skip when a tool is not on `PATH`; the image-hash tests skip without the
+  `multitool` extra.
+- **Boundaries** (`tests/test_boundaries.py`) parse the sources with `ast`: the
+  multitool/glados import boundary and where click may be imported.
 
 The OpenAI `whisper` backend has no tests yet.
 
@@ -149,5 +230,7 @@ Both come from `foundation`:
   rich or plain reporter from `RICH_STDERR_ENABLED`.
 - `cli_common.logging_options` adds `--log-level`/`-v`/`-q` to every task command and
   calls `foundation.loglib.setup_logger_from_click("glados", ...)`. Without flags the
-  level comes from `GLADOS_LOG_LEVEL`, else `warning`. Modules log via
+  level comes from `GLADOS_LOG_LEVEL`, else `warning`. It is
+  `cli_options.logging_options_for("glados")`; multitool's group uses
+  `logging_options_for("multitool")` (`MULTITOOL_LOG_LEVEL`). Modules log via
   `logging.getLogger(__name__)`; log records and progress bars share the stderr console.
