@@ -29,7 +29,8 @@ class OpenAIOptions(pydantic.BaseModel):
     model: str = "gpt-4.1-mini"
     base_url: str = "https://api.openai.com/v1"
     api_key: pydantic.SecretStr | None = pydantic.Field(
-        default_factory=lambda: os.environ.get("OPENAI_API_KEY") or None
+        default_factory=lambda: os.environ.get("OPENAI_API_KEY") or None,
+        validate_default=True,
     )
     timeout: float = 600
 
