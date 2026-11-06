@@ -1,0 +1,33 @@
+# glados
+
+- Only `transcribe` is implemented. `rewrite`, `summarize`, `expand` are stubs
+  (raise NotImplementedError); `describe`/`tts` in the pyproject description don't exist.
+- Run tasks via `uv run glados <task> FILE ...`; each task is also a standalone
+  script (`uv run transcribe FILE`) using the same click.Command.
+- Runtime needs `ffmpeg`, `ffprobe` and `whisper-cli` on PATH. Default whisper model:
+  `platformdirs.user_data_dir("whisper")/default-model.bin`; override with `-m`.
+- Backends live in `glados/plugins/<name>.py`, one module per backend. Never put
+  non-plugin modules there.
+- Which backend implements which task is declared in `pyproject.toml`, one
+  entry-point group per task (`glados.backends.<task>`). The name is the backend,
+  and the value must be `glados.plugins.<name>:__glados_plugin__`. Run `uv sync`
+  after editing it. See `docs/decisions/0001`.
+- `__glados_plugin__(options)` validates its global options with its own pydantic
+  model (`extra="forbid"`, defaults for everything) and returns
+  `(task name, task Protocol, object)` triples, one per task. It is loaded through
+  `foundation.plugin.Register` (`core/backends.py`), and only for the selected
+  backend.
+- Backend selection per task: `-b`, then `GLADOS_<TASK>_BACKEND`, then `[tasks]` in
+  the config, then the only installed implementor. Options: model defaults, then
+  `[backends.<name>]`, then CLI overrides (`-m` → `model`). Per-run values are
+  method arguments, not options.
+- Config is optional: `$XDG_CONFIG_HOME/glados/config.toml`, `${VAR}` expanded,
+  `.env` loaded. It is read on first use in `GladosContext`, never at import.
+- The backend registry is a deliberate exception to `architecture.md`'s "no plugin
+  registries" rule: backends are the replaceable part here. Keep it.
+- Nothing is imported until a backend is selected. A broken backend fails only
+  when selected, with a clear error. Options of unused backends are not
+  validated.
+- Tasks whose output has the same extension as the input must use
+  `infix_destination`; `suffix_destination` would overwrite the input.
+- There are no tests yet.
