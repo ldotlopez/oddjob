@@ -24,8 +24,10 @@ from glados.core.cli_common import (
 from glados.core.cli_options import (
     check_single_output,
     common_file_options,
+    dry_run_option,
     job_action,
     paths_argument,
+    print_plan,
     run_jobs,
 )
 from glados.core.inputs import expand_inputs, text_inputs_except_outputs
@@ -47,6 +49,7 @@ DEFAULT_INFIX = "rewrite"
 @model_option
 @backend_option("rewrite")
 @common_file_options
+@dry_run_option
 @logging_options
 @pass_glados_context
 def cli(
@@ -57,17 +60,22 @@ def cli(
     backend: str | None,
     output: Path | None,
     overwrite: bool,
+    dry_run: bool,
 ) -> None:
     """Rewrite each input in PATH... per --instructions."""
     inputs = expand_inputs(paths, text_inputs_except_outputs(DEFAULT_INFIX))
     check_single_output(output, inputs)
+    dest_fn = override_destination(output, infix_destination(DEFAULT_INFIX))
+    if dry_run:
+        print_plan(inputs, dest_fn)
+        return
     prompt = ctx.config().prompts.render_rewrite(instructions)
     rewriter = ctx.backend("rewrite", Rewriter, backend, {"model": model})
     job = Job(
         steps=[
             (TextStep(lambda text: rewriter.rewrite(text, prompt=prompt)), "Rewriting")
         ],
-        dest_fn=override_destination(output, infix_destination(DEFAULT_INFIX)),
+        dest_fn=dest_fn,
     )
     run_jobs(inputs, job_action(job, overwrite), "Rewriting")
 

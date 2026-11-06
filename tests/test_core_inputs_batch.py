@@ -207,6 +207,28 @@ class MultipleInputTaskTests(unittest.TestCase):
             self.assertEqual(result.exit_code, 2, result.output)
             self.assertIn("exactly one input file", result.output)
 
+    def test_dry_run_prints_the_plan_without_a_backend(self) -> None:
+        tmp = make_tmp(self)
+        for name in ("a.txt", "b.md"):
+            (tmp / name).write_text("text")
+        runner = CliRunner()
+        no_backend = {
+            "XDG_CONFIG_HOME": str(tmp / "config"),
+            "GLADOS_REWRITE_BACKEND": None,
+        }
+        result = runner.invoke(rewrite.cli, ["-n", str(tmp)], env=no_backend)
+        self.assertEqual(result.exit_code, 0, result.output)
+        self.assertEqual(
+            result.output.splitlines(),
+            [
+                f"{tmp / 'a.txt'} -> {tmp / 'a.rewrite.txt'}",
+                f"{tmp / 'b.md'} -> {tmp / 'b.rewrite.md'}",
+            ],
+        )
+        self.assertEqual(sorted(p.name for p in tmp.iterdir()), ["a.txt", "b.md"])
+        without_dry_run = runner.invoke(rewrite.cli, [str(tmp)], env=no_backend)
+        self.assertEqual(without_dry_run.exit_code, 1, without_dry_run.output)
+
 
 if __name__ == "__main__":
     unittest.main()

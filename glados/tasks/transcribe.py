@@ -33,8 +33,10 @@ from glados.core.cli_common import (
 from glados.core.cli_options import (
     check_single_output,
     common_file_options,
+    dry_run_option,
     job_action,
     paths_argument,
+    print_plan,
     run_jobs,
 )
 from glados.core.inputs import expand_inputs, media_type_filter
@@ -278,6 +280,7 @@ class TranscribeStep:
 )
 @backend_option("transcribe")
 @common_file_options
+@dry_run_option
 @logging_options
 @pass_glados_context
 def cli(
@@ -289,11 +292,16 @@ def cli(
     backend: str | None,
     output: Path | None,
     overwrite: bool,
+    dry_run: bool,
 ) -> None:
     """Extract audio and transcribe each input in PATH... to a plain-text or subtitle sidecar."""
     inputs = expand_inputs(paths, media_type_filter("audio/", "video/"))
     check_single_output(output, inputs)
     output_format = resolve_output_format(output_format, output)
+    dest_fn = override_destination(output, suffix_destination(output_format))
+    if dry_run:
+        print_plan(inputs, dest_fn)
+        return
     transcriber = ctx.backend("transcribe", Transcriber, backend, {"model": model})
     job = Job(
         steps=[
@@ -305,7 +313,7 @@ def cli(
                 "Transcribing",
             ),
         ],
-        dest_fn=override_destination(output, suffix_destination(output_format)),
+        dest_fn=dest_fn,
     )
     run_jobs(inputs, job_action(job, overwrite), "Transcribing")
 

@@ -15,7 +15,7 @@ from foundation.clilib import click_logging_options
 from foundation.loglib import setup_logger_from_click
 
 from glados.core.batch import BatchReport, run_batch
-from glados.core.pipeline import JOB_ERRORS, Job
+from glados.core.pipeline import JOB_ERRORS, DestinationFn, Job
 from glados.core.progress import BaseProgressReporter, create_reporter
 
 type Decorator[F] = Callable[[F], F]
@@ -112,6 +112,12 @@ def finish_batch(*reports: BatchReport) -> None:
     if failed:
         click.echo(f"{succeeded} done, {failed} failed", err=True)
         raise click.exceptions.Exit(1)
+
+
+def print_plan(inputs: Sequence[Path], dest_fn: DestinationFn) -> None:
+    """--dry-run: print where each input would land, change nothing."""
+    for input_path in inputs:
+        click.echo(f"{input_path} -> {dest_fn(input_path)}")
 
 
 type JobAction[T] = Callable[[T, BaseProgressReporter], Path]
