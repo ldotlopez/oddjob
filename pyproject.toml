@@ -66,7 +66,8 @@ multitool = [
 [tool.uv]
 package = true
 
-# Two top-level packages in one distribution (docs/decisions/0003).
+# Three top-level packages in one distribution: the two tools and their
+# shared filejobs (docs/decisions/0003, 0006).
 [tool.setuptools.packages.find]
 include = ["glados*", "multitool*", "filejobs*"]
 

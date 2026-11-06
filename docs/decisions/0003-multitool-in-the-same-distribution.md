@@ -1,6 +1,6 @@
 # 0003. multitool lives in the glados distribution, without the plugin system
 
-Status: accepted (2026-11-06), not implemented yet.
+Status: accepted (2026-11-06); partly superseded by 0006
 
 ## Context
 

@@ -1,6 +1,6 @@
 # 0005. One command layout for glados and multitool
 
-Status: accepted (2026-11-06).
+Status: accepted (2026-11-06); partly superseded by 0006
 
 ## Context
 

@@ -8,15 +8,16 @@
   click group, `<tool>/commands/<command>.py` one click command each (wiring only),
   domain modules hold the logic with no CLI (glados: `glados/tasks/`, only where a
   task has logic beyond wiring). click may be imported only in `cli.py`,
-  `commands/` and `core/cli_*.py`; `tests/test_boundaries.py` fails otherwise.
+  `commands/`, `filejobs/cli_*.py` and `glados/core/cli_*.py`;
+  `tests/test_boundaries.py` fails otherwise.
 - Every command that writes a file runs a `Job` through `run_jobs`; reports,
   renames and checks are plain functions under `run_batch` (`docs/decisions/0004`).
 - `multitool/` is a second tool in the same distribution (`docs/decisions/0003`),
-  with no backends or config. It may import only core's backend-free part
-  (`pipeline`, `progress`, `runners`, `inputs`, `batch`, `cli_options`), never
-  `core/backends.py`, `core/config.py`, `core/cli_common.py`,
-  `core/text_backend.py`, `glados.commands`, `glados.tasks` or `glados.plugins`;
-  glados never imports multitool. `tests/test_boundaries.py` checks both.
+  with no backends or config. The backend-free core both tools share is
+  `filejobs/` (`pipeline`, `progress`, `runners`, `inputs`, `batch`,
+  `cli_options`; `docs/decisions/0006`); `glados/core/` holds only glados' backend
+  part. multitool never imports `glados`, glados never imports multitool, and
+  filejobs imports neither. `tests/test_boundaries.py` checks all three.
 - multitool's runtime binaries: ImageMagick (`magick`/`convert`), `exiftool`,
   `ffmpeg`/`ffprobe`. Its image-hash code and tests need the extra:
   `uv sync --extra multitool`.
@@ -25,7 +26,7 @@
   (`whisper`). Default models: `platformdirs.user_data_dir("whisper")/default-model.bin`
   for `whisper_cpp`, `turbo` for `whisper`; override with `-m`. Text backends need
   their service (OpenAI-compatible API, Ollama) or the `llm` CLI.
-- Text backends are only `core.text_backend.ChatTransport`s; `TextBackend` adapts a
+- Text backends are only `tasks.text_backend.ChatTransport`s; `TextBackend` adapts a
   transport to `Rewriter`/`Summarizer`/`Expander` and `text_plugin_triples()` is the
   plugin's return value. Prompts live in `Config.prompts` (`[prompts]`), owned by the
   tasks, never in a backend.
