@@ -30,4 +30,9 @@
   validated.
 - Tasks whose output has the same extension as the input must use
   `infix_destination`; `suffix_destination` would overwrite the input.
+- Console and logging come from `foundation`: progress reporters use
+  `foundation.clilib.get_stderr_console()`/`RICH_STDERR_ENABLED`; every task command
+  takes `--log-level`/`-v`/`-q` via `cli_common.logging_options`, which sets up the
+  `glados` logger with `foundation.loglib` (`GLADOS_LOG_LEVEL` when no flag is given).
+  Modules log through `logging.getLogger(__name__)`.
 - There are no tests yet.
