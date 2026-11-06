@@ -1,13 +1,19 @@
 # glados
 
-- Only `transcribe` is implemented. `rewrite`, `summarize`, `expand` are stubs
-  (raise NotImplementedError); `describe`/`tts` in the pyproject description don't exist.
+- Implemented tasks: `transcribe` (backends `whisper`, `whisper_cpp`) and the text
+  tasks `rewrite`, `summarize`, `expand` (backends `openai`, `ollama`, `llm`).
+  `describe`/`tts` in the pyproject description don't exist.
 - Run tasks via `uv run glados <task> FILE ...`; each task is also a standalone
   script (`uv run transcribe FILE`) using the same click.Command.
 - Runtime needs `ffmpeg` and `ffprobe` on PATH, plus the selected transcribe
   backend's CLI: `whisper-cli` (`whisper_cpp`) or `whisper` from `openai-whisper`
   (`whisper`). Default models: `platformdirs.user_data_dir("whisper")/default-model.bin`
-  for `whisper_cpp`, `turbo` for `whisper`; override with `-m`.
+  for `whisper_cpp`, `turbo` for `whisper`; override with `-m`. Text backends need
+  their service (OpenAI-compatible API, Ollama) or the `llm` CLI.
+- Text backends are only `core.text_backend.ChatTransport`s; `TextBackend` adapts a
+  transport to `Rewriter`/`Summarizer`/`Expander` and `text_plugin_triples()` is the
+  plugin's return value. Prompts live in `Config.prompts` (`[prompts]`), owned by the
+  tasks, never in a backend.
 - Backends live in `glados/plugins/<module>.py`; one module may provide several
   backends (e.g. `whisper.py`: `whisper` and `whisper_cpp`). Never put non-plugin
   modules there.

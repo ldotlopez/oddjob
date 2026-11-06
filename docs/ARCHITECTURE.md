@@ -15,8 +15,12 @@ glados/
     pipeline.py       Job, ProgressStep Protocol, destination policies
     progress.py       ProgressEvent/ProgressStream, rich and plain reporters
     runners.py        FFMpegRunner (ffmpeg/ffprobe subprocess with progress)
+    text_backend.py   ChatTransport Protocol; TextBackend: rewrite/summarize/expand over it
   plugins/            backend modules, each providing one or more backends (only backends live here)
-    whisper.py        whisper (OpenAI CLI) and whisper_cpp (whisper-cli), implement transcribe
+    whisper.py        whisper (OpenAI CLI) and whisper_cpp (whisper-cli): transcribe
+    openai.py         openai (Chat Completions, any compatible server): text tasks
+    ollama.py         ollama (native /api/chat): text tasks
+    llm.py            llm (the llm CLI): text tasks
 ```
 
 ## Layers
@@ -31,9 +35,9 @@ glados/
 - **Contracts** (`tasks/protocols.py`): one `Protocol` per task (`Transcriber`,
   `Rewriter`, `Summarizer`, `Expander`) plus `TranscriptSegment`. Backends satisfy them
   structurally.
-- **Adapters**: `core/runners.py` (ffmpeg) and the backends in `plugins/` (`whisper`,
-  `whisper-cli`).
-  They do the subprocess I/O and report progress as a `ProgressStream`.
+- **Adapters**: `core/runners.py` (ffmpeg) and the backends in `plugins/`: subprocesses
+  (`whisper`, `whisper-cli`, `llm`) and HTTP (`openai`, `ollama`, via `requests`). They
+  do the I/O and report progress as a `ProgressStream`.
 
 ## Data flow (transcribe)
 
@@ -46,6 +50,25 @@ transcribe FILE
        TranscribeStep: Transcriber.transcribe -> segments -> FORMATTERS[format] -> temp file
   -> move temp file to destination
 ```
+
+## Data flow (rewrite, summarize, expand)
+
+```
+rewrite FILE -i INSTRUCTIONS
+  -> prompt = config.prompts.render_rewrite(INSTRUCTIONS)     ([prompts] or default)
+  -> GladosContext.backend("rewrite", Rewriter, -b, {"model": -m}) -> TextBackend
+  -> Job([TextStep(text -> Rewriter.rewrite(text, prompt=prompt))],
+         dest = FILE.rewrite.<ext> or -o)
+       TextStep: read UTF-8 -> transport.complete(prompt, text) streams the reply -> temp file
+  -> move temp file to destination
+```
+
+`summarize` and `expand` have the same shape (`--max-length` / `--target-length` fill
+the prompt's `{length}`; outputs `FILE.summary.<ext>`, `FILE.expanded.<ext>`). The LLM
+backends are only `ChatTransport`s (one system prompt, one user message, streamed
+reply); `core/text_backend.py` wraps a transport into one `TextBackend` that satisfies
+`Rewriter`, `Summarizer` and `Expander`, and `text_plugin_triples()` returns it under
+all three. Prompts belong to the tasks, not to the backends.
 
 Steps and backends yield `ProgressEvent`s; the final event has `done=True` and carries
 the result. `Job` feeds the events to a reporter from `progress.create_reporter()`.
@@ -78,8 +101,8 @@ task it implements, then `uv sync`.
 
 `GladosContext.config()` loads the config on first use (never at import): `.env`, then
 `$XDG_CONFIG_HOME/glados/config.toml` with `${VAR}` expansion, validated into the frozen
-`Config` model and checked against the installed backends. A missing file is an empty
-config.
+`Config` model (`tasks`, `backends`, `prompts`) and checked against the installed
+backends. A missing file is an empty config.
 
 ## Console and logging
 
