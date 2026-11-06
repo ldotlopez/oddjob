@@ -9,13 +9,16 @@ CLI toolkit that applies model backends to files, one task per command.
 | `summarize`  | not implemented | text → `<name>.summary.<ext>`                    |
 | `expand`     | not implemented | text → `<name>.expanded.<ext>`                   |
 
-Backends: `whisper` (local whisper.cpp CLI) implements `transcribe`.
+Backends implementing `transcribe`: `whisper` (OpenAI's local `whisper` CLI) and
+`whisper_cpp` (local whisper.cpp `whisper-cli`).
 
 ## Requirements
 
 - Python 3.13+ and [uv](https://docs.astral.sh/uv/)
-- For `transcribe` with `whisper`: `ffmpeg`, `ffprobe` and `whisper-cli` on `PATH`,
-  and a ggml whisper model.
+- For `transcribe`: `ffmpeg` and `ffprobe` on `PATH`, plus the backend's CLI:
+  - `whisper`: `whisper` from [openai-whisper](https://github.com/openai/whisper)
+    (`uv tool install openai-whisper`); models are downloaded by name on first use.
+  - `whisper_cpp`: `whisper-cli` from whisper.cpp and a ggml whisper model.
 
 ## Install
 
@@ -28,9 +31,9 @@ uv sync
 Every task runs as `glados <task> FILE ...` or as its own command (`transcribe FILE ...`).
 
 ```sh
-uv run transcribe talk.mp4                    # -> talk.srt
-uv run glados transcribe talk.mp4 -f vtt -l en
-uv run transcribe talk.mp4 -m ~/models/ggml-small.bin -o subs/talk.srt -y
+uv run transcribe talk.mp4                    # -> talk.srt (backend from [tasks])
+uv run glados transcribe -b whisper talk.mp4 -f vtt -l en -m small
+uv run transcribe -b whisper_cpp talk.mp4 -m ~/models/ggml-small.bin -o subs/talk.srt -y
 ```
 
 Common options:
@@ -40,7 +43,7 @@ Common options:
 | `-o, --output FILE`     | explicit destination (default: derived from the input name) |
 | `-y, --overwrite`       | overwrite an existing destination                           |
 | `-b, --backend NAME`    | backend for this task (also `GLADOS_<TASK>_BACKEND`)        |
-| `-m, --model PATH`      | overrides the backend's `model` option                      |
+| `-m, --model MODEL`     | overrides the backend's `model` option (name or path)       |
 | `-v` / `-q`             | more / less logging (repeatable)                            |
 | `--log-level SPEC`      | e.g. `debug` or `glados.core:debug,*:info` (also `GLADOS_LOG_LEVEL`) |
 
@@ -54,17 +57,25 @@ from the environment (and a `.env` file); write a literal `$` as `$$`.
 
 ```toml
 [tasks]
-transcribe = "whisper"          # backend per task
+transcribe = "whisper_cpp"      # backend per task
 
-[backends.whisper]
+[backends.whisper]              # OpenAI whisper CLI
+model = "turbo"                 # model name, or path to a .pt checkpoint
+binary = "whisper"
+
+[backends.whisper_cpp]          # whisper.cpp
 model = "~/models/ggml-small.bin"
 binary = "whisper-cli"
 ```
 
 Backend selection: `-b`, then `GLADOS_<TASK>_BACKEND`, then `[tasks]`, then the only
-installed backend. Backend options: the backend's defaults, then `[backends.<name>]`,
-then CLI flags. The default whisper model is
-`$XDG_DATA_HOME/whisper/default-model.bin`.
+installed backend; with both whisper backends installed, `transcribe` needs one of
+those. Backend options: the backend's defaults, then `[backends.<name>]`, then CLI
+flags. Default models: `turbo` for `whisper`, `$XDG_DATA_HOME/whisper/default-model.bin`
+for `whisper_cpp`.
+
+`whisper` used to name the whisper.cpp backend; that one is now `whisper_cpp`. Move
+existing `[backends.whisper]` settings for whisper.cpp to `[backends.whisper_cpp]`.
 
 Progress is drawn as rich bars on a terminal and as plain percentage lines otherwise
 (piped stderr, `TERM=dumb`, `RICH_DISABLED=1`).
