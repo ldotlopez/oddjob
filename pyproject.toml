@@ -23,6 +23,8 @@ transcribe = "glados.tasks.transcribe:cli"
 rewrite = "glados.tasks.rewrite:cli"
 summarize = "glados.tasks.summarize:cli"
 expand = "glados.tasks.expand:cli"
+# File utilities without the backend registry (docs/decisions/0003).
+multitool = "multitool.cli:cli"
 
 # Which backend implements which task, readable without importing any
 # backend (see docs/decisions/0002). One group per task; the entry point's
@@ -48,6 +50,12 @@ llm = "glados.plugins.llm:__glados_plugin__"
 ollama = "glados.plugins.ollama:__glados_plugin__"
 openai = "glados.plugins.openai:__glados_plugin__"
 
+[project.optional-dependencies]
+multitool = [
+    "pillow>=13.0.0",
+    "pillow-heif>=1.8.1",
+]
+
 # [build-system]
 # requires = ["hatchling"]
 # build-backend = "hatchling.build"
@@ -57,6 +65,10 @@ openai = "glados.plugins.openai:__glados_plugin__"
 
 [tool.uv]
 package = true
+
+# Two top-level packages in one distribution (docs/decisions/0003).
+[tool.setuptools.packages.find]
+include = ["glados*", "multitool*"]
 
 [tool.uv.sources]
 foundation = { git = "https://github.com/ldotlopez/foundation.git", branch = "main" }

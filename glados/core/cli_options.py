@@ -94,9 +94,8 @@ def logging_options_for[F: Callable[..., object]](app_logger: str) -> Decorator[
 
 
 def finish_batch(report: BatchReport) -> None:
-    """Print the summary of a batch run; exit 1 if any input failed."""
-    for failure in report.failures:
-        click.echo(f"failed: {failure.item}: {failure.reason}", err=True)
+    """Print the summary of a batch run; exit 1 if any input failed. Each
+    failure was already logged when it happened (core/batch.py)."""
     if report.failures:
         click.echo(f"{report.succeeded} done, {len(report.failures)} failed", err=True)
         raise click.exceptions.Exit(1)
