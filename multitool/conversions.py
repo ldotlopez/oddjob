@@ -116,14 +116,16 @@ def run_conversion(
     reporter: BaseProgressReporter,
     *,
     overwrite: bool,
-) -> None:
-    """Run `step` on the source as a Job, then remove the source if asked."""
+) -> Path:
+    """Run `step` on the source as a Job, then remove the source if asked.
+    Returns the written destination."""
     if conversion.source.suffix.lower() == conversion.destination.suffix.lower():
         raise ValueError(f"already a {conversion.destination.suffix} file")
     job = Job(
         steps=[(step, f"Converting {conversion.source.name}")],
         dest_fn=lambda _source: conversion.destination,
     )
-    job.run(conversion.source, reporter, overwrite=overwrite)
+    written = job.run(conversion.source, reporter, overwrite=overwrite)
     if conversion.remove_source:
         conversion.source.unlink()
+    return written

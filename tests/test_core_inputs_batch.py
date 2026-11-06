@@ -12,7 +12,7 @@ from click.testing import CliRunner
 from support import NullReporter
 
 from glados.core.batch import run_batch
-from glados.core.cli_options import run_jobs
+from glados.core.cli_options import job_action, run_jobs
 from glados.core.inputs import (
     accept_all,
     expand_inputs,
@@ -134,7 +134,7 @@ class BytesStepAndRunJobsTests(unittest.TestCase):
 
         @click.command()
         def command() -> None:
-            run_jobs(self.job, self.inputs, overwrite=False, description="Testing")
+            run_jobs(self.inputs, job_action(self.job, overwrite=False), "Testing")
 
         result = runner.invoke(command, [])
         self.assertEqual(result.exit_code, 1, result.output)

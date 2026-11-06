@@ -114,17 +114,32 @@ def finish_batch(*reports: BatchReport) -> None:
         raise click.exceptions.Exit(1)
 
 
-def run_jobs(
-    job: Job, inputs: Sequence[Path], overwrite: bool, description: str
+type JobAction[T] = Callable[[T, BaseProgressReporter], Path]
+
+
+def job_action(job: Job, overwrite: bool) -> JobAction[Path]:
+    """Run `job` on one input file, returning where the result landed."""
+
+    def run(input_path: Path, reporter: BaseProgressReporter) -> Path:
+        return job.run(input_path, reporter, overwrite=overwrite)
+
+    return run
+
+
+def run_jobs[T](
+    items: Sequence[T],
+    action: JobAction[T],
+    description: str,
+    label: Callable[[T], str] = str,
 ) -> None:
-    """Run `job` on every input file, print where each result landed, then
-    the batch summary."""
+    """Run `action` on every item, print where each result landed, then the
+    batch summary. `action` returns the path it wrote."""
     written: list[Path] = []
 
-    def run(input_path: Path, reporter: BaseProgressReporter) -> None:
-        written.append(job.run(input_path, reporter, overwrite=overwrite))
+    def run(item: T, reporter: BaseProgressReporter) -> None:
+        written.append(action(item, reporter))
 
-    report = run_batch(inputs, run, description=description)
+    report = run_batch(items, run, description=description, label=label)
     for dest in written:
         click.echo(f"Wrote {dest}")
     finish_batch(report)

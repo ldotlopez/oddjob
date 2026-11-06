@@ -7,12 +7,11 @@ from pathlib import Path
 
 import rich_click as click
 
-from glados.core.batch import run_batch
 from glados.core.cli_options import (
     dry_run_option,
-    finish_batch,
     overwrite_option,
     paths_argument,
+    run_jobs,
 )
 from glados.core.inputs import expand_inputs
 from glados.core.pipeline import ProgressStep
@@ -55,16 +54,14 @@ def convert_all(
     except FileNotFoundError as exc:
         raise click.ClickException(str(exc)) from exc
 
-    def convert(conversion: Conversion, reporter: BaseProgressReporter) -> None:
-        run_conversion(conversion, step, reporter, overwrite=overwrite)
+    def convert(conversion: Conversion, reporter: BaseProgressReporter) -> Path:
+        return run_conversion(conversion, step, reporter, overwrite=overwrite)
 
-    finish_batch(
-        run_batch(
-            conversions,
-            convert,
-            description="Converting",
-            label=lambda conversion: str(conversion.source),
-        )
+    run_jobs(
+        conversions,
+        convert,
+        "Converting",
+        label=lambda conversion: str(conversion.source),
     )
 
 

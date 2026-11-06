@@ -10,12 +10,11 @@ from pathlib import Path
 
 import rich_click as click
 
-from glados.core.batch import run_batch
 from glados.core.cli_options import (
     dry_run_option,
-    finish_batch,
     overwrite_option,
     paths_argument,
+    run_jobs,
     run_single_job,
 )
 from glados.core.inputs import accept_all, expand_inputs
@@ -112,15 +111,12 @@ def merge_cmd(paths: tuple[Path, ...], remove_video: bool, dry_run: bool) -> Non
             click.echo(merge.describe())
         return
 
-    def apply(merge: motionphotos.Merge, reporter: BaseProgressReporter) -> None:
+    def apply(merge: motionphotos.Merge, reporter: BaseProgressReporter) -> Path:
         description = f"Merging {merge.image.name}"
         job = to_destination(joining_step(merge.video), description, merge.image)
-        job.run(merge.image, reporter, overwrite=True)
+        written = job.run(merge.image, reporter, overwrite=True)
         if merge.remove_video:
             merge.video.unlink()
+        return written
 
-    finish_batch(
-        run_batch(
-            merges, apply, description="Merging", label=lambda merge: str(merge.image)
-        )
-    )
+    run_jobs(merges, apply, "Merging", label=lambda merge: str(merge.image))

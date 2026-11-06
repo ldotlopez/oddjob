@@ -5,6 +5,8 @@ import unittest
 from pathlib import Path
 
 from click.testing import CliRunner
+from support import write_executable
+from test_multitool_conversions import FAKE_WRITER
 from test_multitool_domain import JPEG, MP4
 
 from multitool import motionphotos, renamers
@@ -43,6 +45,7 @@ class CommandTests(unittest.TestCase):
             motionphotos.split((self.tmp / "a.jpg").read_bytes()), (JPEG, MP4)
         )
         self.assertTrue((self.tmp / "a.mp4").exists())
+        self.assertIn(f"Wrote {self.tmp / 'a.jpg'}", result.output)
 
     def test_motionphotos_join_and_split(self) -> None:
         (self.tmp / "still.jpg").write_bytes(JPEG)
@@ -102,6 +105,18 @@ class CommandTests(unittest.TestCase):
         self.assertIn(
             f"convert {self.tmp / 'a.png'} -> {self.tmp / 'a.jpg'}", result.output
         )
+
+    def test_jpgize_prints_what_it_wrote(self) -> None:
+        tools = self.tmp / "bin"
+        tools.mkdir()
+        for name in ("magick", "exiftool"):
+            write_executable(tools, name, FAKE_WRITER)
+        (self.tmp / "a.png").write_bytes(b"png")
+        result = self.runner.invoke(
+            cli, ["jpgize", str(self.tmp / "a.png")], env={"PATH": str(tools)}
+        )
+        self.assertEqual(result.exit_code, 0, result.output)
+        self.assertIn(f"Wrote {self.tmp / 'a.jpg'}", result.output)
 
 
 if __name__ == "__main__":

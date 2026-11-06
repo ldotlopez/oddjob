@@ -17,6 +17,7 @@ from glados.core.cli_common import (
 from glados.core.cli_options import (
     check_single_output,
     common_file_options,
+    job_action,
     paths_argument,
     run_jobs,
 )
@@ -63,7 +64,7 @@ def cli(
         ],
         dest_fn=override_destination(output, infix_destination(DEFAULT_INFIX)),
     )
-    run_jobs(job, inputs, overwrite, "Summarizing")
+    run_jobs(inputs, job_action(job, overwrite), "Summarizing")
 
 
 if __name__ == "__main__":
