@@ -129,6 +129,34 @@ def copy_into_place(source: Path, dest: Path) -> None:
 type TextTransform = Callable[[str], ProgressStream[str]]
 
 
+def land_text_stream(events: ProgressStream[str], suffix: str) -> ProgressStream[Path]:
+    """Pass `events` through, then write the text carried by the final one
+    to a temp file with `suffix`; the final event carries that path. A
+    stream that ends without text is a RuntimeError."""
+    final_event: ProgressEvent[str] | None = None
+    try:
+        for event in events:
+            if event.done:
+                final_event = event
+            else:
+                yield event
+    except BaseException:
+        events.close()
+        raise
+
+    if final_event is None or not final_event.result:
+        raise RuntimeError("backend ended without producing any text")
+
+    output_path = temp_output_path("filejobs-text-", suffix)
+    try:
+        output_path.write_text(final_event.result, encoding="utf-8")
+    except BaseException:
+        output_path.unlink(missing_ok=True)
+        raise
+
+    yield replace(final_event, result=output_path)
+
+
 class TextStep:
     """Reads `input_path` as UTF-8 text, runs `transform` on it and writes
     the result to a temp file with the input's suffix. Satisfies
@@ -139,28 +167,7 @@ class TextStep:
 
     def run(self, input_path: Path) -> ProgressStream[Path]:
         events = self.transform(input_path.read_text(encoding="utf-8"))
-        final_event: ProgressEvent[str] | None = None
-        try:
-            for event in events:
-                if event.done:
-                    final_event = event
-                else:
-                    yield event
-        except BaseException:
-            events.close()
-            raise
-
-        if final_event is None or not final_event.result:
-            raise RuntimeError("backend ended without producing any text")
-
-        output_path = temp_output_path("filejobs-text-", input_path.suffix)
-        try:
-            output_path.write_text(final_event.result, encoding="utf-8")
-        except BaseException:
-            output_path.unlink(missing_ok=True)
-            raise
-
-        yield replace(final_event, result=output_path)
+        return land_text_stream(events, input_path.suffix)
 
 
 type BytesTransform = Callable[[bytes], bytes]
