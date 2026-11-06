@@ -1,18 +1,42 @@
-"""Unit tests for the backend-free core shared with multitool: input
-expansion, batch runs and destination checks."""
+"""Unit tests for the backend-free core shared by glados' tasks and
+multitool: input expansion, batch runs, BytesStep, run_jobs and the
+multiple-input task commands."""
 
+import os
 import tempfile
 import unittest
 from pathlib import Path
 
+import rich_click as click
+from click.testing import CliRunner
+from support import NullReporter
+
 from glados.core.batch import run_batch
-from glados.core.inputs import accept_all, expand_inputs
-from glados.core.pipeline import check_destination, move_to_destination
+from glados.core.cli_options import run_jobs
+from glados.core.inputs import (
+    accept_all,
+    expand_inputs,
+    media_type_filter,
+    text_inputs_except_outputs,
+)
+from glados.core.pipeline import (
+    BytesStep,
+    Job,
+    check_destination,
+    move_to_destination,
+    suffix_destination,
+)
+from glados.core.progress import BaseProgressReporter
+from glados.tasks import rewrite, transcribe
+
+
+def make_tmp(test: unittest.TestCase) -> Path:
+    return Path(test.enterContext(tempfile.TemporaryDirectory()))
 
 
 class ExpandInputsTests(unittest.TestCase):
     def setUp(self) -> None:
-        self.tmp = Path(self.enterContext(tempfile.TemporaryDirectory()))
+        self.tmp = make_tmp(self)
         (self.tmp / "dir" / "sub").mkdir(parents=True)
         for name in (
             "dir/b.txt",
@@ -40,12 +64,22 @@ class ExpandInputsTests(unittest.TestCase):
         self.assertEqual(inputs[0], file)
         self.assertEqual(len(inputs), len(set(inputs)))
 
+    def test_type_filters(self) -> None:
+        is_media = media_type_filter("audio/", "video/")
+        self.assertTrue(is_media(Path("talk.MP4")))
+        self.assertTrue(is_media(Path("talk.m4a")))
+        self.assertFalse(is_media(Path("talk.txt")))
+        is_input = text_inputs_except_outputs("rewrite")
+        self.assertTrue(is_input(Path("notes.md")))
+        self.assertFalse(is_input(Path("notes.rewrite.md")))
+        self.assertFalse(is_input(Path("photo.jpg")))
+
 
 class RunBatchTests(unittest.TestCase):
     def test_failures_are_recorded_and_the_rest_still_run(self) -> None:
         seen: list[int] = []
 
-        def action(item: int) -> None:
+        def action(item: int, _reporter: BaseProgressReporter) -> None:
             if item == 2:
                 raise ValueError("bad item")
             seen.append(item)
@@ -59,24 +93,77 @@ class RunBatchTests(unittest.TestCase):
         )
 
     def test_unexpected_errors_propagate(self) -> None:
-        def action(item: int) -> None:
+        def action(item: int, _reporter: BaseProgressReporter) -> None:
             raise KeyError(item)
 
         with self.assertRaises(KeyError):
             run_batch([1], action, description="Testing")
 
+    def test_step_tasks_are_removed_once_complete(self) -> None:
+        def action(item: int, reporter: BaseProgressReporter) -> None:
+            task_id = reporter.add_task(f"step {item}", total=1)
+            reporter.update(task_id, completed=1)
+            reporter.complete(task_id)
 
-class DestinationTests(unittest.TestCase):
-    def test_existing_destination_needs_overwrite(self) -> None:
-        with tempfile.TemporaryDirectory() as tmp:
-            produced, dest = Path(tmp, "new"), Path(tmp, "dest")
-            produced.write_text("new")
-            dest.write_text("old")
-            with self.assertRaises(FileExistsError):
-                check_destination(dest, overwrite=False)
-            move_to_destination(produced, dest, overwrite=True)
-            self.assertEqual(dest.read_text(), "new")
-            self.assertFalse(produced.exists())
+        report = run_batch([1, 2, 3], action, description="Testing")
+        self.assertEqual(report.succeeded, 3)
+
+
+class BytesStepAndRunJobsTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.tmp = make_tmp(self)
+        self.inputs = []
+        for name in ("a.dat", "b.dat"):
+            path = self.tmp / name
+            path.write_bytes(name.encode())
+            os.utime(path, (1_000_000, 1_000_000))
+            self.inputs.append(path)
+        self.job = Job(
+            steps=[(BytesStep(bytes.upper, ".out"), "Uppercasing")],
+            dest_fn=suffix_destination("out"),
+        )
+
+    def test_bytes_step_keeps_timestamps(self) -> None:
+        dest = self.job.run(self.inputs[0], NullReporter(), overwrite=False)
+        self.assertEqual(dest.read_bytes(), b"A.DAT")
+        self.assertEqual(dest.stat().st_mtime, 1_000_000)
+
+    def test_run_jobs_continues_and_exits_1_on_failure(self) -> None:
+        (self.tmp / "a.out").write_text("exists")
+        runner = CliRunner()
+
+        @click.command()
+        def command() -> None:
+            run_jobs(self.job, self.inputs, overwrite=False, description="Testing")
+
+        result = runner.invoke(command, [])
+        self.assertEqual(result.exit_code, 1, result.output)
+        self.assertEqual((self.tmp / "b.out").read_bytes(), b"B.DAT")
+        self.assertIn(f"Wrote {self.tmp / 'b.out'}", result.output)
+
+    def test_destination_helpers(self) -> None:
+        produced, dest = self.tmp / "new", self.tmp / "dest"
+        produced.write_text("new")
+        dest.write_text("old")
+        with self.assertRaises(FileExistsError):
+            check_destination(dest, overwrite=False)
+        move_to_destination(produced, dest, overwrite=True)
+        self.assertEqual(dest.read_text(), "new")
+        self.assertFalse(produced.exists())
+
+
+class MultipleInputTaskTests(unittest.TestCase):
+    """-o is rejected with several inputs before any backend is touched."""
+
+    def test_output_needs_a_single_input(self) -> None:
+        tmp = make_tmp(self)
+        for name in ("a.txt", "b.txt"):
+            (tmp / name).write_text("text")
+        runner = CliRunner()
+        for command in (rewrite.cli, transcribe.cli):
+            result = runner.invoke(command, ["-o", str(tmp / "out.txt"), str(tmp)])
+            self.assertEqual(result.exit_code, 2, result.output)
+            self.assertIn("exactly one input file", result.output)
 
 
 if __name__ == "__main__":

@@ -7,6 +7,7 @@ caller's decision (`accepts`), not this module's.
 
 from __future__ import annotations
 
+import mimetypes
 from collections.abc import Callable, Iterable
 from pathlib import Path
 
@@ -36,3 +37,25 @@ def expand_inputs(paths: Iterable[Path], accepts: FileFilter) -> list[Path]:
 def accept_all(path: Path) -> bool:
     """Every file qualifies."""
     return True
+
+
+def media_type_filter(*prefixes: str) -> FileFilter:
+    """Files whose type, guessed from the name, starts with one of
+    `prefixes` (e.g. "audio/", "video/")."""
+
+    def accepts(path: Path) -> bool:
+        media_type = mimetypes.guess_type(path.name, strict=False)[0]
+        return media_type is not None and media_type.startswith(prefixes)
+
+    return accepts
+
+
+def text_inputs_except_outputs(infix: str) -> FileFilter:
+    """Text files, except a task's own earlier outputs (<name>.<infix>.<ext>),
+    so running it again on a directory does not process its results."""
+    is_text = media_type_filter("text/")
+
+    def accepts(path: Path) -> bool:
+        return is_text(path) and not path.stem.endswith(f".{infix}")
+
+    return accepts

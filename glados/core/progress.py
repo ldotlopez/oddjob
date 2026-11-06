@@ -60,6 +60,10 @@ class BaseProgressReporter(Protocol):
 
     def complete(self, task_id: int) -> None: ...
 
+    def remove(self, task_id: int) -> None:
+        """Stop showing a task (e.g. a finished per-file step in a batch)."""
+        ...
+
 
 class RichProgressReporter:
     def __init__(self) -> None:
@@ -92,8 +96,13 @@ class RichProgressReporter:
         self._progress.update(task_id, **kwargs)
 
     def complete(self, task_id: int) -> None:
-        task = self._progress.tasks[task_id]
+        # Progress.tasks is a list; ids stop matching positions once a task
+        # has been removed.
+        task = next(task for task in self._progress.tasks if task.id == task_id)
         self._progress.update(task_id, completed=task.total if task.total else 100)
+
+    def remove(self, task_id: int) -> None:
+        self._progress.remove_task(task_id)
 
 
 class PlainProgressReporter:
@@ -138,6 +147,12 @@ class PlainProgressReporter:
 
     def complete(self, task_id: int) -> None:
         print(f"{self._descriptions[task_id]}: done", file=sys.stderr)
+
+    def remove(self, task_id: int) -> None:
+        """Plain lines cannot be taken back; just forget the task."""
+        self._descriptions.pop(task_id, None)
+        self._totals.pop(task_id, None)
+        self._last_printed.pop(task_id, None)
 
 
 def create_reporter() -> BaseProgressReporter:

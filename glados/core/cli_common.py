@@ -14,7 +14,6 @@ from __future__ import annotations
 import logging
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
-from pathlib import Path
 
 import rich_click as click
 from dotenv import load_dotenv
@@ -22,8 +21,6 @@ from dotenv import load_dotenv
 from glados.core.backends import BackendError, check_config, resolve
 from glados.core.cli_options import logging_options_for
 from glados.core.config import Config, ConfigError, config_path, load_config
-from glados.core.pipeline import Job
-from glados.core.progress import create_reporter
 
 APP_LOGGER = "glados"
 
@@ -32,10 +29,10 @@ LOGGER = logging.getLogger(__name__)
 
 @dataclass(slots=True)
 class GladosContext:
-    """What every task command needs: the configuration (loaded once, on
-    first use, never at import), the backend for its task, and running its
-    Job with progress reporting. Errors become a clean message + exit
-    code instead of every task repeating the same try/except block."""
+    """What every task command needs from glados: the configuration (loaded
+    once, on first use, never at import) and the backend for its task.
+    Config and backend errors become a clean message + exit code. Running
+    the task's Job over its inputs is cli_options.run_jobs."""
 
     _config: Config | None = None
 
@@ -66,14 +63,6 @@ class GladosContext:
             return resolve(task, protocol, choice, self.config(), overrides)
         except BackendError as exc:
             raise click.ClickException(str(exc)) from exc
-
-    def run_job(self, job: Job, input_path: Path, overwrite: bool) -> None:
-        try:
-            with create_reporter() as reporter:
-                dest = job.run(input_path, reporter, overwrite=overwrite)
-        except (FileNotFoundError, FileExistsError, RuntimeError, ValueError) as exc:
-            raise click.ClickException(str(exc)) from exc
-        click.echo(f"Wrote {dest}")
 
 
 pass_glados_context = click.make_pass_decorator(GladosContext, ensure=True)

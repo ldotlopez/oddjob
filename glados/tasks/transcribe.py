@@ -30,7 +30,13 @@ from glados.core.cli_common import (
     model_option,
     pass_glados_context,
 )
-from glados.core.cli_options import common_file_options
+from glados.core.cli_options import (
+    check_single_output,
+    common_file_options,
+    paths_argument,
+    run_jobs,
+)
+from glados.core.inputs import expand_inputs, media_type_filter
 from glados.core.pipeline import Job, override_destination, suffix_destination
 from glados.core.progress import ProgressEvent, ProgressStream
 from glados.core.runners import CliArgs, FFMpegRunner
@@ -250,7 +256,7 @@ class TranscribeStep:
 
 
 @click.command("transcribe")
-@click.argument("input_path", type=click.Path(path_type=Path))
+@paths_argument
 @model_option
 @click.option(
     "-l",
@@ -275,7 +281,7 @@ class TranscribeStep:
 @pass_glados_context
 def cli(
     ctx: GladosContext,
-    input_path: Path,
+    paths: tuple[Path, ...],
     model: str | None,
     language: str | None,
     output_format: str | None,
@@ -283,7 +289,9 @@ def cli(
     output: Path | None,
     overwrite: bool,
 ) -> None:
-    """Extract audio and transcribe INPUT_PATH to a plain-text or subtitle sidecar."""
+    """Extract audio and transcribe each input in PATH... to a plain-text or subtitle sidecar."""
+    inputs = expand_inputs(paths, media_type_filter("audio/", "video/"))
+    check_single_output(output, inputs)
     output_format = resolve_output_format(output_format, output)
     transcriber = ctx.backend("transcribe", Transcriber, backend, {"model": model})
     job = Job(
@@ -298,7 +306,7 @@ def cli(
         ],
         dest_fn=override_destination(output, suffix_destination(output_format)),
     )
-    ctx.run_job(job, input_path, overwrite)
+    run_jobs(job, inputs, overwrite, "Transcribing")
 
 
 if __name__ == "__main__":

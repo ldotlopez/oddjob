@@ -12,6 +12,7 @@ from __future__ import annotations
 import logging
 import os
 import shutil
+import subprocess
 import tempfile
 from collections.abc import Callable, Sequence
 from dataclasses import replace
@@ -23,6 +24,23 @@ from glados.core.progress import BaseProgressReporter, ProgressEvent, ProgressSt
 type DestinationFn = Callable[[Path], Path]
 
 LOGGER = logging.getLogger(__name__)
+
+# What running a Job on one input may raise because of that input or the
+# tools it drives (missing/existing files, failed subprocesses, invalid
+# content). Commands report these as clean errors; anything else is a bug.
+JOB_ERRORS: tuple[type[Exception], ...] = (
+    OSError,
+    RuntimeError,
+    ValueError,
+    subprocess.SubprocessError,
+)
+
+
+def temp_output_path(prefix: str, suffix: str) -> Path:
+    """A new empty temp file for a step's output; the step owns it."""
+    file_descriptor, path_str = tempfile.mkstemp(prefix=prefix, suffix=suffix)
+    os.close(file_descriptor)
+    return Path(path_str)
 
 
 @runtime_checkable
@@ -110,11 +128,7 @@ class TextStep:
         if final_event is None or not final_event.result:
             raise RuntimeError("backend ended without producing any text")
 
-        file_descriptor, output_path_str = tempfile.mkstemp(
-            prefix="glados-text-", suffix=input_path.suffix
-        )
-        os.close(file_descriptor)
-        output_path = Path(output_path_str)
+        output_path = temp_output_path("glados-text-", input_path.suffix)
         try:
             output_path.write_text(final_event.result, encoding="utf-8")
         except BaseException:
@@ -122,6 +136,33 @@ class TextStep:
             raise
 
         yield replace(final_event, result=output_path)
+
+
+type BytesTransform = Callable[[bytes], bytes]
+
+
+class BytesStep:
+    """Reads `input_path` as bytes, runs `transform` on it and writes the
+    result to a temp file with `suffix` (default: the input's), carrying
+    over the input's permissions and timestamps. The byte-level
+    counterpart of TextStep, for quick in-memory transforms."""
+
+    def __init__(self, transform: BytesTransform, suffix: str | None = None) -> None:
+        self.transform = transform
+        self.suffix = suffix
+
+    def run(self, input_path: Path) -> ProgressStream[Path]:
+        content = self.transform(input_path.read_bytes())
+        output_path = temp_output_path(
+            "glados-bytes-", self.suffix or input_path.suffix
+        )
+        try:
+            output_path.write_bytes(content)
+            shutil.copystat(input_path, output_path)
+        except BaseException:
+            output_path.unlink(missing_ok=True)
+            raise
+        yield ProgressEvent(completed=1, total=1, done=True, result=output_path)
 
 
 class Job:

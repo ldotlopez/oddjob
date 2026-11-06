@@ -14,7 +14,13 @@ from glados.core.cli_common import (
     model_option,
     pass_glados_context,
 )
-from glados.core.cli_options import common_file_options
+from glados.core.cli_options import (
+    check_single_output,
+    common_file_options,
+    paths_argument,
+    run_jobs,
+)
+from glados.core.inputs import expand_inputs, text_inputs_except_outputs
 from glados.core.pipeline import Job, TextStep, infix_destination, override_destination
 from glados.tasks.protocols import Summarizer
 
@@ -22,7 +28,7 @@ DEFAULT_INFIX = "summary"
 
 
 @click.command("summarize")
-@click.argument("input_path", type=click.Path(path_type=Path))
+@paths_argument
 @click.option(
     "--max-length",
     type=click.IntRange(min=1),
@@ -36,14 +42,16 @@ DEFAULT_INFIX = "summary"
 @pass_glados_context
 def cli(
     ctx: GladosContext,
-    input_path: Path,
+    paths: tuple[Path, ...],
     max_length: int | None,
     model: str | None,
     backend: str | None,
     output: Path | None,
     overwrite: bool,
 ) -> None:
-    """Summarize INPUT_PATH."""
+    """Summarize each input in PATH...."""
+    inputs = expand_inputs(paths, text_inputs_except_outputs(DEFAULT_INFIX))
+    check_single_output(output, inputs)
     prompt = ctx.config().prompts.render_summarize(max_length)
     summarizer = ctx.backend("summarize", Summarizer, backend, {"model": model})
     job = Job(
@@ -55,7 +63,7 @@ def cli(
         ],
         dest_fn=override_destination(output, infix_destination(DEFAULT_INFIX)),
     )
-    ctx.run_job(job, input_path, overwrite)
+    run_jobs(job, inputs, overwrite, "Summarizing")
 
 
 if __name__ == "__main__":

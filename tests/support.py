@@ -49,6 +49,30 @@ def require_settings(*names: str) -> dict[str, str]:
     return settings
 
 
+class NullReporter:
+    """A progress reporter that shows nothing, for running Jobs in tests."""
+
+    def __enter__(self) -> Self:
+        return self
+
+    def __exit__(self, *exc_info: object) -> None:
+        return None
+
+    def add_task(self, description: str, total: float | None) -> int:
+        return 0
+
+    def update(
+        self, task_id: int, completed: float, total: float | None = None
+    ) -> None:
+        return None
+
+    def complete(self, task_id: int) -> None:
+        return None
+
+    def remove(self, task_id: int) -> None:
+        return None
+
+
 def drain[T](stream: ProgressStream[T]) -> tuple[list[ProgressEvent[T]], T | None]:
     """Consume a progress stream; return its events and the final result."""
     events = list(stream)

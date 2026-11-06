@@ -1,0 +1,126 @@
+"""`multitool motionphotos`: check, join, split, strip and merge.
+
+Every command that writes a file runs a Job with a BytesStep, so results
+land through the same temp-file -> destination flow as glados' tasks.
+"""
+
+from __future__ import annotations
+
+from pathlib import Path
+
+import rich_click as click
+
+from glados.core.batch import run_batch
+from glados.core.cli_options import (
+    dry_run_option,
+    finish_batch,
+    overwrite_option,
+    paths_argument,
+    run_single_job,
+)
+from glados.core.inputs import accept_all, expand_inputs
+from glados.core.pipeline import JOB_ERRORS, BytesStep, Job, check_destination
+from glados.core.progress import BaseProgressReporter
+from multitool import motionphotos, sidecars
+
+existing_file = click.Path(exists=True, dir_okay=False, path_type=Path)
+
+
+def to_destination(step: BytesStep, description: str, destination: Path) -> Job:
+    return Job(steps=[(step, description)], dest_fn=lambda _input: destination)
+
+
+def joining_step(video: Path) -> BytesStep:
+    return BytesStep(lambda image: motionphotos.join(image, video.read_bytes()))
+
+
+@click.group("motionphotos")
+def motionphotos_cmd() -> None:
+    """Check, join, split, strip and merge motion photos."""
+
+
+@motionphotos_cmd.command("check")
+@click.argument("file", type=existing_file)
+def check_cmd(file: Path) -> None:
+    """Exit 0 if FILE is a motion photo, 1 if not."""
+    try:
+        photo = motionphotos.MotionPhoto.parse(file.read_bytes())
+    except JOB_ERRORS as exc:
+        raise click.ClickException(str(exc)) from exc
+    if photo.video is None:
+        click.echo(f"{file}: not a motion photo")
+        raise click.exceptions.Exit(1)
+    click.echo(f"{file}: motion photo")
+
+
+@motionphotos_cmd.command("join")
+@click.option("-i", "--image", required=True, type=existing_file)
+@click.option("-v", "--video", required=True, type=existing_file)
+@click.option("-o", "--output", required=True, type=click.Path(path_type=Path))
+@overwrite_option
+@click.option("--rm", "remove_video", is_flag=True, help="remove VIDEO afterwards")
+def join_cmd(
+    image: Path, video: Path, output: Path, overwrite: bool, remove_video: bool
+) -> None:
+    """Join IMAGE and VIDEO into the motion photo OUTPUT."""
+    job = to_destination(joining_step(video), "Joining", output)
+    run_single_job(job, image, overwrite)
+    if remove_video:
+        video.unlink()
+
+
+@motionphotos_cmd.command("split")
+@click.argument("file", type=existing_file)
+@click.option("-i", "--image", required=True, type=click.Path(path_type=Path))
+@click.option("-v", "--video", required=True, type=click.Path(path_type=Path))
+@overwrite_option
+def split_cmd(file: Path, image: Path, video: Path, overwrite: bool) -> None:
+    """Split motion photo FILE into IMAGE and VIDEO."""
+    for destination in (image, video):
+        try:
+            check_destination(destination, overwrite)
+        except FileExistsError as exc:
+            raise click.ClickException(str(exc)) from exc
+    still = BytesStep(lambda content: motionphotos.split(content)[0], image.suffix)
+    clip = BytesStep(lambda content: motionphotos.split(content)[1], video.suffix)
+    run_single_job(to_destination(still, "Extracting image", image), file, overwrite)
+    run_single_job(to_destination(clip, "Extracting video", video), file, overwrite)
+
+
+@motionphotos_cmd.command("strip")
+@click.argument("file", type=existing_file)
+@click.option(
+    "-o", "--output", type=click.Path(path_type=Path), help="default: FILE itself"
+)
+@overwrite_option
+def strip_cmd(file: Path, output: Path | None, overwrite: bool) -> None:
+    """Remove the video of motion photo FILE (in place needs -y)."""
+    job = to_destination(BytesStep(motionphotos.strip), "Stripping", output or file)
+    run_single_job(job, file, overwrite)
+
+
+@motionphotos_cmd.command("merge")
+@paths_argument
+@click.option("--rm", "remove_video", is_flag=True, help="remove each merged video")
+@dry_run_option
+def merge_cmd(paths: tuple[Path, ...], remove_video: bool, dry_run: bool) -> None:
+    """Merge each NAME.jpg + NAME.mp4 pair in PATH... into NAME.jpg."""
+    groups = sidecars.group_sidecars(expand_inputs(paths, accept_all))
+    merges = motionphotos.plan_merges(groups, remove_video)
+    if dry_run:
+        for merge in merges:
+            click.echo(merge.describe())
+        return
+
+    def apply(merge: motionphotos.Merge, reporter: BaseProgressReporter) -> None:
+        description = f"Merging {merge.image.name}"
+        job = to_destination(joining_step(merge.video), description, merge.image)
+        job.run(merge.image, reporter, overwrite=True)
+        if merge.remove_video:
+            merge.video.unlink()
+
+    finish_batch(
+        run_batch(
+            merges, apply, description="Merging", label=lambda merge: str(merge.image)
+        )
+    )

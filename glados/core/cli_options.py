@@ -1,4 +1,4 @@
-"""Click options and argument helpers with no backend knowledge.
+"""Click options and job runners with no backend knowledge.
 
 Shared by glados' task commands and by multitool; nothing here imports the
 backend registry or the glados config (those live in core/cli_common.py).
@@ -7,14 +7,16 @@ backend registry or the glados config (those live in core/cli_common.py).
 from __future__ import annotations
 
 import functools
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from pathlib import Path
 
 import rich_click as click
 from foundation.clilib import click_logging_options
 from foundation.loglib import setup_logger_from_click
 
-from glados.core.batch import BatchReport
+from glados.core.batch import BatchReport, run_batch
+from glados.core.pipeline import JOB_ERRORS, Job
+from glados.core.progress import BaseProgressReporter, create_reporter
 
 type Decorator[F] = Callable[[F], F]
 
@@ -26,7 +28,8 @@ def output_option[F: Callable[..., object]](func: F) -> F:
         "--output",
         type=click.Path(path_type=Path, dir_okay=False),
         default=None,
-        help="explicit destination path (default: task-specific naming — see this command's --help)",
+        help="explicit destination path, only with a single input file"
+        " (default: task-specific naming — see this command's --help)",
     )(func)
 
 
@@ -93,9 +96,44 @@ def logging_options_for[F: Callable[..., object]](app_logger: str) -> Decorator[
     return decorator
 
 
-def finish_batch(report: BatchReport) -> None:
-    """Print the summary of a batch run; exit 1 if any input failed. Each
+def check_single_output(output: Path | None, inputs: Sequence[Path]) -> None:
+    """-o names one destination, so it needs exactly one input file."""
+    if output is not None and len(inputs) != 1:
+        raise click.UsageError(
+            f"-o/--output needs exactly one input file, got {len(inputs)}"
+        )
+
+
+def finish_batch(*reports: BatchReport) -> None:
+    """Print the summary of batch runs; exit 1 if any input failed. Each
     failure was already logged when it happened (core/batch.py)."""
-    if report.failures:
-        click.echo(f"{report.succeeded} done, {len(report.failures)} failed", err=True)
+    succeeded = sum(report.succeeded for report in reports)
+    failed = sum(len(report.failures) for report in reports)
+    if failed:
+        click.echo(f"{succeeded} done, {failed} failed", err=True)
         raise click.exceptions.Exit(1)
+
+
+def run_jobs(
+    job: Job, inputs: Sequence[Path], overwrite: bool, description: str
+) -> None:
+    """Run `job` on every input file, print where each result landed, then
+    the batch summary."""
+    written: list[Path] = []
+
+    def run(input_path: Path, reporter: BaseProgressReporter) -> None:
+        written.append(job.run(input_path, reporter, overwrite=overwrite))
+
+    report = run_batch(inputs, run, description=description)
+    for dest in written:
+        click.echo(f"Wrote {dest}")
+    finish_batch(report)
+
+
+def run_single_job(job: Job, input_path: Path, overwrite: bool) -> Path:
+    """Run `job` on one input; a failure becomes a clean error message."""
+    try:
+        with create_reporter() as reporter:
+            return job.run(input_path, reporter, overwrite=overwrite)
+    except JOB_ERRORS as exc:
+        raise click.ClickException(str(exc)) from exc
