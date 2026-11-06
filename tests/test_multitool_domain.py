@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING
 
 from foundation.cache import UserCache
 
-from multitool import media, motionphotos, renamers, sidecars
+from multitool import media, motionphotos, renamers, sidecars, subtitles
 
 if TYPE_CHECKING:
     import PIL.Image
@@ -134,6 +134,43 @@ class RenamerTests(unittest.TestCase):
             renamers.plan_extension_fix(Path("a.JPEG")),
             renamers.Rename(source=Path("a.JPEG"), destination=Path("a.jpg")),
         )
+
+
+SRT = """\ufeff1
+00:00:01,000 --> 00:00:02,500
+The Budget
+for Q3
+
+2
+00:00:03,000 --> 00:00:04,000
+something else
+"""
+
+
+class SubtitleTests(unittest.TestCase):
+    def test_parse_srt(self) -> None:
+        self.assertEqual(
+            subtitles.parse_srt(SRT.replace("\n", "\r\n")),
+            [
+                subtitles.Cue(start="00:00:01,000", text="The Budget for Q3"),
+                subtitles.Cue(start="00:00:03,000", text="something else"),
+            ],
+        )
+
+    def test_a_block_without_timing_is_an_error(self) -> None:
+        with self.assertRaises(ValueError):
+            subtitles.parse_srt("1\nno timing here\n")
+
+    def test_matching_ignores_case(self) -> None:
+        cues = subtitles.parse_srt(SRT)
+        self.assertEqual(
+            [cue.start for cue in subtitles.matching_cues(cues, "budget")],
+            ["00:00:01,000"],
+        )
+
+    def test_subtitle_path(self) -> None:
+        self.assertEqual(subtitles.subtitle_path(Path("a/m.mp4")), Path("a/m.srt"))
+        self.assertEqual(subtitles.subtitle_path(Path("a/m.SRT")), Path("a/m.SRT"))
 
 
 @unittest.skipUnless(HAS_PILLOW, "needs the multitool extra (Pillow)")

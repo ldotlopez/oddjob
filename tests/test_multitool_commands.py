@@ -8,7 +8,7 @@ from pathlib import Path
 from click.testing import CliRunner
 from support import write_executable
 from test_multitool_conversions import FAKE_WRITER
-from test_multitool_domain import HAS_PILLOW, JPEG, MP4
+from test_multitool_domain import HAS_PILLOW, JPEG, MP4, SRT
 
 from multitool import motionphotos, renamers
 from multitool.cli import cli
@@ -254,6 +254,39 @@ class AutocropCommandTests(unittest.TestCase):
         self.assertIn("1 done, 1 failed", result.stderr)
         self.assertTrue((self.tmp / "logo.cropped.png").exists())
         self.assertFalse((self.tmp / "photo.cropped.jpg").exists())
+
+
+class SrtGrepCommandTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.tmp = Path(self.enterContext(tempfile.TemporaryDirectory()))
+        (self.tmp / "meeting.srt").write_text(SRT, encoding="utf-8")
+        (self.tmp / "meeting.mp4").write_bytes(MP4)
+        self.runner = CliRunner()
+
+    def test_prints_matching_cues_once_per_srt(self) -> None:
+        result = self.runner.invoke(
+            cli,
+            ["srt-grep", "BUDGET", str(self.tmp), str(self.tmp / "meeting.mp4")],
+        )
+        self.assertEqual(result.exit_code, 0, result.output)
+        self.assertEqual(
+            result.stdout,
+            f"{self.tmp / 'meeting.srt'} @ 00:00:01,000: The Budget for Q3\n",
+        )
+
+    def test_no_match_exits_1(self) -> None:
+        result = self.runner.invoke(cli, ["srt-grep", "absent", str(self.tmp)])
+        self.assertEqual((result.exit_code, result.stdout), (1, ""))
+
+    def test_a_media_file_without_sidecar_fails_and_the_rest_runs(self) -> None:
+        (self.tmp / "silent.mp4").write_bytes(MP4)
+        result = self.runner.invoke(
+            cli,
+            ["srt-grep", "budget", str(self.tmp / "silent.mp4"), str(self.tmp)],
+        )
+        self.assertEqual(result.exit_code, 1, result.output)
+        self.assertIn("The Budget for Q3", result.stdout)
+        self.assertIn("1 done, 1 failed", result.stderr)
 
 
 if __name__ == "__main__":
