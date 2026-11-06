@@ -29,7 +29,8 @@ Backends:
 - For the text tasks, the backend's service or CLI:
   - `openai`: an API key (`OPENAI_API_KEY`, or `api_key`) for OpenAI, or the
     `base_url` of an OpenAI-compatible server.
-  - `ollama`: a running Ollama server (default `http://localhost:11434`).
+  - `ollama`: a running Ollama server (default `http://localhost:11434`), plus an
+    `api_key` if it needs one (ollama.com, or a server behind an authenticating proxy).
   - `llm`: `llm` on `PATH`, with its own keys and plugins configured.
 
 ## Install
@@ -95,6 +96,7 @@ timeout = 600
 model = "llama3.2"
 base_url = "http://localhost:11434"
 options = { num_ctx = 8192 }    # passed through as Ollama model options
+# api_key = "${OLLAMA_API_KEY}" # optional, sent as `Authorization: Bearer <key>`
 timeout = 600
 
 [backends.llm]
@@ -125,7 +127,15 @@ Progress is drawn as rich bars on a terminal and as plain percentage lines other
 
 ```sh
 uv run ruff check --fix . && uv run ruff format .
+uv run python -m unittest discover -s tests -v
 ```
+
+Unit tests use fake executables and a local fake HTTP server, so they need no services.
+Each backend also has an integration test against the real thing (`whisper-cli`, `llm`,
+an Ollama server, an OpenAI-compatible API), skipped until it is configured: copy
+`tests/integration.env.example` to `tests/integration.env` (git-ignored, it holds
+secrets) and fill in the backends to test. `GLADOS_TEST_*` environment variables
+override the file.
 
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the module layout and how to add a
 backend, and [docs/decisions/](docs/decisions/) for recorded decisions.

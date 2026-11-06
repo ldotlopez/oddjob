@@ -80,9 +80,11 @@ class OpenAITransport:
                         f"openai request failed ({response.status_code}):"
                         f" {_error_message(response)}"
                     )
+                saw_event = False
                 for line in response.iter_lines(decode_unicode=True):
                     if not line or not line.startswith("data:"):
                         continue
+                    saw_event = True
                     payload = line.removeprefix("data:").strip()
                     if payload == "[DONE]":
                         break
@@ -95,6 +97,12 @@ class OpenAITransport:
                         chunks.append(content)
                         received += len(content)
                         yield ProgressEvent(completed=received, total=None)
+                if not saw_event:
+                    raise RuntimeError(
+                        f"openai: {url} answered without a completion stream"
+                        f" (content type {response.headers.get('Content-Type')!r});"
+                        " check base_url, it usually ends in /v1"
+                    )
         except requests.RequestException as exc:
             raise RuntimeError(f"openai request failed: {exc}") from exc
 

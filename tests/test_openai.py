@@ -91,6 +91,20 @@ class OpenAITransportTest(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, r"\(401\): Incorrect API key"):
             drain(self.transport(server.base_url).complete("s", "u"))
 
+    def test_response_without_stream_is_an_error(self) -> None:
+        page = b"<!doctype html><title>Open WebUI</title>"
+        server = self.serve(CannedResponse(200, "text/html", page))
+
+        with self.assertRaisesRegex(RuntimeError, "without a completion stream"):
+            drain(self.transport(server.base_url).complete("s", "u"))
+
+    def test_empty_stream_is_not_an_error(self) -> None:
+        server = self.serve(sse())
+
+        _, result = drain(self.transport(server.base_url).complete("s", "u"))
+
+        self.assertEqual(result, "")
+
     def test_stream_error_event(self) -> None:
         server = self.serve(sse(delta("partial"), {"error": {"message": "overloaded"}}))
 
