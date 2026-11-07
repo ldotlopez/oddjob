@@ -2,10 +2,12 @@
 
 - Implemented tasks: `transcribe` (backends `whisper`, `whisper_cpp`) and the text
   tasks `rewrite`, `summarize`, `expand`, `translate`, `describe` (backends
-  `openai`, `ollama`, `llm`; `describe` takes images and needs a vision model).
+  `openai`, `ollama`, `llm`; `describe` takes images and needs a vision model), and
+  `audio-grep` (system grep over cached transcripts, through the `transcribe`
+  backends; decision 0009).
 - multitool commands: `sidecars`, `motionphotos`, `jpgize`, `mp4ize`, `img-hash`,
   `img-duplicates`, `img-check`, `autocrop`, `img-reduce`, `img-caption`,
-  `hash-rename`, `fix-extensions`, `date-sync`, `fs-cleanup`, `srt-grep`.
+  `hash-rename`, `fix-extensions`, `date-sync`, `fs-cleanup`.
 - Run tasks via `uv run glados <task> PATH...`; each task is also a standalone
   script (`uv run transcribe PATH...`) using the same click.Command.
 - Layout, shared by both tools (`docs/decisions/0005`): `<tool>/cli.py` is the

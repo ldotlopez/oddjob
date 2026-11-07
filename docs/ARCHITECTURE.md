@@ -24,10 +24,13 @@ filejobs/             backend-free core shared by both tools
   runners.py          FFMpegRunner (ffmpeg/ffprobe subprocess with progress)
 glados/
   cli.py              entry point: `glados` group, one subcommand per task
-  commands/           one click command per task (transcribe, rewrite, summarize, expand, translate, describe)
+  commands/           one click command per task (transcribe, rewrite, summarize, expand, translate, describe,
+                      audio-grep)
   tasks/              task domain code: protocols.py (task Protocols), transcribe.py (steps, formatters),
                       translate.py (language -> file name infix), describe.py (describe_image, DescribeStep),
-                      text_backend.py (ChatTransport Protocol; TextBackend: every text task over it)
+                      text_backend.py (ChatTransport Protocol; TextBackend: every text task over it),
+                      audio_grep.py (argument split, transcript cache, grep over transcripts),
+                      grep.py (GrepRunner: the system grep)
   core/               glados' backend machinery
     cli_common.py     GladosContext, backend/model options, glados' logging options
     config.py         Config model, config file loading and validation
@@ -42,14 +45,13 @@ multitool/
   commands/           one module per tool: sidecars, motionphotos, conversions (jpgize, mp4ize),
                       imghash (img-hash, img-duplicates, img-check), imgedit (autocrop,
                       img-reduce), captions (img-caption), renames (hash-rename,
-                      fix-extensions), dates (date-sync), cleanup (fs-cleanup),
-                      subtitles (srt-grep)
+                      fix-extensions), dates (date-sync), cleanup (fs-cleanup)
   sidecars.py, motionphotos.py, conversions.py, imghash.py, imgedit.py, captions.py,
-  renamers.py, dates.py, cleanup.py, subtitles.py
+  renamers.py, dates.py, cleanup.py
                       domain code: grouping, motion-photo parsing, conversion steps, average hash
                       and decode checks, autocrop and downscaling, caption planning and step,
                       rename planning, date reading and change planning, junk and permission
-                      planning, SRT parsing and search
+                      planning
   media.py            which files are images/videos and which ones each converter takes
   external.py         ImageMagick and exiftool adapters, user commands
   shotwell.py         read-only adapter for a Shotwell library (SQLite), for date-sync
@@ -137,6 +139,22 @@ transcribe PATH...
   -> run_jobs: per input, run the Job and move its temp file to the destination
 ```
 
+## Data flow (audio-grep)
+
+```
+audio-grep ARGUMENTS...
+  -> split_command_line: existing dirs and audio/video files are inputs, the rest grep args
+  -> inputs = expand_inputs(inputs, audio/video)
+  -> run_batch: per input, CachedTranscripts.segments
+       key = sha256(content sha256, mtime_ns, --backend, --model, --language)
+       UserCache ($XDG_CACHE_HOME/glados/transcripts, 180-day TTL) hit -> segments
+       miss -> GladosContext.backend("transcribe", ...) (first miss only)
+            -> AudioExtractor -> Transcriber.transcribe -> segments -> cache
+  -> grep_transcripts: FORMATTERS[--transcript-format] -> one temp file per input
+       -> GrepRunner: grep GREP_ARGS TEMP... -> temp paths in its output replaced by media paths
+  -> exit with grep's status, or 2 if an input failed
+```
+
 ## Data flow (rewrite, summarize, expand, translate, describe)
 
 ```
@@ -219,8 +237,7 @@ functions under `run_batch` for reports, renames and checks, and `cli_options` f
 - `img-hash`, `img-duplicates`, `img-check`, `autocrop` and `img-reduce` need the `multitool` extra
   (Pillow, pillow-heif); `multitool.imghash` and `multitool.imgedit` are imported
   through `load_extra_module` only when one of them runs.
-- `img-check` and `srt-grep` are reports: the problems or matches on stdout, exit 1 if
-  there were any problems or no matches.
+- `img-check` is a report: the problems on stdout, exit 1 if there were any.
 
 Boundary ([decision 0006](decisions/0006-filejobs-package.md)): multitool imports
 nothing from glados, glados never imports multitool, and filejobs imports neither.

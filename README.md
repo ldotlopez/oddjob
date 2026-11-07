@@ -12,6 +12,7 @@ backends.
 | `expand`     | implemented     | text → `<name>.expanded.<ext>`                   |
 | `translate`  | implemented     | text → `<name>.<language>.<ext>`                 |
 | `describe`   | implemented     | image → description on stdout, or `<name>.description.txt` with `-w` (needs a model that takes images) |
+| `audio-grep` | implemented     | video/audio → grep's output over the transcriptions, on stdout (uses the `transcribe` backends) |
 
 Backends:
 
@@ -91,6 +92,22 @@ Common options:
 `PATH: description` per image; `-w, --write` (implied by `-o`) writes
 `<name>.description.txt` instead, and `-y`/`-n` apply only then. It also takes
 `-i, --instructions` (e.g. `in Spanish`).
+
+`audio-grep` runs the system `grep` over the transcriptions of audio/video files:
+
+```sh
+uv run audio-grep -i -n budget talks/ meeting.mp4   # talks/q3.mp4:4:[01:02.30]the budget for Q3
+```
+
+Arguments that are existing directories or audio/video files are the inputs; every
+other argument goes to grep unchanged, and grep's output names the media files. Its
+own options are long-only, since grep owns the short ones: `--backend`, `--model`,
+`--language`, `--transcript-format` (what grep searches, default `lrc`: one
+timestamped line per segment) and `--log-level`. A pattern starting with `-` needs
+`-e`. Exit status is grep's, or 2 if a file could not be transcribed. No sidecar is
+written: transcripts are cached for 180 days in `$XDG_CACHE_HOME/glados/transcripts`,
+keyed by a digest of the file's content, its mtime and `--backend`/`--model`/
+`--language`, so the cache holds no paths.
 
 ## Configuration
 
@@ -173,7 +190,6 @@ File utilities without backends or config, run as `multitool <command>`:
 | `fix-extensions PATH...`    | lowercase extensions; `jpeg` → `jpg`, `mpeg` → `mpg`, `tif` → `tiff`  |
 | `date-sync PATH...`         | copy each image's or video's date `--from` exif/mtime/name/shotwell `--to` exif/mtime/name; `--to name` renames to `YYYY-mm-dd HH.MM.SS <crc32>.<ext>` (`--name-format`, `--shotwell-db`, `--mtime-fallback`) |
 | `fs-cleanup PATH...`        | remove macOS, Windows and KDE leftovers (`.DS_Store`, `._NAME`, `Thumbs.db`, `.Trash-<uid>`...); `--perms`: chmod files 644, directories 755 |
-| `srt-grep PATTERN PATH...`  | cues containing PATTERN in `.srt` files (a media file means its `NAME.srt`; exit 1 if none) |
 
 ```sh
 uv run multitool jpgize -n ~/Pictures/import     # print the planned conversions
@@ -187,7 +203,7 @@ take `-n/--dry-run`; commands that would replace an existing file need `-y/--ove
 and `img-caption` and `date-sync --to exif` always do (they write in place).
 `img-hash`, `img-duplicates`, `img-check`, `autocrop` and `img-reduce` need the
 `multitool` extra (`uv sync --extra multitool`). `img-caption` pairs with
-`glados describe -w`, and `srt-grep` with `glados transcribe -f srt`. Commands taking `PATH...`
+`glados describe -w`. Commands taking `PATH...`
 keep going when one input fails (exit 1 at the end); on success, commands that write
 files print nothing (`-v` logs `wrote <dest>` for each). Logging options (`-v`, `-q`, `--log-level`, `MULTITOOL_LOG_LEVEL`) go before the
 command: `multitool -v jpgize ...`.
