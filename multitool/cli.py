@@ -13,6 +13,7 @@ import rich_click as click
 
 from filejobs.cli_options import logging_options_for
 from multitool.commands.captions import img_caption_cmd
+from multitool.commands.cleanup import fs_cleanup_cmd
 from multitool.commands.conversions import jpgize_cmd, mp4ize_cmd
 from multitool.commands.imgedit import autocrop_cmd
 from multitool.commands.imghash import (
@@ -39,6 +40,7 @@ COMMANDS = [
     img_caption_cmd,
     hash_rename_cmd,
     fix_extensions_cmd,
+    fs_cleanup_cmd,
     srt_grep_cmd,
 ]
 

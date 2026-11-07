@@ -10,7 +10,15 @@ from typing import TYPE_CHECKING
 
 from foundation.cache import UserCache
 
-from multitool import captions, media, motionphotos, renamers, sidecars, subtitles
+from multitool import (
+    captions,
+    cleanup,
+    media,
+    motionphotos,
+    renamers,
+    sidecars,
+    subtitles,
+)
 
 if TYPE_CHECKING:
     import PIL.Image
@@ -297,6 +305,65 @@ class ImageEditTests(unittest.TestCase):
             imgedit.autocrop(opaque)
         with self.assertRaisesRegex(ValueError, "fully transparent"):
             imgedit.autocrop(empty)
+
+
+class CleanupTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.tmp = make_tmp(self)
+
+    def touch(self, relative: str, mode: int = 0o644) -> Path:
+        path = self.tmp / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(b"x")
+        path.chmod(mode)
+        return path
+
+    def test_junk_names(self) -> None:
+        for name in (".DS_Store", "Icon\r", ".directory", "Thumbs.db", "DESKTOP.INI"):
+            self.assertTrue(cleanup.is_junk_file(Path(name)), name)
+        for name in ("ds_store", "photo.jpg", "._", ".Trash"):
+            self.assertFalse(cleanup.is_junk_file(Path(name)), name)
+        for name in (".Trashes", "$RECYCLE.BIN", ".Trash-1000"):
+            self.assertTrue(cleanup.is_junk_directory(Path(name)), name)
+        self.assertFalse(cleanup.is_junk_directory(Path(".Trash-x")))
+
+    def test_apple_double_only_next_to_its_file(self) -> None:
+        self.touch("a.jpg")
+        self.assertTrue(cleanup.is_junk_file(self.touch("._a.jpg")))
+        self.assertFalse(cleanup.is_junk_file(self.touch("._orphan.jpg")))
+
+    def test_plan_removes_junk_without_descending_into_junk_dirs(self) -> None:
+        self.touch("d/.DS_Store")
+        self.touch("d/a.jpg")
+        self.touch(".Trashes/501/old.jpg")
+        planned = cleanup.plan_cleanup([self.tmp], fix_permissions=False)
+        self.assertEqual(
+            [action.describe() for action in planned],
+            [f"rm -r {self.tmp / '.Trashes'}", f"rm {self.tmp / 'd/.DS_Store'}"],
+        )
+
+    def test_perms_planned_only_when_asked_and_different(self) -> None:
+        script = self.touch("d/run.sh", 0o755)
+        self.touch("d/ok.jpg")
+        (self.tmp / "d").chmod(0o700)
+        self.assertEqual(cleanup.plan_cleanup([self.tmp], fix_permissions=False), [])
+        planned = cleanup.plan_cleanup([self.tmp / "d"], fix_permissions=True)
+        self.assertEqual(
+            planned,
+            [
+                cleanup.Chmod(path=self.tmp / "d", mode=0o755),
+                cleanup.Chmod(path=script, mode=0o644),
+            ],
+        )
+
+    def test_symlinks_are_left_alone(self) -> None:
+        target = self.touch("real/.DS_Store", 0o600)
+        (self.tmp / "link").symlink_to(self.tmp / "real")
+        (self.tmp / "real" / "Thumbs.db").symlink_to(target)
+        planned = cleanup.plan_cleanup([self.tmp / "link"], fix_permissions=True)
+        self.assertEqual(planned, [])
+        planned = cleanup.plan_cleanup([self.tmp / "real"], fix_permissions=False)
+        self.assertEqual(planned, [cleanup.Removal(path=target, directory=False)])
 
 
 if __name__ == "__main__":

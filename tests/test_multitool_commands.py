@@ -324,5 +324,56 @@ class ImgCaptionCommandTests(unittest.TestCase):
         self.assertEqual((self.tmp / "b.jpg").read_bytes(), JPEG)
 
 
+class FsCleanupCommandTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.tmp = Path(self.enterContext(tempfile.TemporaryDirectory()))
+        self.runner = CliRunner()
+        (self.tmp / "a.jpg").write_bytes(b"a")
+        (self.tmp / "a.jpg").chmod(0o600)
+        (self.tmp / ".DS_Store").write_bytes(b"junk")
+        (self.tmp / ".Spotlight-V100").mkdir()
+        (self.tmp / ".Spotlight-V100" / "store.db").write_bytes(b"junk")
+
+    def test_dry_run_prints_the_plan_and_changes_nothing(self) -> None:
+        result = self.runner.invoke(cli, ["fs-cleanup", "-n", "--perms", str(self.tmp)])
+        self.assertEqual(result.exit_code, 0, result.output)
+        self.assertEqual(
+            result.stdout.splitlines(),
+            [
+                f"chmod 755 {self.tmp}",  # TemporaryDirectory is 700
+                f"rm {self.tmp / '.DS_Store'}",
+                f"rm -r {self.tmp / '.Spotlight-V100'}",
+                f"chmod 644 {self.tmp / 'a.jpg'}",
+            ],
+        )
+        self.assertTrue((self.tmp / ".DS_Store").exists())
+        self.assertEqual((self.tmp / "a.jpg").stat().st_mode & 0o777, 0o600)
+
+    def test_removes_junk_silently_and_keeps_modes_without_perms(self) -> None:
+        result = self.runner.invoke(cli, ["fs-cleanup", str(self.tmp)])
+        self.assertEqual(result.exit_code, 0, result.output)
+        self.assertEqual(result.output, "")
+        self.assertEqual([p.name for p in self.tmp.iterdir()], ["a.jpg"])
+        self.assertEqual((self.tmp / "a.jpg").stat().st_mode & 0o777, 0o600)
+        again = self.runner.invoke(cli, ["fs-cleanup", str(self.tmp)])
+        self.assertEqual(again.output, "")
+
+    def test_perms_chmods(self) -> None:
+        result = self.runner.invoke(cli, ["fs-cleanup", "--perms", str(self.tmp)])
+        self.assertEqual(result.exit_code, 0, result.output)
+        self.assertEqual((self.tmp / "a.jpg").stat().st_mode & 0o777, 0o644)
+
+    def test_a_failed_removal_exits_1_after_the_rest(self) -> None:
+        locked = self.tmp / "locked"
+        locked.mkdir()
+        (locked / "Thumbs.db").write_bytes(b"junk")
+        locked.chmod(0o500)
+        self.addCleanup(locked.chmod, 0o755)
+        result = self.runner.invoke(cli, ["fs-cleanup", str(self.tmp)])
+        self.assertEqual(result.exit_code, 1, result.output)
+        self.assertIn("2 done, 1 failed", result.stderr)
+        self.assertFalse((self.tmp / ".DS_Store").exists())
+
+
 if __name__ == "__main__":
     unittest.main()
