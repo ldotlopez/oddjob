@@ -11,7 +11,7 @@ backends.
 | `summarize`  | implemented     | text → `<name>.summary.<ext>`                    |
 | `expand`     | implemented     | text → `<name>.expanded.<ext>`                   |
 | `translate`  | implemented     | text → `<name>.<language>.<ext>`                 |
-| `describe`   | implemented     | image → `<name>.description.txt` (needs a model that takes images) |
+| `describe`   | implemented     | image → description on stdout, or `<name>.description.txt` with `-w` (needs a model that takes images) |
 
 Backends:
 
@@ -87,7 +87,9 @@ Common options:
 (default: the `-o` extension if it is a known format, else `txt`). `rewrite` takes
 `-i, --instructions`; `summarize` takes `--max-length` and `expand`
 `--target-length`, both approximate word counts. `translate` needs `-l, --language`
-(e.g. `es`, `Brazilian Portuguese`), which also names its output; `describe` takes
+(e.g. `es`, `Brazilian Portuguese`), which also names its output. `describe` prints
+`PATH: description` per image; `-w, --write` (implied by `-o`) writes
+`<name>.description.txt` instead, and `-y`/`-n` apply only then. It also takes
 `-i, --instructions` (e.g. `in Spanish`).
 
 ## Configuration
@@ -165,7 +167,7 @@ File utilities without backends or config, run as `multitool <command>`:
 | `img-duplicates PATH...`    | groups of near-duplicate images (`--max-distance`, `-x CMD` per group) |
 | `img-check PATH...`         | list the images that cannot be fully decoded, with the reason (exit 1 if any) |
 | `autocrop PATH...`          | crop images to their non-transparent pixels → `NAME.cropped.<ext>`     |
-| `img-caption PATH...`       | write each `NAME.description.txt` (from `glados describe`) into the image's XMP and EXIF description |
+| `img-caption PATH...`       | write each `NAME.description.txt` (from `glados describe -w`) into the image's XMP and EXIF description |
 | `hash-rename PATH...`       | rename each file to `<digest of its content>.<ext>` (`--algo`)        |
 | `fix-extensions PATH...`    | lowercase extensions; `jpeg` → `jpg`, `mpeg` → `mpg`, `tif` → `tiff`  |
 | `srt-grep PATTERN PATH...`  | cues containing PATTERN in `.srt` files (a media file means its `NAME.srt`; exit 1 if none) |
@@ -181,7 +183,7 @@ Commands that change files (`jpgize`, `mp4ize`, `motionphotos merge`, `autocrop`
 replace an existing file need `-y/--overwrite`, and `img-caption` always does (it
 writes in place). `img-hash`, `img-duplicates`, `img-check` and `autocrop` need the
 `multitool` extra (`uv sync --extra multitool`). `img-caption` pairs with
-`glados describe`, and `srt-grep` with `glados transcribe -f srt`. Commands taking `PATH...`
+`glados describe -w`, and `srt-grep` with `glados transcribe -f srt`. Commands taking `PATH...`
 keep going when one input fails (exit 1 at the end); on success, commands that write
 files print nothing (`-v` logs `wrote <dest>` for each). Logging options (`-v`, `-q`, `--log-level`, `MULTITOOL_LOG_LEVEL`) go before the
 command: `multitool -v jpgize ...`.

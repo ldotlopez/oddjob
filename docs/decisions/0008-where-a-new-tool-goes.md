@@ -59,7 +59,7 @@ source name unless the name clashes or misdescribes it (`renamers` became
 ## Applied in the first round
 
 - glados: `translate` (text backends). `describe-image` split into
-  `glados describe` (writes `NAME.description.txt`) and
+  `glados describe` (prints descriptions; `-w` writes `NAME.description.txt`) and
   `multitool img-caption` (writes it into the image's metadata).
 - multitool: `fix-extensions`, `img-check`, `autocrop`. `agrep` split into
   `glados transcribe -f srt` (already present) and `multitool srt-grep`.

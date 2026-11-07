@@ -19,14 +19,14 @@ filejobs/             backend-free core shared by both tools
   cli_options.py      backend-free click options, run_jobs/job_action, print_plan (-n), finish_batch
   inputs.py           PATH... expansion into input files, per-command file filters
   batch.py            run_batch: one action per input, failures logged and collected
-  pipeline.py         Job, ProgressStep Protocol, TextStep, land_text_stream, BytesStep, destination policies, JOB_ERRORS
+  pipeline.py         Job, consume_stream, ProgressStep Protocol, TextStep, land_text_stream, BytesStep, destination policies, JOB_ERRORS
   progress.py         ProgressEvent/ProgressStream, rich and plain reporters
   runners.py          FFMpegRunner (ffmpeg/ffprobe subprocess with progress)
 glados/
   cli.py              entry point: `glados` group, one subcommand per task
   commands/           one click command per task (transcribe, rewrite, summarize, expand, translate, describe)
   tasks/              task domain code: protocols.py (task Protocols), transcribe.py (steps, formatters),
-                      translate.py (language -> file name infix), describe.py (DescribeStep),
+                      translate.py (language -> file name infix), describe.py (describe_image, DescribeStep),
                       text_backend.py (ChatTransport Protocol; TextBackend: every text task over it)
   core/               glados' backend machinery
     cli_common.py     GladosContext, backend/model options, glados' logging options
@@ -153,13 +153,18 @@ all of them. Prompts belong to the tasks, not to the backends.
 
 `translate -l LANGUAGE` has the same shape too: the language fills `{language}` and,
 through `tasks/translate.language_infix`, names the output (`FILE.es.<ext>`).
-`describe` takes images instead of text:
+`describe` takes images instead of text, and by default prints instead of writing:
 
 ```
-describe PATH... -i INSTRUCTIONS
+describe PATH... -i INSTRUCTIONS [-w | -o FILE]
   -> inputs = expand_inputs(PATH..., images)
   -> prompt = config.prompts.render_describe(INSTRUCTIONS)
   -> GladosContext.backend("describe", Describer, -b, {"model": -m}) -> TextBackend
+  default (a report):
+  -> run_batch: describe_image -> transport.complete(prompt, "", images=[INPUT])
+       -> consume_stream -> text
+  -> print "INPUT: text" per image, then finish_batch
+  -w or -o (a file producer; -y and -n apply only here):
   -> Job([DescribeStep], dest = INPUT.description.txt or -o)
        DescribeStep: transport.complete(prompt, "", images=[INPUT]) -> land_text_stream -> temp .txt
   -> run_jobs
