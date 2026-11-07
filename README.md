@@ -197,14 +197,15 @@ File utilities without backends or config, run as `glados <command>`:
 
 ```sh
 uv run glados jpgize -n ~/Pictures/import     # print the planned conversions
-uv run glados motionphotos merge --rm ~/DCIM
+uv run glados motionphotos merge -y --rm ~/DCIM
 uv run glados img-duplicates ~/Pictures -x "echo"
 ```
 
 Commands that change files (`jpgize`, `mp4ize`, `motionphotos merge`, `autocrop`,
 `img-reduce`, `img-caption`, `hash-rename`, `fix-extensions`, `date-sync`, `fs-cleanup`)
 take `-n/--dry-run`; commands that would replace an existing file need `-y/--overwrite`,
-and `img-caption` and `date-sync --to exif` always do (they write in place).
+and `img-caption`, `date-sync --to exif`, `motionphotos merge` and `motionphotos strip`
+without `-o` always do (they write in place, and refuse up front without it).
 `img-hash`, `img-duplicates`, `img-check`, `autocrop` and `img-reduce` need the
 `images` extra (`uv sync --extra images`). `img-caption` pairs with
 `glados describe -w`. Commands taking `PATH...`
