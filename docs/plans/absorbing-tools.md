@@ -266,6 +266,19 @@ stay green.
   `jpgize`, `mp4ize`, glados' text tasks where output and input formats
   match). It changes a shared option set, so settle it in its own decision
   record before rolling it out.
+- **`--keep-mtime` (or similar) next to `--in-place`, for every tool.**
+  Copy mtime, atime, permissions and the like from the original onto the
+  result. Today this depends on the step: `BytesStep` (`autocrop`,
+  `img-reduce`, `motionphotos`) and `mp4ize`'s remux already call
+  `shutil.copystat`; `TextStep` (glados' text tasks) does not. Decide in the
+  same record as `--in-place` whether it is an option or the default.
+- **Image tools keep EXIF.** Every image-manipulating command must carry
+  the input's metadata over. Today: `autocrop` and `img-reduce` keep EXIF
+  and the ICC profile (`imgedit._encode`), `jpgize` copies all tags with
+  exiftool. Not kept: XMP and IPTC in the Pillow-based edits (Pillow only
+  re-writes `exif` and `icc_profile`); copying them with
+  `ExifTool.copy_tags` after the edit would cover every format. Also check
+  each new image command against this rule.
 - **iOS motion photos (`jpeg`/`heic` + `mov`).** `motionphotos merge` pairs
   only `.jpg`/`.jpeg` with `.mp4`; iOS exports Live Photos as `.jpeg` +
   `.mov` or `.heic` + `.mov`. Findings so far:
