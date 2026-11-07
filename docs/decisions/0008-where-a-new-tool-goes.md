@@ -1,6 +1,6 @@
 # 0008. Where a new tool goes: not absorbed, glados, multitool or filejobs
 
-Status: accepted (2026-11-06). Extends 0003's scope. Partly superseded by 0009.
+Status: accepted (2026-11-06). Extends 0003's scope. Partly superseded by 0009 and 0011.
 
 ## Context
 

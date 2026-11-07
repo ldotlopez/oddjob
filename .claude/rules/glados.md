@@ -5,35 +5,37 @@
   `openai`, `ollama`, `llm`; `describe` takes images and needs a vision model), and
   `audio-grep` (system grep over cached transcripts, through the `transcribe`
   backends; decision 0009).
-- multitool commands: `sidecars`, `motionphotos`, `jpgize`, `mp4ize`, `img-hash`,
+- File commands (no backends or config): `sidecars`, `motionphotos`, `jpgize`, `mp4ize`, `img-hash`,
   `img-duplicates`, `img-check`, `autocrop`, `img-reduce`, `img-caption`,
   `hash-rename`, `fix-extensions`, `date-sync`, `fs-cleanup`.
-- Run tasks via `uv run glados <task> PATH...`; each task is also a standalone
-  script (`uv run transcribe PATH...`) using the same click.Command.
-- Layout, shared by both tools (`docs/decisions/0005`): `<tool>/cli.py` is the
-  click group, `<tool>/commands/<command>.py` one click command each (wiring only),
-  domain modules hold the logic with no CLI (glados: `glados/tasks/`, only where a
-  task has logic beyond wiring). click may be imported only in `cli.py`,
+- One tool (`docs/decisions/0011`): run every command as `uv run glados <command>
+  PATH...`; `glados` is the only installed script. A command may resolve a backend
+  and do file work in one run.
+- Layout (`docs/decisions/0005`, 0011): `glados/cli.py` is the click group (help
+  panels by subject), `glados/commands/<command>.py` one click command or family
+  each (wiring only, objects named `<name>_cmd`), and `glados/lib/` holds the
+  domain modules, flat, with no config, backends or CLI (only where a command has
+  logic beyond wiring). click may be imported only in `cli.py`,
   `commands/`, `filejobs/cli_*.py` and `glados/core/cli_*.py`;
   `tests/test_boundaries.py` fails otherwise.
 - Every command that writes a file runs a `Job` through `run_jobs`; reports,
   renames and checks are plain functions under `run_batch` (`docs/decisions/0004`).
-- `multitool/` is a second tool in the same distribution (`docs/decisions/0003`),
-  with no backends or config. The backend-free core both tools share is
-  `filejobs/` (`pipeline`, `progress`, `runners`, `inputs`, `batch`,
-  `cli_options`; `docs/decisions/0006`); `glados/core/` holds only glados' backend
-  part. multitool never imports `glados`, glados never imports multitool, and
-  filejobs imports neither. `tests/test_boundaries.py` checks all three.
-- multitool's runtime binaries: ImageMagick (`magick`/`convert`), `exiftool`,
-  `ffmpeg`/`ffprobe`. Its Pillow code (`imghash`, `imgedit`: `img-hash`,
-  `img-duplicates`, `img-check`, `autocrop`, `img-reduce`) and their tests need the extra:
-  `uv sync --extra multitool`; commands load it through `load_extra_module`.
+- The backend-free core is `filejobs/` (`pipeline`, `progress`, `runners`, `inputs`,
+  `batch`, `cli_options`; `docs/decisions/0006`); `glados/core/` holds the backend
+  part. Boundaries: filejobs imports nothing from glados; `glados.lib` imports none
+  of `glados.core`, `glados.plugins`, `glados.commands`; `glados.plugins` imports
+  only `glados.lib`. `tests/test_boundaries.py` checks them. Only commands taking
+  `pass_glados` reach config or backends; file commands never do.
+- File commands' runtime binaries: ImageMagick (`magick`/`convert`), `exiftool`,
+  `ffmpeg`/`ffprobe`. The Pillow code (`imghash`, `imgedit`: `img-hash`,
+  `img-duplicates`, `img-check`, `autocrop`, `img-reduce`) and its tests need the extra:
+  `uv sync --extra images`; commands load it through `load_extra_module`.
 - Runtime needs `ffmpeg` and `ffprobe` on PATH, plus the selected transcribe
   backend's CLI: `whisper-cli` (`whisper_cpp`) or `whisper` from `openai-whisper`
   (`whisper`). Default models: `platformdirs.user_data_dir("whisper")/default-model.bin`
   for `whisper_cpp`, `turbo` for `whisper`; override with `-m`. Text backends need
   their service (OpenAI-compatible API, Ollama) or the `llm` CLI.
-- Text backends are only `tasks.text_backend.ChatTransport`s (`complete(system, user,
+- Text backends are only `lib.text_backend.ChatTransport`s (`complete(system, user,
   images=())`); `TextBackend` adapts a transport to every text task Protocol
   (`Rewriter`, `Summarizer`, `Expander`, `Translator`, `Describer`) and
   `text_plugin_triples()` is the
@@ -70,8 +72,9 @@
 - Tasks whose output has the same extension as the input must use
   `infix_destination`; `suffix_destination` would overwrite the input.
 - Console and logging come from `foundation`: progress reporters use
-  `foundation.clilib.get_stderr_console()`/`RICH_STDERR_ENABLED`; every task command
-  takes `--log-level`/`-v`/`-q` via `cli_common.logging_options`, which sets up the
+  `foundation.clilib.get_stderr_console()`/`RICH_STDERR_ENABLED`; every command
+  takes `--log-level`/`-v`/`-q` after its name via `cli_common.logging_options`
+  (`audio-grep`: `--log-level` only; the group takes none), which sets up the
   `glados` logger with `foundation.loglib` (`GLADOS_LOG_LEVEL` when no flag is given)
   and gives the `filejobs` logger the same level. Silent on success (decision 0007):
   `wrote <dest>` and plain progress are INFO, shown with `-v`.
@@ -81,7 +84,7 @@
   `support.FakeHTTPServer`, never real services. Integration tests read
   `tests/integration.env` (git-ignored, holds secrets: never commit or print it) and
   skip when unconfigured. The `whisper` (OpenAI CLI) backend has no tests yet.
-  multitool's integration tests (`test_multitool_integration.py`) run the real
+  The file commands' integration tests (`test_file_integration.py`) run the real
   ImageMagick, exiftool and ffmpeg and skip when one is missing from PATH.
 - Call `whisper-cli` with long options only: it exits 0 on an unknown argument, so a
   wrong short flag fails silently. Its default language is `en`; pass `auto`.

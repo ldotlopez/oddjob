@@ -1,7 +1,6 @@
 # Plan: merge multitool into glados, one tool
 
-Status: steps 2–5 done (2026-11-07); steps 1 and 6 (docs) wait for
-approval. Deviations: steps 3 and 4 landed in one commit, so no commit
+Status: done (2026-11-07); decision 0011. Deviations: steps 3 and 4 landed in one commit, so no commit
 installs scripts pointing at removed objects; `motionphotos join`/`split`
 lost the `-v` short form of `--video`, since `-v` is now verbose on every
 command.

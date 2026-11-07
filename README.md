@@ -1,8 +1,8 @@
 # glados
 
-CLI toolkit that applies model backends to files, one task per command. The same
-distribution also installs [`multitool`](#multitool), file utilities with no
-backends.
+CLI toolkit for files, one command each, all under `glados`: tasks that go through
+replaceable model backends (below), and [file commands](#file-commands) with no
+backends or config. `glados --help` lists them by subject.
 
 | Task         | Status          | Input → output                                   |
 | :----------- | :-------------- | :----------------------------------------------- |
@@ -41,35 +41,35 @@ Backends:
   - `llm`: `llm` on `PATH`, with its own keys and plugins configured.
 - `describe`: a backend model that takes images (e.g. `gpt-4.1-mini`, or an Ollama
   vision model such as `llama3.2-vision` via `-m`).
-- For multitool: ImageMagick (`magick` or `convert`) and `exiftool` for `jpgize`,
+- For the file commands: ImageMagick (`magick` or `convert`) and `exiftool` for `jpgize`,
   `exiftool` for `img-caption` and for `date-sync` with `exif`, `ffmpeg`/`ffprobe` for
-  `mp4ize`, and the `multitool` extra (Pillow, pillow-heif) for `img-hash`,
+  `mp4ize`, and the `images` extra (Pillow, pillow-heif) for `img-hash`,
   `img-duplicates`, `img-check`, `autocrop` and `img-reduce`.
 
 ## Install
 
 ```sh
 uv sync                       # glados
-uv sync --extra multitool     # also multitool's Pillow-based image commands
+uv sync --extra images        # also the Pillow-based image commands
 ```
 
 ## Usage
 
-Every task runs as `glados <task> PATH...` or as its own command (`transcribe PATH...`).
+Every task runs as `glados <task> PATH...`.
 `PATH` may be a file or a directory; directories are walked recursively for the files
 the task handles (audio/video for `transcribe`, text files for the others, skipping
 the task's own earlier outputs), and each file gets its own output next to it. If an
 input fails, the rest still run and the command exits 1 at the end.
 
 ```sh
-uv run transcribe talk.mp4                    # -> talk.txt (backend from [tasks])
-uv run transcribe lectures/ extra.m4a         # every audio/video file under lectures/, plus extra.m4a
-uv run rewrite -n notes/                      # print input -> destination, change nothing
+uv run glados transcribe talk.mp4             # -> talk.txt (backend from [tasks])
+uv run glados transcribe lectures/ extra.m4a  # every audio/video file under lectures/, plus extra.m4a
+uv run glados rewrite -n notes/               # print input -> destination, change nothing
 uv run glados transcribe -b whisper talk.mp4 -f vtt -l en -m small
-uv run transcribe -b whisper_cpp talk.mp4 -m ~/models/ggml-small.bin -o subs/talk.srt -y   # SRT, from -o
-uv run rewrite -b ollama notes.md -i "more formal tone"   # -> notes.rewrite.md
+uv run glados transcribe -b whisper_cpp talk.mp4 -m ~/models/ggml-small.bin -o subs/talk.srt -y   # SRT, from -o
+uv run glados rewrite -b ollama notes.md -i "more formal tone"   # -> notes.rewrite.md
 uv run glados summarize -b openai report.txt --max-length 200
-uv run expand -b llm -m gpt-4o-mini outline.md --target-length 800
+uv run glados expand -b llm -m gpt-4o-mini outline.md --target-length 800
 ```
 
 Common options:
@@ -96,7 +96,7 @@ Common options:
 `audio-grep` runs the system `grep` over the transcriptions of audio/video files:
 
 ```sh
-uv run audio-grep -i -n budget talks/ meeting.mp4   # talks/q3.mp4:4:[01:02.30]the budget for Q3
+uv run glados audio-grep -i -n budget talks/ meeting.mp4   # talks/q3.mp4:4:[01:02.30]the budget for Q3
 ```
 
 Arguments that are existing directories or audio/video files are the inputs; every
@@ -171,16 +171,16 @@ Commands print nothing on success. Progress is drawn as transient rich bars on a
 terminal; otherwise (piped stderr, `TERM=dumb`, `RICH_DISABLED=1`) it is logged as
 percentage lines at INFO, shown with `-v`.
 
-## multitool
+## File commands
 
-File utilities without backends or config, run as `multitool <command>`:
+File utilities without backends or config, run as `glados <command>`:
 
 | Command                     | What it does                                                          |
 | :-------------------------- | :-------------------------------------------------------------------- |
 | `sidecars scan PATH...`     | list groups of files sharing a name (`-e jpg -e mp4`: only groups with all of them) |
 | `sidecars find FILE`        | list the sidecar files of FILE                                        |
 | `motionphotos check FILE`   | exit 0 if FILE is a motion photo, 1 if not                            |
-| `motionphotos join/split/strip` | build a motion photo from a JPEG and an MP4, take one apart, or drop its video |
+| `motionphotos join/split/strip` | build a motion photo from a JPEG and an MP4 (`-i IMAGE --video VIDEO`), take one apart, or drop its video |
 | `motionphotos merge PATH...`| merge each `NAME.jpg` + `NAME.mp4` pair into `NAME.jpg` (`--rm`: remove the video) |
 | `jpgize PATH...`            | HEIC/HEIF/WebP/PNG → JPEG, upright, keeping metadata and timestamps (`--rm`: remove sources) |
 | `mp4ize PATH...`            | remux videos into MP4 without re-encoding the video (`--rm`: remove sources) |
@@ -196,9 +196,9 @@ File utilities without backends or config, run as `multitool <command>`:
 | `fs-cleanup PATH...`        | remove macOS, Windows and KDE leftovers (`.DS_Store`, `._NAME`, `Thumbs.db`, `.Trash-<uid>`...); `--perms`: chmod files 644, directories 755 |
 
 ```sh
-uv run multitool jpgize -n ~/Pictures/import     # print the planned conversions
-uv run multitool motionphotos merge --rm ~/DCIM
-uv run multitool img-duplicates ~/Pictures -x "echo"
+uv run glados jpgize -n ~/Pictures/import     # print the planned conversions
+uv run glados motionphotos merge --rm ~/DCIM
+uv run glados img-duplicates ~/Pictures -x "echo"
 ```
 
 Commands that change files (`jpgize`, `mp4ize`, `motionphotos merge`, `autocrop`,
@@ -206,16 +206,17 @@ Commands that change files (`jpgize`, `mp4ize`, `motionphotos merge`, `autocrop`
 take `-n/--dry-run`; commands that would replace an existing file need `-y/--overwrite`,
 and `img-caption` and `date-sync --to exif` always do (they write in place).
 `img-hash`, `img-duplicates`, `img-check`, `autocrop` and `img-reduce` need the
-`multitool` extra (`uv sync --extra multitool`). `img-caption` pairs with
+`images` extra (`uv sync --extra images`). `img-caption` pairs with
 `glados describe -w`. Commands taking `PATH...`
 keep going when one input fails (exit 1 at the end); on success, commands that write
-files print nothing (`-v` logs `wrote <dest>` for each). Logging options (`-v`, `-q`, `--log-level`, `MULTITOOL_LOG_LEVEL`) go before the
-command: `multitool -v jpgize ...`.
+files print nothing (`-v` logs `wrote <dest>` for each). Logging options (`-v`, `-q`,
+`--log-level`, `GLADOS_LOG_LEVEL`) are the same as the tasks' and go after the command
+name: `glados jpgize -v ...`.
 
 ## Development
 
 ```sh
-uv sync --extra multitool     # so the image-hash tests run
+uv sync --extra images        # so the image-hash tests run
 uv run ruff check --fix . && uv run ruff format .
 uv run python -m unittest discover -s tests -v
 ```
@@ -225,7 +226,7 @@ Each backend also has an integration test against the real thing (`whisper-cli`,
 an Ollama server, an OpenAI-compatible API), skipped until it is configured: copy
 `tests/integration.env.example` to `tests/integration.env` (git-ignored, it holds
 secrets) and fill in the backends to test. `GLADOS_TEST_*` environment variables
-override the file. multitool's integration tests run the real ImageMagick, exiftool
+override the file. The file commands' integration tests run the real ImageMagick, exiftool
 and ffmpeg, and skip when they are not on `PATH`.
 
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the module layout and how to add a

@@ -1,21 +1,22 @@
 # Architecture
 
-The repository holds two command-line tools in one distribution
-([decision 0003](decisions/0003-multitool-in-the-same-distribution.md)):
+The repository holds one command-line tool, `glados`, whose commands are of two
+kinds ([decision 0011](decisions/0011-one-tool.md)):
 
-- **glados**: file-based tasks backed by models. Each task is a click command that
-  builds a `Job` from pipeline steps, gets a backend for its task Protocol, and runs the
-  job over every input with progress reporting.
-- **multitool**: file utilities (sidecars, motion photos, conversions, image hashes and
-  edits, renames, dates, cleanup) with no backends (see [multitool](#multitool)).
+- **Tasks**: file-based work backed by models. Each task is a click command that
+  builds a `Job` from pipeline steps, gets a backend for its task Protocol through
+  `pass_glados`, and runs the job over every input with progress reporting.
+- **File commands**: file utilities (sidecars, motion photos, conversions, image hashes
+  and edits, renames, dates, cleanup) with no backends or config (see
+  [File commands](#file-commands)).
 
-Both build on **filejobs**, the backend-free core they share
-([decision 0006](decisions/0006-filejobs-package.md)).
+A command may be both: resolve a backend and do file work. Every command builds on
+**filejobs**, the backend-free core ([decision 0006](decisions/0006-filejobs-package.md)).
 
 Every command takes several files and directories (see [Inputs](#inputs)).
 
 ```
-filejobs/             backend-free core shared by both tools
+filejobs/             backend-free core: no backends, config or glados imports
   cli_options.py      backend-free click options, run_jobs/job_action, print_plan (-n), finish_batch
   inputs.py           PATH... expansion into input files, per-command file filters
   batch.py            run_batch: one action per input, failures logged and collected
@@ -23,17 +24,30 @@ filejobs/             backend-free core shared by both tools
   progress.py         ProgressEvent/ProgressStream, rich and plain reporters
   runners.py          FFMpegRunner (ffmpeg/ffprobe subprocess with progress)
 glados/
-  cli.py              entry point: `glados` group, one subcommand per task
-  commands/           one click command per task (transcribe, rewrite, summarize, expand, translate, describe,
-                      audio-grep)
-  tasks/              task domain code: protocols.py (task Protocols), transcribe.py (steps, formatters),
+  cli.py              entry point: the `glados` group, every command, help panels by subject
+  commands/           one module per command or command family (wiring only):
+                      tasks: transcribe, rewrite, summarize, expand, translate, describe, audio_grep;
+                      file commands: sidecars, motionphotos, conversions (jpgize, mp4ize),
+                      imghash (img-hash, img-duplicates, img-check), imgedit (autocrop,
+                      img-reduce), captions (img-caption), renames (hash-rename,
+                      fix-extensions), dates (date-sync), cleanup (fs-cleanup)
+  lib/                domain code, no config, backends or CLI:
+                      protocols.py (task Protocols), transcribe.py (steps, formatters),
                       translate.py (language -> file name infix), describe.py (describe_image, DescribeStep),
                       text_backend.py (ChatTransport Protocol; TextBackend: every text task over it),
                       audio_grep.py (argument split, transcript cache, grep over transcripts),
-                      grep.py (GrepRunner: the system grep)
-  core/               glados' backend machinery
+                      grep.py (GrepRunner: the system grep);
+                      sidecars.py, motionphotos.py, conversions.py, imghash.py, imgedit.py,
+                      captions.py, renamers.py, dates.py, cleanup.py (grouping, motion-photo
+                      parsing, conversion steps, average hash and decode checks, autocrop and
+                      downscaling, caption planning and step, rename planning, date reading
+                      and change planning, junk and permission planning);
+                      media.py (which files are images/videos and which ones each converter
+                      takes), external.py (ImageMagick and exiftool adapters, user commands),
+                      shotwell.py (read-only adapter for a Shotwell library, for date-sync)
+  core/               backend machinery
     session.py        Glados: config and backends without click
-    cli_common.py     pass_glados (injects Glados), backend/model options, glados' logging options
+    cli_common.py     pass_glados (injects Glados), backend/model options, the logging options
     config.py         Config model, config file loading and validation
     backends.py       backend discovery (entry-point metadata), selection, loading
   plugins/            backend modules, each providing one or more backends (only backends live here)
@@ -41,45 +55,28 @@ glados/
     openai.py         openai (Chat Completions, any compatible server): text tasks
     ollama.py         ollama (native /api/chat): text tasks
     llm.py            llm (the llm CLI): text tasks
-multitool/
-  cli.py              entry point: `multitool` group
-  commands/           one module per tool: sidecars, motionphotos, conversions (jpgize, mp4ize),
-                      imghash (img-hash, img-duplicates, img-check), imgedit (autocrop,
-                      img-reduce), captions (img-caption), renames (hash-rename,
-                      fix-extensions), dates (date-sync), cleanup (fs-cleanup)
-  sidecars.py, motionphotos.py, conversions.py, imghash.py, imgedit.py, captions.py,
-  renamers.py, dates.py, cleanup.py
-                      domain code: grouping, motion-photo parsing, conversion steps, average hash
-                      and decode checks, autocrop and downscaling, caption planning and step,
-                      rename planning, date reading and change planning, junk and permission
-                      planning
-  media.py            which files are images/videos and which ones each converter takes
-  external.py         ImageMagick and exiftool adapters, user commands
-  shotwell.py         read-only adapter for a Shotwell library (SQLite), for date-sync
-tests/                unittest suite: one module per backend module or tool area; support.py: shared fakes
+tests/                unittest suite: one module per backend module or command area; support.py: shared fakes
 ```
 
 ## Layers
 
-- **Entry points**: `<tool>/cli.py` (the click group) and `<tool>/commands/` (one click
-  command each), the same layout in both tools
-  ([decision 0005](decisions/0005-one-command-layout.md)). glados' task commands are
-  also installed on their own through `[project.scripts]`, so a task is the same
-  `click.Command` whether it runs as `glados <task>` or standalone. Commands only parse
-  options, expand inputs, wire adapters (glados: the backend, from `Glados`) and
+- **Entry points**: `glados/cli.py` (the click group; the only installed script) and
+  `glados/commands/` (one click command or command family each)
+  ([decision 0005](decisions/0005-one-command-layout.md), 0011). Commands only parse
+  options, expand inputs, wire adapters (tasks: the backend, from `Glados`) and
   hand the work to `run_jobs` or `run_batch`. click is imported only in `cli.py`,
   `commands/`, `filejobs/cli_*.py` and `glados/core/cli_*.py`;
   `tests/test_boundaries.py` enforces it.
-- **Domain** (`glados/tasks/`, multitool's top-level modules): steps, formatters,
-  parsing and planning, with no CLI. A command that only wires shared core pieces (the
-  text tasks: one `TextStep`) has no domain module.
+- **Domain** (`glados/lib/`): steps, formatters, parsing and planning, with no config,
+  backends or CLI. A command that only wires shared core pieces (the text tasks: one
+  `TextStep`) has no domain module.
 - **Core**: orchestration with no task knowledge, in two packages. `filejobs/`
-  (`pipeline`, `progress`, `runners`, `inputs`, `batch`, `cli_options`) is shared by
-  both tools: `Job` chains `ProgressStep[Path]` steps, each consuming the previous
+  (`pipeline`, `progress`, `runners`, `inputs`, `batch`, `cli_options`) is the
+  backend-free part: `Job` chains `ProgressStep[Path]` steps, each consuming the previous
   step's output path, and moves the last result to the destination; intermediates are
-  deleted. `glados/core/` (`backends`, `config`, `session`, `cli_common`) is glados' backend
-  part, used only by glados.
-- **Contracts** (`tasks/protocols.py`): one `Protocol` per task (`Transcriber`,
+  deleted. `glados/core/` (`backends`, `config`, `session`, `cli_common`) is the backend
+  part, reached only by commands that take `pass_glados`.
+- **Contracts** (`lib/protocols.py`): one `Protocol` per task (`Transcriber`,
   `Rewriter`, `Summarizer`, `Expander`) plus `TranscriptSegment`. Backends satisfy them
   structurally.
 - **Adapters**: `filejobs/runners.py` (ffmpeg) and the backends in `plugins/`: subprocesses
@@ -114,7 +111,7 @@ counts as done. On success nothing is printed
 
 `-n/--dry-run` (every command that changes files) prints the plan and returns before
 any tool or backend is resolved: `input -> destination` for glados' tasks
-(`print_plan`), each planned operation for multitool's. The one exception is
+(`print_plan`), each planned operation for the file commands'. The one exception is
 `date-sync --from exif`, whose plan needs the dates, so `-n` runs exiftool to read
 them (it writes nothing).
 
@@ -172,13 +169,13 @@ rewrite PATH... -i INSTRUCTIONS
 `summarize` and `expand` have the same shape (`--max-length` / `--target-length` fill
 the prompt's `{length}`; outputs `FILE.summary.<ext>`, `FILE.expanded.<ext>`). The LLM
 backends are only `ChatTransport`s (one system prompt, one user message with optional
-images, streamed reply); `tasks/text_backend.py` wraps a transport into one
+images, streamed reply); `lib/text_backend.py` wraps a transport into one
 `TextBackend` that satisfies `Rewriter`, `Summarizer`, `Expander`, `Translator` and
 `Describer`, and `text_plugin_triples()` returns it under
 all of them. Prompts belong to the tasks, not to the backends.
 
 `translate -l LANGUAGE` has the same shape too: the language fills `{language}` and,
-through `tasks/translate.language_infix`, names the output (`FILE.es.<ext>`).
+through `lib/translate.language_infix`, names the output (`FILE.es.<ext>`).
 `describe` takes images instead of text, and by default prints instead of writing:
 
 ```
@@ -204,12 +201,13 @@ the result. `Job` feeds the events to a reporter from `progress.create_reporter(
 In a batch, `run_batch` shows one overall bar and hands each input a reporter that
 `remove()`s every step's bar once it completes.
 
-## multitool
+## File commands
 
-multitool has no backends, entry-point groups or config. Its commands use
-filejobs: `Job` and `run_jobs` for every command that writes a file, plain
-functions under `run_batch` for reports, renames and checks, and `cli_options` for
-`PATH...`, `-y`, `-n` and logging (`logging_options_for("multitool")`).
+File commands have no backends, entry-point groups or config: they never take
+`pass_glados`, so they never load the config. They use filejobs: `Job` and `run_jobs`
+for every command that writes a file, plain functions under `run_batch` for reports,
+renames and checks, and `cli_options` for `PATH...`, `-y` and `-n`; logging comes from
+`cli_common.logging_options`, as for the tasks.
 
 - Commands that change files (`jpgize`, `mp4ize`, `motionphotos`, `autocrop`,
   `img-reduce`, `img-caption`, `hash-rename`, `fix-extensions`, `date-sync`,
@@ -235,14 +233,17 @@ functions under `run_batch` for reports, renames and checks, and `cli_options` f
   profile; lossy formats saved at quality 90); `img-reduce --in-place` lands the result
   on the input's own path. `img-caption` is `CaptionStep` (exiftool writes
   XMP-dc:Description and EXIF:ImageDescription into a copy, landed in place).
-- `img-hash`, `img-duplicates`, `img-check`, `autocrop` and `img-reduce` need the `multitool` extra
-  (Pillow, pillow-heif); `multitool.imghash` and `multitool.imgedit` are imported
-  through `load_extra_module` only when one of them runs.
+- `img-hash`, `img-duplicates`, `img-check`, `autocrop` and `img-reduce` need the `images` extra
+  (Pillow, pillow-heif); `glados.lib.imghash` and `glados.lib.imgedit` are imported
+  through `load_extra_module` only when one of them runs. `img-hash` caches hashes in
+  `$XDG_CACHE_HOME/glados/imghash`.
 - `img-check` is a report: the problems on stdout, exit 1 if there were any.
 
-Boundary ([decision 0006](decisions/0006-filejobs-package.md)): multitool imports
-nothing from glados, glados never imports multitool, and filejobs imports neither.
-`tests/test_boundaries.py` checks all three.
+Boundaries ([decision 0011](decisions/0011-one-tool.md)): filejobs imports nothing
+from glados; `glados.lib` imports none of `glados.core`, `glados.plugins` and
+`glados.commands`; `glados.plugins` imports only `glados.lib`.
+`tests/test_boundaries.py` checks them, and `tests/test_session.py` runs a file command
+with a config loader that always fails.
 
 ## Backends
 
@@ -282,14 +283,16 @@ Tests exercise backends directly (options model, transport/backend object,
   read `GLADOS_TEST_*` settings from `tests/integration.env` (git-ignored; template in
   `integration.env.example`), overridden by the environment, and skip their class when
   the backend's enabling setting is empty.
-- **multitool** is tested through its domain modules, its conversion steps against fake
-  executables, and its commands through click's `CliRunner`. Its integration tests
-  (`tests/test_multitool_integration.py`) run the real ImageMagick, exiftool and
+- **File commands** are tested through their domain modules (`test_file_domain.py`),
+  the conversion steps against fake executables (`test_conversions.py`), and the
+  commands through click's `CliRunner` (`test_file_commands.py`, which also checks
+  that no command declares an option twice). Their integration tests
+  (`tests/test_file_integration.py`) run the real ImageMagick, exiftool and
   ffmpeg and skip when a tool is not on `PATH`; the image-hash tests skip without the
-  `multitool` extra.
+  `images` extra.
 - **Boundaries** (`tests/test_boundaries.py`) parse the sources with `ast`: the
-  import boundaries between filejobs, glados and multitool, and where click may be
-  imported.
+  import boundaries of filejobs, `glados.lib` and `glados.plugins`, and where click may
+  be imported.
 
 The OpenAI `whisper` backend has no tests yet.
 
@@ -309,11 +312,11 @@ Both come from `foundation`:
 - `progress.py` draws through `foundation.clilib.get_stderr_console()` and picks the
   rich or plain reporter from `RICH_STDERR_ENABLED`. Rich bars are transient; the plain
   reporter logs its lines at INFO on `filejobs.progress`, so they show only with `-v`.
-- `cli_common.logging_options` adds `--log-level`/`-v`/`-q` to every task command and
+- `cli_common.logging_options` adds `--log-level`/`-v`/`-q` to every command, after
+  its name (`audio-grep`: `--log-level` only; the group takes none), and
   calls `foundation.loglib.setup_logger_from_click("glados", ...)`. Without flags the
   level comes from `GLADOS_LOG_LEVEL`, else `warning`. It is
-  `cli_options.logging_options_for("glados")`; multitool's group uses
-  `logging_options_for("multitool")` (`MULTITOOL_LOG_LEVEL`). The shared `filejobs`
+  `cli_options.logging_options_for("glados")`. The shared `filejobs`
   logger gets the app logger's level, so `-v` and a bare `--log-level info` reach it
   (a bare level alone would only set the app logger); an explicit `filejobs:<level>`
   rule in `--log-level` wins. Modules log via

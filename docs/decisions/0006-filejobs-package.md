@@ -1,6 +1,6 @@
 # 0006. The backend-free core is its own package, filejobs
 
-Status: accepted (2026-11-06). Partly supersedes 0003 and 0005.
+Status: accepted (2026-11-06). Partly supersedes 0003 and 0005. Partly superseded by 0011.
 
 ## Context
 
