@@ -1,6 +1,8 @@
 # glados
 
-- Implemented tasks: `transcribe` (backends `whisper`, `whisper_cpp`) and the text
+- Implemented tasks: `transcribe` (backends `whisper`, `whisper_cpp`), `speak`
+  (backend `piper`; text files, `--text` or stdin to WAV; text and stdin need `-o`)
+  and the text
   tasks `rewrite`, `summarize`, `expand`, `translate`, `describe` (backends
   `openai`, `ollama`, `llm`; `describe` takes images and needs a vision model, and
   replies in `-l` or else the system locale's language: `Prompts.render_describe`
@@ -66,8 +68,6 @@
 - Config is optional: `$XDG_CONFIG_HOME/glados/config.toml`, `${VAR}` expanded,
   `.env` loaded. It is read on first use in `Glados` (`core/session.py`),
   injected by `pass_glados`, never at import.
-- The backend registry is a deliberate exception to `architecture.md`'s "no plugin
-  registries" rule: backends are the replaceable part here. Keep it.
 - One user cache for every command (`docs/decisions/0012`): open it with
   `glados.core.cache.open_user_cache()` (180-day expiry, 1 GiB, least recently used
   dropped first) and key entries with `glados.lib.cache.cache_key("<tool>", version,
@@ -75,6 +75,8 @@
   as a `ByteStore`. Include everything that changes the cached value (content, prompt,
   backend, effective options via `Glados.backend_options`) and bump the layout version
   when the value's format changes.
+- The backend registry is a deliberate exception to `architecture.md`'s "no plugin
+  registries" rule: backends are the replaceable part here. Keep it.
 - Nothing is imported until a backend is selected. A broken backend fails only
   when selected, with a clear error. Options of unused backends are not
   validated.
@@ -95,5 +97,7 @@
   skip when unconfigured. The `whisper` (OpenAI CLI) backend has no tests yet.
   The file commands' integration tests (`test_file_integration.py`) run the real
   ImageMagick, exiftool and ffmpeg and skip when one is missing from PATH.
+- `speak` needs `piper` (piper-tts) on PATH and a voice `.onnx` (default
+  `platformdirs.user_data_dir("piper")/default-voice.onnx`; override with `-m`).
 - Call `whisper-cli` with long options only: it exits 0 on an unknown argument, so a
   wrong short flag fails silently. Its default language is `en`; pass `auto`.

@@ -26,13 +26,17 @@ filejobs/             backend-free core: no backends, config or glados imports
 glados/
   cli.py              entry point: the `glados` group, every command, help panels by subject
   commands/           one module per command or command family (wiring only):
-                      tasks: transcribe, rewrite, summarize, expand, translate, describe, audio_grep;
+                      tasks: transcribe, speak, rewrite, summarize, expand, translate, describe, audio_grep;
                       file commands: sidecars, motionphotos, conversions (jpgize, mp4ize),
                       imghash (img-hash, img-duplicates, img-check), imgedit (autocrop,
                       img-reduce), captions (img-caption), renames (hash-rename,
                       fix-extensions), dates (date-sync), cleanup (fs-cleanup)
   lib/                domain code, no config, backends or CLI:
                       protocols.py (task Protocols), transcribe.py (steps, formatters),
+                      speak.py (text source selection, SpeakStep),
+                      translate.py (language -> file name infix), describe.py (describe_image, DescribeStep, CachedDescriber),
+                      language.py (language code or locale -> language name, via langcodes),
+                      cache.py (ByteStore Protocol; `<tool>/<digest>` cache keys, file digest),
                       text_backend.py (ChatTransport Protocol; TextBackend: every text task over it),
                       audio_grep.py (argument split, transcript cache, grep over transcripts),
                       grep.py (GrepRunner: the system grep);
@@ -51,6 +55,7 @@ glados/
     backends.py       backend discovery (entry-point metadata), selection, loading
   plugins/            backend modules, each providing one or more backends (only backends live here)
     whisper.py        whisper (OpenAI CLI) and whisper_cpp (whisper-cli): transcribe
+    piper.py          piper (piper-tts CLI): speak
     openai.py         openai (Chat Completions, any compatible server): text tasks
     ollama.py         ollama (native /api/chat): text tasks
     llm.py            llm (the llm CLI): text tasks

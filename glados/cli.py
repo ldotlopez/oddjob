@@ -26,12 +26,14 @@ from glados.commands.motionphotos import motionphotos_cmd
 from glados.commands.renames import fix_extensions_cmd, hash_rename_cmd
 from glados.commands.rewrite import rewrite_cmd
 from glados.commands.sidecars import sidecars_cmd
+from glados.commands.speak import speak_cmd
 from glados.commands.summarize import summarize_cmd
 from glados.commands.transcribe import transcribe_cmd
 from glados.commands.translate import translate_cmd
 
 TASK_COMMANDS: list[click.Command] = [
     transcribe_cmd,
+    speak_cmd,
     rewrite_cmd,
     summarize_cmd,
     expand_cmd,
@@ -60,7 +62,7 @@ FILE_COMMANDS: list[click.Command] = [
 # `glados --help` sections, by what a command works on.
 PANELS: dict[str, list[str]] = {
     "Text": ["rewrite", "summarize", "expand", "translate", "describe"],
-    "Audio": ["transcribe", "audio-grep"],
+    "Audio": ["transcribe", "speak", "audio-grep"],
     "Images": [
         "img-hash",
         "img-duplicates",

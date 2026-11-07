@@ -3,7 +3,8 @@ matching backends structurally (no inheritance required). Each backend's
 `__glados_plugin__` entry point returns its object once per task it
 implements, under that task's Protocol (see plugins/whisper.py).
 
-Transcriber is implemented by plugins/whisper.py; Rewriter, Summarizer,
+Transcriber is implemented by plugins/whisper.py, Speaker by
+plugins/piper.py; Rewriter, Summarizer,
 Expander, Translator and Describer by plugins/openai.py, plugins/ollama.py
 and plugins/llm.py, all through tasks/text_backend.py.
 """
@@ -29,6 +30,15 @@ class Transcriber(Protocol):
     def transcribe(
         self, audio_path: Path, *, language: str | None
     ) -> ProgressStream[list[TranscriptSegment]]: ...
+
+
+@runtime_checkable
+class Speaker(Protocol):
+    """Text to speech. The final event carries a temporary WAV file that
+    the caller owns; `speaker` picks a voice of a multi-speaker model
+    (None: the model's own default)."""
+
+    def speak(self, text: str, *, speaker: int | None) -> ProgressStream[Path]: ...
 
 
 # --------------------------------------------------------------------------

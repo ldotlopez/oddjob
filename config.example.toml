@@ -1,0 +1,126 @@
+# glados sample configuration.
+#
+# Copy to XDG_CONFIG_HOME/glados/config.toml (usually ~/.config/glados/config.toml).
+# The file is optional, and every setting below is optional too: the values shown are
+# mostly the defaults, so keep only what you want to change.
+#
+# Placeholders written as a dollar sign plus braces around an environment variable name
+# are expanded from the environment (and from a .env file) before the file is parsed,
+# in comments too, and a variable that is not set is an error. Write a literal dollar
+# sign as two. Keep secrets in the environment or in .env, never in this file.
+#
+# Backend selection per task: -b on the command line, then GLADOS_<TASK>_BACKEND, then
+# [tasks] below, then the only installed backend. Backend options: the backend's
+# defaults, then [backends.<name>], then [backends.<name>.tasks.<task>], then -m.
+
+
+# --------------------------------------------------------------------------
+# Which backend runs each task
+# --------------------------------------------------------------------------
+# Needed only for a task with several installed backends: transcribe (whisper,
+# whisper_cpp) and the text tasks rewrite, summarize, expand, translate and describe
+# (llm, ollama, openai). speak has only piper.
+
+[tasks]
+transcribe = "whisper_cpp"
+speak = "piper"
+rewrite = "ollama"
+summarize = "ollama"
+expand = "ollama"
+translate = "ollama"
+describe = "openai"
+
+
+# --------------------------------------------------------------------------
+# transcribe: speech to text
+# --------------------------------------------------------------------------
+
+# whisper.cpp, a C/C++ port of Whisper. Needs the whisper-cli binary and a ggml model.
+#   Project:  https://github.com/ggml-org/whisper.cpp
+#   Models:   https://huggingface.co/ggerganov/whisper.cpp
+[backends.whisper_cpp]
+model = "~/models/ggml-small.bin"    # default: data dir whisper/default-model.bin
+binary = "whisper-cli"
+
+# OpenAI's reference implementation. Needs the whisper CLI (uv tool install openai-whisper);
+# models are downloaded by name on first use.
+#   Project:  https://github.com/openai/whisper
+[backends.whisper]
+model = "turbo"                      # a model name, or the path to a .pt checkpoint
+binary = "whisper"
+
+
+# --------------------------------------------------------------------------
+# speak: text to speech
+# --------------------------------------------------------------------------
+
+# Piper, a fast local neural text-to-speech engine. Needs the piper command
+# (the piper-tts package) and a voice .onnx file with its .json beside it.
+#   Project:  https://github.com/OHF-Voice/piper1-gpl
+#   Voices:   https://huggingface.co/rhasspy/piper-voices
+[backends.piper]
+model = "~/voices/en_US-lessac-medium.onnx"   # default: data dir piper/default-voice.onnx
+binary = "piper"
+
+
+# --------------------------------------------------------------------------
+# rewrite, summarize, expand, translate, describe: text and vision models
+# --------------------------------------------------------------------------
+
+# Ollama, local models behind its native /api/chat endpoint.
+#   Project:  https://ollama.com
+#   API:      https://github.com/ollama/ollama/blob/main/docs/api.md
+#   Library:  https://ollama.com/library
+[backends.ollama]
+model = "llama3.2"
+base_url = "http://localhost:11434"
+options = { num_ctx = 8192 }         # passed through as Ollama model options
+timeout = 600                        # seconds
+# For ollama.com or a server behind an authenticating proxy, set api_key to an
+# environment placeholder; it is sent as "Authorization: Bearer <key>".
+
+# OpenAI Chat Completions, or any compatible server (vLLM, LM Studio, llama.cpp
+# server, ...) by changing base_url.
+#   API:      https://platform.openai.com/docs/api-reference/chat
+#   Models:   https://platform.openai.com/docs/models
+# api_key defaults to the OPENAI_API_KEY environment variable.
+[backends.openai]
+model = "gpt-4.1-mini"
+base_url = "https://api.openai.com/v1"
+timeout = 600
+
+# On top of [backends.openai], for describe only: it needs a model that takes images.
+[backends.openai.tasks.describe]
+model = "gpt-4.1"
+
+# The llm command-line tool, with its own keys and plugins already configured.
+#   Project:  https://llm.datasette.io
+#   Plugins:  https://llm.datasette.io/en/stable/plugins/directory.html
+[backends.llm]
+# model = "gpt-4o-mini"              # unset: llm's own default model
+binary = "llm"
+
+
+# --------------------------------------------------------------------------
+# System prompts of the text tasks, for every backend
+# --------------------------------------------------------------------------
+# Each prompt may use only its own placeholder, in braces: instructions in rewrite and
+# describe, length in summarize and expand, language in translate. A literal brace is
+# doubled. Unset prompts keep their built-in default.
+
+[prompts]
+summarize = "Summarize the text the user sends as bullet points. {length}"
+
+
+# --------------------------------------------------------------------------
+# Tools the commands run, not configured here
+# --------------------------------------------------------------------------
+# Needed on PATH by the file commands and by transcribe:
+#   ffmpeg, ffprobe   https://ffmpeg.org           transcribe, mp4ize, date-sync
+#   ImageMagick       https://imagemagick.org      jpgize
+#   exiftool          https://exiftool.org         jpgize, img-caption, date-sync
+#   grep              https://www.gnu.org/software/grep/   audio-grep
+# Python libraries behind the images extra (uv sync --extra images), used by img-hash,
+# img-duplicates, img-check, autocrop and img-reduce:
+#   Pillow            https://python-pillow.org
+#   pillow-heif       https://github.com/bigcat88/pillow_heif

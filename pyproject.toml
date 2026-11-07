@@ -1,7 +1,7 @@
 [project]
 name = "glados"
 version = "0.1.0"
-description = "CLI toolkit for files: model-backed tasks (transcribe, rewrite, summarize, expand, translate, describe, audio-grep) through replaceable backends (whisper, whisper.cpp, OpenAI-compatible APIs, Ollama, llm), and file utilities for sidecars, motion photos, conversions, image hashes, checks, crops, downscaling and captions, renames, extension fixes, date sync and OS-leftover cleanup."
+description = "CLI toolkit for files: model-backed tasks (transcribe, speak, rewrite, summarize, expand, translate, describe, audio-grep) through replaceable backends (whisper, whisper.cpp, piper, OpenAI-compatible APIs, Ollama, llm), and file utilities for sidecars, motion photos, conversions, image hashes, checks, crops, downscaling and captions, renames, extension fixes, date sync and OS-leftover cleanup."
 requires-python = ">=3.13"
 dependencies = [
     "platformdirs>=4.0",
@@ -26,6 +26,9 @@ glados = "glados.cli:cli"
 [project.entry-points."glados.backends.transcribe"]
 whisper = "glados.plugins.whisper:__glados_plugin__"
 whisper_cpp = "glados.plugins.whisper:__glados_plugin__"
+
+[project.entry-points."glados.backends.speak"]
+piper = "glados.plugins.piper:__glados_plugin__"
 
 [project.entry-points."glados.backends.rewrite"]
 llm = "glados.plugins.llm:__glados_plugin__"

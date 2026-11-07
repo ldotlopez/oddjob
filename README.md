@@ -7,6 +7,7 @@ backends or config. `glados --help` lists them by subject.
 | Task         | Status          | Input → output                                   |
 | :----------- | :-------------- | :----------------------------------------------- |
 | `transcribe` | implemented     | video/audio → `txt`, `srt`, `vtt`, `json`, `csv`, `lrc` |
+| `speak`      | implemented     | text files, `--text` or stdin → `<name>.wav` (`-o` for text and stdin) |
 | `rewrite`    | implemented     | text → `<name>.rewrite.<ext>`                    |
 | `summarize`  | implemented     | text → `<name>.summary.<ext>`                    |
 | `expand`     | implemented     | text → `<name>.expanded.<ext>`                   |
@@ -20,6 +21,7 @@ Backends:
 | :------------ | :---------------------------- | :------------------------------------------------- |
 | `whisper`     | transcribe                    | OpenAI's local `whisper` CLI (openai-whisper)      |
 | `whisper_cpp` | transcribe                    | local whisper.cpp `whisper-cli`                    |
+| `piper`       | speak                         | local `piper` CLI ([piper-tts](https://github.com/OHF-Voice/piper1-gpl)) |
 | `openai`      | the text tasks¹               | OpenAI Chat Completions API, or any compatible server |
 | `ollama`      | the text tasks¹               | Ollama's native API (`/api/chat`)                  |
 | `llm`         | the text tasks¹               | the [`llm`](https://llm.datasette.io) CLI          |
@@ -33,6 +35,8 @@ Backends:
   - `whisper`: `whisper` from [openai-whisper](https://github.com/openai/whisper)
     (`uv tool install openai-whisper`); models are downloaded by name on first use.
   - `whisper_cpp`: `whisper-cli` from whisper.cpp and a ggml whisper model.
+- For `speak`: `piper` from piper-tts on `PATH` and a voice `.onnx` file (its `.json`
+  beside it), set with `-m` or `[backends.piper] model`.
 - For the text tasks, the backend's service or CLI:
   - `openai`: an API key (`OPENAI_API_KEY`, or `api_key`) for OpenAI, or the
     `base_url` of an OpenAI-compatible server.
@@ -96,6 +100,18 @@ Common options:
 `LC_MESSAGES`, `LANG`), and in no particular language under `C`/`POSIX` or an unset locale.
 Descriptions are cached; `--no-cache` skips it.
 
+`speak` voices text as WAV audio. Its text comes from text files (`PATH...`, each
+written next to itself as `<name>.wav`), from `-t, --text TEXT`, or from stdin (`-`, or
+a pipe when nothing else is given; a pipe is ignored if `PATH...` or `--text` is given).
+Text and stdin have no name to derive a destination from, so they need `-o`. `--speaker N`
+picks a voice of a multi-speaker model.
+
+```sh
+uv run glados speak notes.txt                       # -> notes.wav
+uv run glados speak -t "Hello there" -o hello.wav
+echo "Hello there" | uv run glados speak -o hello.wav
+```
+
 `audio-grep` runs the system `grep` over the transcriptions of audio/video files:
 
 ```sh
@@ -140,6 +156,10 @@ binary = "whisper"
 [backends.whisper_cpp]          # whisper.cpp
 model = "~/models/ggml-small.bin"
 binary = "whisper-cli"
+
+[backends.piper]                # piper-tts
+model = "~/voices/en_US-lessac-medium.onnx"
+binary = "piper"
 
 [backends.openai]               # also any OpenAI-compatible server
 model = "gpt-4.1-mini"
