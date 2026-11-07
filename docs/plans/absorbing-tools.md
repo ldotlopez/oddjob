@@ -3,7 +3,7 @@
 Status: draft (2026-11-06). Prerequisites done (2.1, 2.3, 2.4; 2.2 needed
 no code); mediatools inventoried and ported: six tools, removebg left out by
 the user (section 1). Round 2 (`ocdutils/ocdutils/`) inventoried
-2026-11-07: three tools to port.
+2026-11-07: three tools ported.
 
 ## Context
 
@@ -66,9 +66,9 @@ Settled with the user (2026-11-07). Already covered, so not ported:
 
 | Tool | Source | Writes files? | Replaceable implementation? | External binaries / services | New Python deps | Destination | Done |
 |---|---|---|---|---|---|---|---|
-| `deosxfy` + `perms` | `oc/fsjanitor.py` | deletes OS junk files; `--perms` chmods (files 644, dirs 755) | no | — | — | multitool `fs-cleanup` (macOS, Windows, KDE junk; opt-in `--perms`), one plan of removals and chmods | |
-| `image-reduce` | `oc/fsjanitor.py` | new file per input (`NAME.reduced.<ext>`), or the original atomically with `--in-place` | no | — | — (Pillow, `multitool` extra) | multitool `img-reduce`, file producer | |
-| `dtnamer` + `uniqnamer` | `oc/dtnamer.py`, `oc/uniqnamer.py` | renames, rewrites EXIF in place, or sets mtime | no | `exiftool` | — (no `piexif`, `dateutil`) | multitool `date-sync --from exif\|mtime\|name --to exif\|mtime\|name`; names are `YYYY-mm-dd HH.MM.SS <crc32>.<ext>`; Shotwell source dropped (machine-specific) | |
+| `deosxfy` + `perms` | `oc/fsjanitor.py` | deletes OS junk files; `--perms` chmods (files 644, dirs 755) | no | — | — | multitool `fs-cleanup` (macOS, Windows, KDE junk; opt-in `--perms`), one plan of removals and chmods | `d31882a` |
+| `image-reduce` | `oc/fsjanitor.py` | new file per input (`NAME.reduced.<ext>`), or the original atomically with `--in-place` | no | — | — (Pillow, `multitool` extra) | multitool `img-reduce`, file producer | `aed78c3` |
+| `dtnamer` + `uniqnamer` | `oc/dtnamer.py`, `oc/uniqnamer.py` | renames, rewrites EXIF in place, or sets mtime | no | `exiftool` | — (no `piexif`, `dateutil`) | multitool `date-sync --from exif\|mtime\|name --to exif\|mtime\|name`; names are `YYYY-mm-dd HH.MM.SS <crc32>.<ext>`; Shotwell source dropped (machine-specific) | `ea95343` |
 | `sidecars` (video prune) | `oc/sidecars.py` | deletes the video sidecars of images | no | — | — | not absorbed: `motionphotos merge --rm` (after `jpgize`/`mp4ize`) does it without losing the video | |
 | `mdupes` | `oc/mdupes.py` | only reports | second `img-duplicates` method | — | `opencv`, `python-magic` | not absorbed: decision 0003 chose the average hash | |
 | `checksumrenamer` | `oc/checksumrenamer.py` | — | — | — | — | not absorbed: an unfinished stub | |
@@ -298,6 +298,72 @@ stay green.
     Android gallery. If the MOV trailer plays, let `merge` accept `.mov`;
     if not, let `merge` remux a `.mov` sidecar through `Mp4RemuxStep`
     before joining. HEIC stays a `jpgize` step before `merge`.
+
+### Bugs, issues and inconsistencies found in round 2
+
+Found while porting `ocdutils/ocdutils`; none is fixed yet unless it says
+so.
+
+Bugs:
+
+- **`hash-rename` counts every file twice in its summary.** Hashing and
+  renaming are two `run_batch` runs, and `finish_batch` adds both reports.
+  So two files where one rename fails print `3 done, 1 failed`.
+  `date-sync` avoids it by passing only the read batch's failures
+  (`BatchReport(failures=...)`); `rename_planned` should do the same.
+- **Empty plans warn on a clean tree.** `run_batch` logs `WARNING ...: no
+  input files` when given nothing. `fix-extensions` and `hash-rename` pass
+  it an empty plan when nothing needs renaming, so a clean run is not
+  silent (decision 0007). `fs-cleanup` and `date-sync` return early
+  instead. Fix it in `rename_planned`, or have `run_batch` warn only when
+  there were no inputs at all, not when there was nothing to do.
+- **`motionphotos.is_mp4` accepts any ISO BMFF file.** It only checks for
+  an `ftyp` box, so MOV, 3GP, HEIF and AVIF all pass, and `join` then
+  reports "not an MP4 file" only for non-BMFF data. Either rename it to
+  match what it checks, or check the brand (see the iOS item above).
+
+Inconsistencies:
+
+- **In-place writes without `-y` fail in two ways.** `img-caption` fails
+  each file through `check_destination` (`0 done, N failed`, exit 1), while
+  `date-sync --to exif` refuses up front with a usage error (exit 2).
+  Pick one for every in-place command; the up-front error is clearer.
+- **`-n` and external binaries.** The skill says `-n` returns before
+  resolving any external binary. But `date-sync --from exif -n` must run
+  exiftool (read-only) to compute the plan. The rule should say
+  "nothing that writes", and the skill updated to match.
+- **Plans that cannot know the outcome.** Without the Pillow extra, `-n` of
+  `autocrop` and `img-reduce` lists every candidate, including images that
+  will fail (no transparency) or be skipped (already small enough).
+  Document it, or check sizes in `-n` when the extra is installed.
+- **`describe()` paths are not quoted.** `mv a b`, `rm`, `chmod` and
+  `exiftool` plans print raw paths, but `date-sync` names contain spaces
+  (`2019-07-14 18.03.22 9f3a01bc.jpg`). The plans read like shell commands
+  that cannot be pasted. Use `shlex.quote` in every `describe()`, which
+  changes existing `-n` output and tests.
+- **Directory inputs.** `filejobs.inputs.expand_inputs` yields files only,
+  so `fs-cleanup` walks the trees itself to reach directories. If a second
+  command needs directories, move that walk to `filejobs` (decision 0006,
+  second consumer).
+- **Different quality defaults.** `imgedit` now saves lossy formats at
+  quality 90, which changed `autocrop` too (was 75). `jpgize` (ImageMagick)
+  keeps ImageMagick's own default. Settle one quality policy for every
+  image writer.
+
+Performance:
+
+- **`date-sync` starts one exiftool process per file** for reads and
+  writes. That is slow on large libraries. Use exiftool's `-stay_open`
+  mode, or one `-json` call per directory.
+- **`date-sync --to name` reads every file in full for the crc32 while
+  planning**, also with `-n`, which is slow on videos. Acceptable for now,
+  since `hash-rename` does the same.
+
+Edge cases:
+
+- **`date-sync` and DST.** A wall-clock time in the repeated hour at the
+  end of daylight saving is ambiguous. `astimezone()` takes the first one,
+  so `--to mtime` may be an hour off for such files.
 
 ## Order
 
