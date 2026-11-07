@@ -13,7 +13,7 @@ from test_llm import ECHO_LLM
 
 from glados.commands import translate
 from glados.core.config import Prompts
-from glados.tasks.translate import language_infix
+from glados.lib.translate import language_infix
 
 
 class LanguageInfixTests(unittest.TestCase):

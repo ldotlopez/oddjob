@@ -10,7 +10,7 @@ import pydantic
 from glados.cli import TASK_COMMANDS
 from glados.core.backends import check_config, resolve, tasks
 from glados.core.config import Config, ConfigError
-from glados.tasks.protocols import Describer, Translator
+from glados.lib.protocols import Describer, Translator
 
 BACKEND_ENVVAR = re.compile(r"^GLADOS_(\w+)_BACKEND$")
 

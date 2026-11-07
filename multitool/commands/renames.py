@@ -17,7 +17,7 @@ from filejobs.cli_options import (
 )
 from filejobs.inputs import accept_all, expand_inputs
 from filejobs.progress import BaseProgressReporter
-from multitool import renamers
+from glados.lib import renamers
 
 
 def rename_planned(

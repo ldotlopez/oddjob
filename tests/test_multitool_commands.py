@@ -15,7 +15,7 @@ from support import recorded_argv, write_executable
 from test_multitool_conversions import FAKE_WRITER
 from test_multitool_domain import HAS_PILLOW, JPEG, MP4
 
-from multitool import motionphotos, renamers
+from glados.lib import motionphotos, renamers
 from multitool.cli import cli
 
 

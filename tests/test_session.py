@@ -11,7 +11,7 @@ from glados.core.backends import BackendError
 from glados.core.cli_common import pass_glados
 from glados.core.config import Config, ConfigError
 from glados.core.session import Glados
-from glados.tasks.protocols import Summarizer
+from glados.lib.protocols import Summarizer
 
 
 class CountingLoader:

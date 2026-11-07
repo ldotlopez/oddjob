@@ -14,7 +14,7 @@ from pathlib import Path
 from filejobs.inputs import media_type_filter
 from filejobs.pipeline import consume_stream, land_text_stream
 from filejobs.progress import BaseProgressReporter, ProgressStream
-from glados.tasks.protocols import Describer
+from glados.lib.protocols import Describer
 
 DESCRIPTION_EXTENSION = "description.txt"
 

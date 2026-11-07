@@ -12,12 +12,12 @@ from pathlib import Path
 import pydantic
 from support import drain, recorded_argv, require_settings, write_executable
 
+from glados.lib.protocols import Transcriber, TranscriptSegment
 from glados.plugins.whisper import (
     WhisperCppBackend,
     WhisperCppOptions,
     __glados_plugin__,
 )
-from glados.tasks.protocols import Transcriber, TranscriptSegment
 
 FAKE_WHISPER = """
 import json

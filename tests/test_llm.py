@@ -10,14 +10,14 @@ from pathlib import Path
 import pydantic
 from support import drain, recorded_argv, require_settings, write_executable
 
-from glados.plugins.llm import LlmCliTransport, LlmOptions, __glados_plugin__
-from glados.tasks.protocols import (
+from glados.lib.protocols import (
     Describer,
     Expander,
     Rewriter,
     Summarizer,
     Translator,
 )
+from glados.plugins.llm import LlmCliTransport, LlmOptions, __glados_plugin__
 
 ECHO_LLM = """
 import json

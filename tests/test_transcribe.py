@@ -4,7 +4,7 @@ import unittest
 from pathlib import Path
 
 from glados.commands.transcribe import resolve_output_format
-from glados.tasks.transcribe import DEFAULT_OUTPUT_FORMAT
+from glados.lib.transcribe import DEFAULT_OUTPUT_FORMAT
 
 
 class ResolveOutputFormatTests(unittest.TestCase):

@@ -12,7 +12,7 @@ from pathlib import Path
 
 from click.testing import CliRunner, Result
 
-from multitool import motionphotos
+from glados.lib import motionphotos
 from multitool.cli import cli
 
 HAS_PILLOW = importlib.util.find_spec("PIL") is not None

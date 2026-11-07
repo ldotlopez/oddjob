@@ -60,7 +60,7 @@ class CaptionStep:
         self.text = text
 
     def run(self, input_path: Path) -> ProgressStream[Path]:
-        produced = temp_output_path("multitool-caption-", input_path.suffix)
+        produced = temp_output_path("glados-caption-", input_path.suffix)
         try:
             shutil.copy2(input_path, produced)
             self.writer.set_description(produced, self.text)

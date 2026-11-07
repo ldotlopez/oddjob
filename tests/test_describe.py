@@ -14,7 +14,7 @@ from filejobs.pipeline import Job, suffix_destination
 from filejobs.progress import ProgressEvent, ProgressStream
 from glados.commands import describe
 from glados.core.config import Prompts
-from glados.tasks.describe import (
+from glados.lib.describe import (
     DESCRIPTION_EXTENSION,
     DescribeStep,
     describe_image,

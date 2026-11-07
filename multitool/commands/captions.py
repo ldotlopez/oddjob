@@ -15,9 +15,9 @@ from filejobs.cli_options import (
 from filejobs.inputs import expand_inputs
 from filejobs.pipeline import Job
 from filejobs.progress import BaseProgressReporter
-from multitool import media
-from multitool.captions import Caption, CaptionStep, plan_captions
-from multitool.external import ExifTool
+from glados.lib import media
+from glados.lib.captions import Caption, CaptionStep, plan_captions
+from glados.lib.external import ExifTool
 
 
 @click.command("img-caption")

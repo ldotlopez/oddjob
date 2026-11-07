@@ -13,8 +13,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Self
 
-from multitool.media import JPEG_EXTENSIONS, MP4_EXTENSION
-from multitool.sidecars import SidecarGroup
+from glados.lib.media import JPEG_EXTENSIONS, MP4_EXTENSION
+from glados.lib.sidecars import SidecarGroup
 
 MARKER = b"MotionPhoto_Data"
 

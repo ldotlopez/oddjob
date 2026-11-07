@@ -1,5 +1,5 @@
 """`multitool img-hash`, `img-duplicates` and `img-check` (need the
-`multitool` extra; multitool.imghash is imported only when one of them
+`multitool` extra; glados.lib.imghash is imported only when one of them
 runs)."""
 
 from __future__ import annotations
@@ -18,8 +18,8 @@ from filejobs.cli_options import finish_batch, paths_argument
 from filejobs.inputs import expand_inputs
 from filejobs.pipeline import JOB_ERRORS
 from filejobs.progress import BaseProgressReporter
-from multitool import media
-from multitool.external import run_command_with_paths
+from glados.lib import media
+from glados.lib.external import run_command_with_paths
 
 CACHE_APP = "multitool"
 
@@ -28,7 +28,7 @@ def load_extra_module(name: str) -> ModuleType:
     """multitool.<name>, a module that needs the optional `multitool` extra
     (imghash, imgedit); a clean error if the extra is not installed."""
     try:
-        return importlib.import_module(f"multitool.{name}")
+        return importlib.import_module(f"glados.lib.{name}")
     except ImportError as exc:
         raise click.ClickException(
             f"{exc.name} is missing: install the multitool extra"

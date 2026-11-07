@@ -29,9 +29,9 @@ from foundation.cache import CacheMissError
 from filejobs.inputs import FileFilter
 from filejobs.pipeline import ProgressStep, consume_stream
 from filejobs.progress import BaseProgressReporter
-from glados.tasks.grep import GrepResult, GrepRunner
-from glados.tasks.protocols import Transcriber, TranscriptSegment
-from glados.tasks.transcribe import FORMATTERS, AudioExtractor
+from glados.lib.grep import GrepResult, GrepRunner
+from glados.lib.protocols import Transcriber, TranscriptSegment
+from glados.lib.transcribe import FORMATTERS, AudioExtractor
 
 DEFAULT_TRANSCRIPT_FORMAT = "lrc"
 TRANSCRIPT_TTL = 180 * 24 * 60 * 60  # seconds

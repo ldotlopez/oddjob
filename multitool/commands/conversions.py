@@ -17,15 +17,15 @@ from filejobs.inputs import expand_inputs
 from filejobs.pipeline import ProgressStep
 from filejobs.progress import BaseProgressReporter
 from filejobs.runners import FFMpegRunner
-from multitool import media
-from multitool.conversions import (
+from glados.lib import media
+from glados.lib.conversions import (
     Conversion,
     JpegConversionStep,
     Mp4RemuxStep,
     plan_conversions,
     run_conversion,
 )
-from multitool.external import ExifTool, ImageMagick
+from glados.lib.external import ExifTool, ImageMagick
 
 
 def conversion_options[F: Callable[..., object]](func: F) -> F:

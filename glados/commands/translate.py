@@ -32,8 +32,8 @@ from glados.core.cli_common import (
     pass_glados,
 )
 from glados.core.session import Glados
-from glados.tasks.protocols import Translator
-from glados.tasks.translate import language_infix
+from glados.lib.protocols import Translator
+from glados.lib.translate import language_infix
 
 
 def infix_of(

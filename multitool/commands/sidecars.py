@@ -8,7 +8,7 @@ import rich_click as click
 
 from filejobs.cli_options import paths_argument
 from filejobs.inputs import accept_all, expand_inputs
-from multitool import sidecars
+from glados.lib import sidecars
 
 
 @click.group("sidecars")

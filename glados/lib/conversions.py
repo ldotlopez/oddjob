@@ -17,7 +17,7 @@ from filejobs.pipeline import (
 )
 from filejobs.progress import BaseProgressReporter, ProgressEvent, ProgressStream
 from filejobs.runners import FFMpegRunner
-from multitool.external import ExifTool, ImageMagick
+from glados.lib.external import ExifTool, ImageMagick
 
 LOGGER = logging.getLogger(__name__)
 
@@ -33,7 +33,7 @@ class JpegConversionStep:
         self.exiftool = exiftool
 
     def run(self, input_path: Path) -> ProgressStream[Path]:
-        produced = temp_output_path("multitool-jpeg-", ".jpg")
+        produced = temp_output_path("glados-jpeg-", ".jpg")
         try:
             self.magick.to_jpeg(input_path, produced)
             self.exiftool.copy_tags(input_path, produced)
@@ -52,7 +52,7 @@ class Mp4RemuxStep:
         self.ffmpeg = ffmpeg
 
     def run(self, input_path: Path) -> ProgressStream[Path]:
-        produced = temp_output_path("multitool-mp4-", ".mp4")
+        produced = temp_output_path("glados-mp4-", ".mp4")
         duration = self.ffmpeg.probe_duration(input_path)
         try:
             yield from self._remux(input_path, produced, duration)

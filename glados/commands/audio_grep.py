@@ -21,7 +21,7 @@ from filejobs.inputs import expand_inputs, media_type_filter
 from filejobs.progress import BaseProgressReporter
 from glados.core.cli_common import APP_LOGGER, pass_glados
 from glados.core.session import Glados
-from glados.tasks.audio_grep import (
+from glados.lib.audio_grep import (
     DEFAULT_TRANSCRIPT_FORMAT,
     TRANSCRIPT_TTL,
     CachedTranscripts,
@@ -30,9 +30,9 @@ from glados.tasks.audio_grep import (
     grep_transcripts,
     split_command_line,
 )
-from glados.tasks.grep import GrepRunner
-from glados.tasks.protocols import Transcriber
-from glados.tasks.transcribe import FORMATTERS
+from glados.lib.grep import GrepRunner
+from glados.lib.protocols import Transcriber
+from glados.lib.transcribe import FORMATTERS
 
 CACHE_APP = "glados"
 # grep's exit status for an error; a failed transcription counts as one.

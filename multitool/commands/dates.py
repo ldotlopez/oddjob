@@ -16,9 +16,9 @@ from filejobs.cli_options import (
 )
 from filejobs.inputs import expand_inputs
 from filejobs.progress import BaseProgressReporter
-from multitool import dates
-from multitool.external import ExifTool
-from multitool.shotwell import ShotwellLibrary
+from glados.lib import dates
+from glados.lib.external import ExifTool
+from glados.lib.shotwell import ShotwellLibrary
 
 SOURCES = click.Choice([place.value for place in dates.Place])
 TARGETS = click.Choice([place.value for place in dates.TARGETS])

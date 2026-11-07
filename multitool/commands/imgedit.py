@@ -1,5 +1,5 @@
 """`multitool autocrop` and `img-reduce` (need the `multitool` extra;
-multitool.imgedit is imported only when they run, after -n)."""
+glados.lib.imgedit is imported only when they run, after -n)."""
 
 from __future__ import annotations
 
@@ -20,7 +20,7 @@ from filejobs.cli_options import (
 from filejobs.inputs import expand_inputs
 from filejobs.pipeline import BytesStep, Job, infix_destination, override_destination
 from filejobs.progress import BaseProgressReporter
-from multitool import media
+from glados.lib import media
 from multitool.commands.imghash import load_extra_module
 
 LOGGER = logging.getLogger(__name__)

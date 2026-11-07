@@ -25,7 +25,7 @@ from glados.core.cli_common import (
     pass_glados,
 )
 from glados.core.session import Glados
-from glados.tasks.protocols import Summarizer
+from glados.lib.protocols import Summarizer
 
 DEFAULT_INFIX = "summary"
 

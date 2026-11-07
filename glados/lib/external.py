@@ -1,5 +1,5 @@
-"""Adapters for the external programs multitool runs: ImageMagick, exiftool
-and arbitrary user commands. ffmpeg goes through filejobs.runners."""
+"""Adapters for the external programs the file commands run: ImageMagick,
+exiftool and arbitrary user commands. ffmpeg goes through filejobs.runners."""
 
 from __future__ import annotations
 

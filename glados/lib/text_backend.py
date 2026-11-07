@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import Protocol
 
 from filejobs.progress import ProgressStream
-from glados.tasks.protocols import (
+from glados.lib.protocols import (
     Describer,
     Expander,
     Rewriter,

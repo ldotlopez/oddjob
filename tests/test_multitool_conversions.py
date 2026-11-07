@@ -10,14 +10,14 @@ from support import NullReporter, recorded_argv, write_executable
 
 from filejobs.pipeline import Job
 from filejobs.runners import FFMpegRunner
-from multitool.captions import CaptionStep
-from multitool.conversions import (
+from glados.lib.captions import CaptionStep
+from glados.lib.conversions import (
     JpegConversionStep,
     Mp4RemuxStep,
     plan_conversions,
     run_conversion,
 )
-from multitool.external import ExifTool, ImageMagick
+from glados.lib.external import ExifTool, ImageMagick
 
 # Records its argv, then writes the last argument as an output file.
 FAKE_WRITER = """\

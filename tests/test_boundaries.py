@@ -1,12 +1,14 @@
 """Import boundaries of the repository.
 
-- filejobs, the backend-free core, imports neither tool; multitool imports
-  nothing from glados, and glados never imports multitool (decision 0003).
-- Both tools share one layout: `<tool>/cli.py` holds the click group,
-  `<tool>/commands/<command>.py` one click command each, and every other
-  module is domain or core code with no CLI. So click is imported only
-  there and in the shared CLI plumbing (`filejobs/cli_*.py`,
-  `glados/core/cli_*.py`).
+- filejobs, the backend-free core, imports nothing from glados.
+- glados.lib, the domain modules, knows nothing about config, backends or
+  the CLI: it imports none of glados.core, glados.plugins and
+  glados.commands. glados.plugins (the backends) build on glados.lib only,
+  never on glados.core or glados.commands.
+- `cli.py` holds the click group and `commands/<command>.py` one click
+  command each; every other module is domain or core code with no CLI. So
+  click is imported only there and in the shared CLI plumbing
+  (`filejobs/cli_*.py`, `glados/core/cli_*.py`).
 """
 
 import ast
@@ -65,14 +67,16 @@ def may_import_click(relative: Path) -> bool:
 
 
 class BoundaryTests(unittest.TestCase):
-    def test_filejobs_imports_neither_tool(self) -> None:
+    def test_filejobs_imports_no_glados(self) -> None:
         self.assertEqual(violations("filejobs", ("glados", "multitool")), [])
 
-    def test_multitool_never_imports_glados(self) -> None:
-        self.assertEqual(violations("multitool", ("glados",)), [])
+    def test_lib_knows_no_config_backends_or_cli(self) -> None:
+        forbidden = ("glados.core", "glados.plugins", "glados.commands")
+        self.assertEqual(violations("glados/lib", forbidden), [])
 
-    def test_glados_never_imports_multitool(self) -> None:
-        self.assertEqual(violations("glados", ("multitool",)), [])
+    def test_plugins_build_on_lib_only(self) -> None:
+        forbidden = ("glados.core", "glados.commands")
+        self.assertEqual(violations("glados/plugins", forbidden), [])
 
     def test_click_only_in_entry_points_and_commands(self) -> None:
         found = [

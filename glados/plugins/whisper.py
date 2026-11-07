@@ -31,7 +31,7 @@ from platformdirs import user_data_dir
 
 from filejobs.progress import ProgressEvent, ProgressStream
 from filejobs.runners import CliArgs
-from glados.tasks.protocols import Transcriber, TranscriptSegment
+from glados.lib.protocols import Transcriber, TranscriptSegment
 
 LOGGER = logging.getLogger(__name__)
 

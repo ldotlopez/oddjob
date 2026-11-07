@@ -19,9 +19,9 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Protocol
 
-from multitool import media, renamers
-from multitool.external import EXIF_DATE_FORMAT, ExifTool
-from multitool.shotwell import ShotwellLibrary
+from glados.lib import media, renamers
+from glados.lib.external import EXIF_DATE_FORMAT, ExifTool
+from glados.lib.shotwell import ShotwellLibrary
 
 
 class DateNotFoundError(ValueError):

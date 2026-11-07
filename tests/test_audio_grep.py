@@ -15,7 +15,7 @@ from support import NullReporter
 from filejobs.inputs import media_type_filter
 from filejobs.progress import ProgressEvent, ProgressStream
 from glados.commands.audio_grep import cli
-from glados.tasks.audio_grep import (
+from glados.lib.audio_grep import (
     TRANSCRIPT_TTL,
     CachedTranscripts,
     Transcript,
@@ -26,8 +26,8 @@ from glados.tasks.audio_grep import (
     split_command_line,
     transcript_key,
 )
-from glados.tasks.grep import GrepRunner
-from glados.tasks.protocols import TranscriptSegment
+from glados.lib.grep import GrepRunner
+from glados.lib.protocols import TranscriptSegment
 
 SEGMENTS = [
     TranscriptSegment(start=1.0, end=2.5, text=" The Budget for Q3"),
@@ -167,7 +167,7 @@ class CachedTranscriptsTests(unittest.TestCase):
 
     def test_an_unreadable_entry_is_transcribed_again(self) -> None:
         self.store.set(transcript_key(self.media, DEFAULTS), b"garbage")
-        with self.assertLogs("glados.tasks.audio_grep", "WARNING"):
+        with self.assertLogs("glados.lib.audio_grep", "WARNING"):
             self.assertEqual(
                 self.source().segments(self.media, NullReporter()), SEGMENTS
             )

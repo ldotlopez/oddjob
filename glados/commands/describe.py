@@ -36,13 +36,13 @@ from glados.core.cli_common import (
     pass_glados,
 )
 from glados.core.session import Glados
-from glados.tasks.describe import (
+from glados.lib.describe import (
     DESCRIPTION_EXTENSION,
     DescribeStep,
     describe_image,
     is_image,
 )
-from glados.tasks.protocols import Describer
+from glados.lib.protocols import Describer
 
 
 @click.command("describe")

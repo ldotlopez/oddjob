@@ -33,8 +33,8 @@ from glados.core.cli_common import (
     pass_glados,
 )
 from glados.core.session import Glados
-from glados.tasks.protocols import Transcriber
-from glados.tasks.transcribe import (
+from glados.lib.protocols import Transcriber
+from glados.lib.transcribe import (
     DEFAULT_OUTPUT_FORMAT,
     FORMATTERS,
     AudioExtractor,

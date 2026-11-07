@@ -20,14 +20,14 @@ from support import (
     require_settings,
 )
 
-from glados.plugins.openai import OpenAIOptions, OpenAITransport, __glados_plugin__
-from glados.tasks.protocols import (
+from glados.lib.protocols import (
     Describer,
     Expander,
     Rewriter,
     Summarizer,
     Translator,
 )
+from glados.plugins.openai import OpenAIOptions, OpenAITransport, __glados_plugin__
 
 PING_SYSTEM = "Reply with exactly one word: pong. No punctuation."
 

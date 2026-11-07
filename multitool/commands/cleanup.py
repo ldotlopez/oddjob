@@ -9,7 +9,7 @@ import rich_click as click
 from filejobs.batch import run_batch
 from filejobs.cli_options import dry_run_option, finish_batch, paths_argument
 from filejobs.progress import BaseProgressReporter
-from multitool import cleanup
+from glados.lib import cleanup
 
 
 @click.command("fs-cleanup")

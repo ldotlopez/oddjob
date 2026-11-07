@@ -20,7 +20,7 @@ from pathlib import Path
 
 from filejobs.progress import ProgressEvent, ProgressStream
 from filejobs.runners import CliArgs, FFMpegRunner
-from glados.tasks.protocols import Transcriber, TranscriptSegment
+from glados.lib.protocols import Transcriber, TranscriptSegment
 
 DEFAULT_OUTPUT_FORMAT = "txt"
 

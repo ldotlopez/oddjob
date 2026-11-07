@@ -22,7 +22,7 @@ import pydantic
 import requests
 
 from filejobs.progress import ProgressEvent, ProgressStream
-from glados.tasks.text_backend import text_plugin_triples
+from glados.lib.text_backend import text_plugin_triples
 
 LOGGER = logging.getLogger(__name__)
 

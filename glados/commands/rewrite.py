@@ -32,7 +32,7 @@ from glados.core.cli_common import (
     pass_glados,
 )
 from glados.core.session import Glados
-from glados.tasks.protocols import Rewriter
+from glados.lib.protocols import Rewriter
 
 DEFAULT_INFIX = "rewrite"
 

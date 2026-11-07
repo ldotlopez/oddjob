@@ -20,7 +20,7 @@ from filejobs.cli_options import (
 from filejobs.inputs import accept_all, expand_inputs
 from filejobs.pipeline import JOB_ERRORS, BytesStep, Job, check_destination
 from filejobs.progress import BaseProgressReporter
-from multitool import motionphotos, sidecars
+from glados.lib import motionphotos, sidecars
 
 existing_file = click.Path(exists=True, dir_okay=False, path_type=Path)
 
