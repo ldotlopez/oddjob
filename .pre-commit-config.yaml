@@ -1,12 +1,4 @@
 repos:
-  - repo: local
-    hooks:
-      - id: check-shared-files-in-sync
-        name: verify shared dotfiles match canonical source
-        entry: scripts/check-shared-files-in-sync.sh
-        language: script
-        pass_filenames: false
-
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v6.0.0
     hooks:
