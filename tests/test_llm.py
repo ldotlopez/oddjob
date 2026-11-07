@@ -1,5 +1,5 @@
 """`llm` CLI backend: unit tests against a fake `llm`, and an integration
-test against the real one (GLADOS_TEST_LLM_* settings)."""
+test against the real one (ODDJOB_TEST_LLM_* settings)."""
 
 from __future__ import annotations
 
@@ -10,14 +10,14 @@ from pathlib import Path
 import pydantic
 from support import drain, recorded_argv, require_settings, write_executable
 
-from glados.lib.protocols import (
+from oddjob.lib.protocols import (
     Describer,
     Expander,
     Rewriter,
     Summarizer,
     Translator,
 )
-from glados.plugins.llm import LlmCliTransport, LlmOptions, __glados_plugin__
+from oddjob.plugins.llm import LlmCliTransport, LlmOptions, __oddjob_plugin__
 
 ECHO_LLM = """
 import json
@@ -110,7 +110,7 @@ class LlmTransportTest(unittest.TestCase):
 
 class LlmPluginTest(unittest.TestCase):
     def test_implements_text_tasks(self) -> None:
-        triples = __glados_plugin__("llm", {"model": "m"})
+        triples = __oddjob_plugin__("llm", {"model": "m"})
 
         self.assertEqual(
             [(task, protocol) for task, protocol, _ in triples],
@@ -127,18 +127,18 @@ class LlmPluginTest(unittest.TestCase):
 
     def test_rejects_unknown_options(self) -> None:
         with self.assertRaises(pydantic.ValidationError):
-            __glados_plugin__("llm", {"api_key": "secret"})
+            __oddjob_plugin__("llm", {"api_key": "secret"})
 
 
 class LlmIntegrationTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
-        cls.settings = require_settings("GLADOS_TEST_LLM_MODEL")
+        cls.settings = require_settings("ODDJOB_TEST_LLM_MODEL")
 
     def test_completes(self) -> None:
         options = LlmOptions(
-            model=self.settings["GLADOS_TEST_LLM_MODEL"],
-            binary=self.settings.get("GLADOS_TEST_LLM_BINARY", "llm"),
+            model=self.settings["ODDJOB_TEST_LLM_MODEL"],
+            binary=self.settings.get("ODDJOB_TEST_LLM_BINARY", "llm"),
         )
 
         _, result = drain(LlmCliTransport(options).complete(PING_SYSTEM, "ping"))

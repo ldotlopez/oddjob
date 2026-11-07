@@ -1,8 +1,8 @@
 # CLAUDE.md
 
 Python conventions, architecture and `foundation` usage come from `~/.claude/rules/`
-(`python.md`, `architecture.md`, `foundation.md`). glados-specific notes live in
-`.claude/rules/glados.md`. This file holds only agent behavior for this repo.
+(`python.md`, `architecture.md`, `foundation.md`). oddjob-specific notes live in
+`.claude/rules/oddjob.md`. This file holds only agent behavior for this repo.
 
 ## Behavior
 
@@ -16,7 +16,7 @@ Python conventions, architecture and `foundation` usage come from `~/.claude/rul
 
 ## Search scope
 
-- Never run unbounded recursive searches (`grep -r`, `find .`, `ls -R`, `**/*`). Always name a subdirectory and extension (e.g. `glados/`, `*.py`).
+- Never run unbounded recursive searches (`grep -r`, `find .`, `ls -R`, `**/*`). Always name a subdirectory and extension (e.g. `oddjob/`, `*.py`).
 - If a repo-wide search is truly necessary, stop and ask first, stating why and the pattern you will use.
 - If two targeted searches find nothing, stop and ask for the location instead of widening the search.
 

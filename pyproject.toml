@@ -1,5 +1,5 @@
 [project]
-name = "glados"
+name = "oddjob"
 version = "0.1.0"
 description = "CLI toolkit for files: model-backed tasks (transcribe, speak, rewrite, summarize, expand, translate, describe, audio-grep) through replaceable backends (whisper, whisper.cpp, piper, OpenAI-compatible APIs, Ollama, llm), and file utilities for sidecars, motion photos, conversions, image hashes, checks, crops, downscaling and captions, renames, extension fixes, date sync and OS-leftover cleanup."
 requires-python = ">=3.13"
@@ -14,46 +14,46 @@ dependencies = [
     "langcodes[data]>=3.5.1",
 ]
 
-# One entry point: every command is a `glados` subcommand.
+# One entry point: every command is an `oddjob` subcommand.
 [project.scripts]
-glados = "glados.cli:cli"
+oddjob = "oddjob.cli:cli"
 
 # Which backend implements which task, readable without importing any
 # backend (see docs/decisions/0002). One group per task; the entry point's
 # name is the backend name and its value must be
-# `glados.plugins.<module>:__glados_plugin__`. One module may provide several
+# `oddjob.plugins.<module>:__oddjob_plugin__`. One module may provide several
 # backends. Run `uv sync` after editing.
-[project.entry-points."glados.backends.transcribe"]
-whisper = "glados.plugins.whisper:__glados_plugin__"
-whisper_cpp = "glados.plugins.whisper:__glados_plugin__"
+[project.entry-points."oddjob.backends.transcribe"]
+whisper = "oddjob.plugins.whisper:__oddjob_plugin__"
+whisper_cpp = "oddjob.plugins.whisper:__oddjob_plugin__"
 
-[project.entry-points."glados.backends.speak"]
-piper = "glados.plugins.piper:__glados_plugin__"
+[project.entry-points."oddjob.backends.speak"]
+piper = "oddjob.plugins.piper:__oddjob_plugin__"
 
-[project.entry-points."glados.backends.rewrite"]
-llm = "glados.plugins.llm:__glados_plugin__"
-ollama = "glados.plugins.ollama:__glados_plugin__"
-openai = "glados.plugins.openai:__glados_plugin__"
+[project.entry-points."oddjob.backends.rewrite"]
+llm = "oddjob.plugins.llm:__oddjob_plugin__"
+ollama = "oddjob.plugins.ollama:__oddjob_plugin__"
+openai = "oddjob.plugins.openai:__oddjob_plugin__"
 
-[project.entry-points."glados.backends.summarize"]
-llm = "glados.plugins.llm:__glados_plugin__"
-ollama = "glados.plugins.ollama:__glados_plugin__"
-openai = "glados.plugins.openai:__glados_plugin__"
+[project.entry-points."oddjob.backends.summarize"]
+llm = "oddjob.plugins.llm:__oddjob_plugin__"
+ollama = "oddjob.plugins.ollama:__oddjob_plugin__"
+openai = "oddjob.plugins.openai:__oddjob_plugin__"
 
-[project.entry-points."glados.backends.expand"]
-llm = "glados.plugins.llm:__glados_plugin__"
-ollama = "glados.plugins.ollama:__glados_plugin__"
-openai = "glados.plugins.openai:__glados_plugin__"
+[project.entry-points."oddjob.backends.expand"]
+llm = "oddjob.plugins.llm:__oddjob_plugin__"
+ollama = "oddjob.plugins.ollama:__oddjob_plugin__"
+openai = "oddjob.plugins.openai:__oddjob_plugin__"
 
-[project.entry-points."glados.backends.translate"]
-llm = "glados.plugins.llm:__glados_plugin__"
-ollama = "glados.plugins.ollama:__glados_plugin__"
-openai = "glados.plugins.openai:__glados_plugin__"
+[project.entry-points."oddjob.backends.translate"]
+llm = "oddjob.plugins.llm:__oddjob_plugin__"
+ollama = "oddjob.plugins.ollama:__oddjob_plugin__"
+openai = "oddjob.plugins.openai:__oddjob_plugin__"
 
-[project.entry-points."glados.backends.describe"]
-llm = "glados.plugins.llm:__glados_plugin__"
-ollama = "glados.plugins.ollama:__glados_plugin__"
-openai = "glados.plugins.openai:__glados_plugin__"
+[project.entry-points."oddjob.backends.describe"]
+llm = "oddjob.plugins.llm:__oddjob_plugin__"
+ollama = "oddjob.plugins.ollama:__oddjob_plugin__"
+openai = "oddjob.plugins.openai:__oddjob_plugin__"
 
 [project.optional-dependencies]
 # Pillow-based image commands (img-hash, img-duplicates, img-check, img-trim,
@@ -68,7 +68,7 @@ images = [
 # build-backend = "hatchling.build"
 
 # [tool.hatch.build.targets.wheel]
-# packages = ["src/glados"]
+# packages = ["src/oddjob"]
 
 [tool.uv]
 package = true
@@ -76,7 +76,7 @@ package = true
 # Two top-level packages: the tool and its backend-free core, filejobs
 # (docs/decisions/0006).
 [tool.setuptools.packages.find]
-include = ["glados*", "filejobs*"]
+include = ["oddjob*", "filejobs*"]
 
 [tool.uv.sources]
 foundation = { git = "https://github.com/ldotlopez/foundation.git", branch = "main" }

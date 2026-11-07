@@ -1,0 +1,151 @@
+"""`oddjob img-hash`, `img-duplicates` and `img-check` (need the
+`images` extra; oddjob.lib.imghash is imported only when one of them
+runs)."""
+
+from __future__ import annotations
+
+import importlib
+import shlex
+from collections.abc import Callable
+from pathlib import Path
+from types import ModuleType
+
+import rich_click as click
+from foundation.cache import UserCache
+
+from filejobs.batch import run_batch
+from filejobs.cli_options import finish_batch, paths_argument
+from filejobs.inputs import expand_inputs
+from filejobs.pipeline import JOB_ERRORS
+from filejobs.progress import BaseProgressReporter
+from oddjob.core.cache import open_user_cache
+from oddjob.core.cli_common import logging_options
+from oddjob.lib import media
+from oddjob.lib.external import run_command_with_paths
+
+
+def load_extra_module(name: str) -> ModuleType:
+    """oddjob.lib.<name>, a module that needs the optional `images` extra
+    (imghash, imgedit); a clean error if the extra is not installed."""
+    try:
+        return importlib.import_module(f"oddjob.lib.{name}")
+    except ImportError as exc:
+        raise click.ClickException(
+            f"{exc.name} is missing: install the images extra (uv sync --extra images)"
+        ) from exc
+
+
+def hash_options[F: Callable[..., object]](func: F) -> F:
+    func = click.option(
+        "--no-cache", is_flag=True, help="neither read nor store cached hashes"
+    )(func)
+    func = click.option(
+        "--hash-size",
+        type=click.IntRange(min=2),
+        default=16,
+        show_default=True,
+        help="hash side in pixels (bits = size²)",
+    )(func)
+    return paths_argument(func)
+
+
+def hash_cache(no_cache: bool) -> UserCache | None:
+    """The shared user cache, closed when the running command ends."""
+    if no_cache:
+        return None
+    cache = open_user_cache()
+    click.get_current_context().call_on_close(cache.close)
+    return cache
+
+
+@click.command("img-hash")
+@hash_options
+@logging_options
+def img_hash_cmd(paths: tuple[Path, ...], hash_size: int, no_cache: bool) -> None:
+    """Print the average hash of each image in PATH..."""
+    imghash = load_extra_module("imghash")
+    hasher = imghash.ImageHasher(hash_size, hash_cache(no_cache))
+    results: list[tuple[Path, str]] = []
+
+    def collect(path: Path, _reporter: BaseProgressReporter) -> None:
+        results.append((path, hasher.hash(path)))
+
+    report = run_batch(
+        expand_inputs(paths, media.is_image), collect, description="Hashing"
+    )
+    for path, image_hash in results:
+        click.echo(f"{path}: {image_hash}")
+    finish_batch(report)
+
+
+@click.command("img-check")
+@paths_argument
+@logging_options
+def img_check_cmd(paths: tuple[Path, ...]) -> None:
+    """Print each image in PATH... that cannot be fully decoded, with the
+    reason; exit 1 if there was any."""
+    imghash = load_extra_module("imghash")
+    problems: list[tuple[Path, str]] = []
+
+    def check(path: Path, _reporter: BaseProgressReporter) -> None:
+        if (problem := imghash.decode_problem(path)) is not None:
+            problems.append((path, problem))
+
+    report = run_batch(
+        expand_inputs(paths, media.is_image), check, description="Checking"
+    )
+    for path, problem in problems:
+        click.echo(f"{path}: {problem}")
+    finish_batch(report)
+    if problems:
+        raise click.exceptions.Exit(1)
+
+
+@click.command("img-duplicates")
+@hash_options
+@click.option(
+    "--max-distance",
+    type=click.IntRange(min=0),
+    default=8,
+    show_default=True,
+    help="bits two hashes may differ in and still be duplicates",
+)
+@click.option(
+    "-x",
+    "--command",
+    default=None,
+    help="run this command once per group, with the group's files appended",
+)
+@logging_options
+def img_duplicates_cmd(
+    paths: tuple[Path, ...],
+    hash_size: int,
+    no_cache: bool,
+    max_distance: int,
+    command: str | None,
+) -> None:
+    """Find groups of near-duplicate images in PATH..."""
+    imghash = load_extra_module("imghash")
+    hasher = imghash.ImageHasher(hash_size, hash_cache(no_cache))
+    hashes: list[tuple[Path, str]] = []
+
+    def collect(path: Path, _reporter: BaseProgressReporter) -> None:
+        hashes.append((path, hasher.hash(path)))
+
+    report = run_batch(
+        expand_inputs(paths, media.is_image), collect, description="Hashing"
+    )
+    groups = imghash.duplicate_groups(hashes, max_distance)
+    if not groups:
+        click.echo("no duplicates found")
+    for number, group in enumerate(groups, start=1):
+        if command is None:
+            click.echo(f"group {number}")
+            for path in group:
+                click.echo(f"  {path}")
+            continue
+        try:
+            run_command_with_paths(shlex.split(command), group)
+        except JOB_ERRORS as exc:
+            raise click.ClickException(str(exc)) from exc
+    finish_batch(report)

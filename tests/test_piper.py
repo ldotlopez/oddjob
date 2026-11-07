@@ -1,5 +1,5 @@
 """piper backend: unit tests against a fake `piper`, and an integration test
-against the real one (GLADOS_TEST_PIPER_* settings)."""
+against the real one (ODDJOB_TEST_PIPER_* settings)."""
 
 from __future__ import annotations
 
@@ -11,8 +11,8 @@ from pathlib import Path
 import pydantic
 from support import drain, recorded_argv, require_settings, write_executable
 
-from glados.lib.protocols import Speaker
-from glados.plugins.piper import PiperBackend, PiperOptions, __glados_plugin__
+from oddjob.lib.protocols import Speaker
+from oddjob.plugins.piper import PiperBackend, PiperOptions, __oddjob_plugin__
 
 FAKE_PIPER = """
 import json
@@ -112,7 +112,7 @@ class PiperBackendTest(unittest.TestCase):
 
 class PiperPluginTest(unittest.TestCase):
     def test_implements_speak(self) -> None:
-        [(task, protocol, backend)] = __glados_plugin__("piper", {})
+        [(task, protocol, backend)] = __oddjob_plugin__("piper", {})
 
         self.assertEqual((task, protocol), ("speak", Speaker))
         self.assertIsInstance(backend, Speaker)
@@ -124,26 +124,26 @@ class PiperPluginTest(unittest.TestCase):
 
     def test_rejects_unknown_options(self) -> None:
         with self.assertRaises(pydantic.ValidationError):
-            __glados_plugin__("piper", {"modle": "x"})
+            __oddjob_plugin__("piper", {"modle": "x"})
 
     def test_unknown_backend_names_the_provided_ones(self) -> None:
         with self.assertRaisesRegex(ValueError, "provides no backend 'espeak'"):
-            __glados_plugin__("espeak", {})
+            __oddjob_plugin__("espeak", {})
 
 
 class PiperIntegrationTest(unittest.TestCase):
-    """Runs the real piper with the voice in GLADOS_TEST_PIPER_MODEL."""
+    """Runs the real piper with the voice in ODDJOB_TEST_PIPER_MODEL."""
 
     @classmethod
     def setUpClass(cls) -> None:
-        cls.settings = require_settings("GLADOS_TEST_PIPER_MODEL")
+        cls.settings = require_settings("ODDJOB_TEST_PIPER_MODEL")
 
     def test_speaks(self) -> None:
-        binary = self.settings.get("GLADOS_TEST_PIPER_BINARY", "piper")
+        binary = self.settings.get("ODDJOB_TEST_PIPER_BINARY", "piper")
         if shutil.which(binary) is None:
             raise unittest.SkipTest(f"{binary} not on PATH")
         options = PiperOptions.model_validate(
-            {"model": self.settings["GLADOS_TEST_PIPER_MODEL"], "binary": binary}
+            {"model": self.settings["ODDJOB_TEST_PIPER_MODEL"], "binary": binary}
         )
 
         _, result = drain(PiperBackend(options).speak("Hello there.", speaker=None))

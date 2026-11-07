@@ -3,7 +3,7 @@ and the integration settings.
 
 Unit tests never touch real services. Integration tests read their settings
 from `tests/integration.env` (git-ignored; copy `integration.env.example`),
-with `GLADOS_TEST_*` environment variables taking precedence, and skip
+with `ODDJOB_TEST_*` environment variables taking precedence, and skip
 themselves when a required setting is empty.
 """
 
@@ -26,11 +26,11 @@ from dotenv import dotenv_values
 from filejobs.progress import ProgressEvent, ProgressStream
 
 INTEGRATION_ENV = Path(__file__).with_name("integration.env")
-SETTING_PREFIX = "GLADOS_TEST_"
+SETTING_PREFIX = "ODDJOB_TEST_"
 
 
 def integration_settings() -> dict[str, str]:
-    """Non-empty GLADOS_TEST_* settings: integration.env, then the environment."""
+    """Non-empty ODDJOB_TEST_* settings: integration.env, then the environment."""
     file_values = dotenv_values(INTEGRATION_ENV) if INTEGRATION_ENV.is_file() else {}
     merged = {**file_values, **os.environ}
     return {

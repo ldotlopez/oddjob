@@ -1,8 +1,8 @@
-# glados
+# oddjob
 
-CLI toolkit for files, one command each, all under `glados`: tasks that go through
+CLI toolkit for files, one command each, all under `oddjob`: tasks that go through
 replaceable model backends (below), and [file commands](#file-commands) with no
-backends or config. `glados --help` lists them by subject.
+backends or config. `oddjob --help` lists them by subject.
 
 | Task         | Status          | Input → output                                   |
 | :----------- | :-------------- | :----------------------------------------------- |
@@ -53,27 +53,27 @@ Backends:
 ## Install
 
 ```sh
-uv sync                       # glados
+uv sync                       # oddjob
 uv sync --extra images        # also the Pillow-based image commands
 ```
 
 ## Usage
 
-Every task runs as `glados <task> PATH...`.
+Every task runs as `oddjob <task> PATH...`.
 `PATH` may be a file or a directory; directories are walked recursively for the files
 the task handles (audio/video for `transcribe`, text files for the others, skipping
 the task's own earlier outputs), and each file gets its own output next to it. If an
 input fails, the rest still run and the command exits 1 at the end.
 
 ```sh
-uv run glados transcribe talk.mp4             # -> talk.txt (backend from [tasks])
-uv run glados transcribe lectures/ extra.m4a  # every audio/video file under lectures/, plus extra.m4a
-uv run glados rewrite -n notes/               # print input -> destination, change nothing
-uv run glados transcribe -b whisper talk.mp4 -f vtt -l en -m small
-uv run glados transcribe -b whisper_cpp talk.mp4 -m ~/models/ggml-small.bin -o subs/talk.srt -y   # SRT, from -o
-uv run glados rewrite -b ollama notes.md -i "more formal tone"   # -> notes.rewrite.md
-uv run glados summarize -b openai report.txt --max-length 200
-uv run glados expand -b llm -m gpt-4o-mini outline.md --target-length 800
+uv run oddjob transcribe talk.mp4             # -> talk.txt (backend from [tasks])
+uv run oddjob transcribe lectures/ extra.m4a  # every audio/video file under lectures/, plus extra.m4a
+uv run oddjob rewrite -n notes/               # print input -> destination, change nothing
+uv run oddjob transcribe -b whisper talk.mp4 -f vtt -l en -m small
+uv run oddjob transcribe -b whisper_cpp talk.mp4 -m ~/models/ggml-small.bin -o subs/talk.srt -y   # SRT, from -o
+uv run oddjob rewrite -b ollama notes.md -i "more formal tone"   # -> notes.rewrite.md
+uv run oddjob summarize -b openai report.txt --max-length 200
+uv run oddjob expand -b llm -m gpt-4o-mini outline.md --target-length 800
 ```
 
 Common options:
@@ -83,10 +83,10 @@ Common options:
 | `-o, --output FILE`     | explicit destination, only with a single input file (default: derived from the input name) |
 | `-y, --overwrite`       | overwrite an existing destination                           |
 | `-n, --dry-run`         | print `input -> destination` per input; resolve no backend, write nothing |
-| `-b, --backend NAME`    | backend for this task (also `GLADOS_<TASK>_BACKEND`)        |
+| `-b, --backend NAME`    | backend for this task (also `ODDJOB_<TASK>_BACKEND`)        |
 | `-m, --model MODEL`     | overrides the backend's `model` option (name or path)       |
 | `-v` / `-q`             | more / less logging (repeatable); `-v` shows progress lines and `wrote <dest>` |
-| `--log-level SPEC`      | e.g. `debug` or `glados.core:debug,*:info` (also `GLADOS_LOG_LEVEL`) |
+| `--log-level SPEC`      | e.g. `debug` or `oddjob.core:debug,*:info` (also `ODDJOB_LOG_LEVEL`) |
 
 `transcribe` also takes `-l, --language` (default: auto-detect) and `-f, --format`
 (default: the `-o` extension if it is a known format, else `txt`). `rewrite` takes
@@ -107,15 +107,15 @@ Text and stdin have no name to derive a destination from, so they need `-o`. `--
 picks a voice of a multi-speaker model.
 
 ```sh
-uv run glados speak notes.txt                       # -> notes.wav
-uv run glados speak -t "Hello there" -o hello.wav
-echo "Hello there" | uv run glados speak -o hello.wav
+uv run oddjob speak notes.txt                       # -> notes.wav
+uv run oddjob speak -t "Hello there" -o hello.wav
+echo "Hello there" | uv run oddjob speak -o hello.wav
 ```
 
 `audio-grep` runs the system `grep` over the transcriptions of audio/video files:
 
 ```sh
-uv run glados audio-grep -i -n budget talks/ meeting.mp4   # talks/q3.mp4:4:[01:02.30]the budget for Q3
+uv run oddjob audio-grep -i -n budget talks/ meeting.mp4   # talks/q3.mp4:4:[01:02.30]the budget for Q3
 ```
 
 Arguments that are existing directories or audio/video files are the inputs; every
@@ -131,7 +131,7 @@ no paths.
 ### Cache
 
 `audio-grep`, `describe`, `img-hash` and `img-duplicates` share one cache in
-`$XDG_CACHE_HOME/glados`, owner-only, with keys `<command>/<digest>`. Entries expire
+`$XDG_CACHE_HOME/oddjob`, owner-only, with keys `<command>/<digest>`. Entries expire
 after 180 days, and the least recently used are dropped when the cache passes 1 GiB
 (checked once a day). `describe` keys on the image's content, the prompt, the backend
 and its configured options (not `api_key`); `img-hash` on the content and `--hash-size`.
@@ -140,7 +140,7 @@ time.
 
 ## Configuration
 
-Optional, at `$XDG_CONFIG_HOME/glados/config.toml`. `${VAR}` placeholders are expanded
+Optional, at `$XDG_CONFIG_HOME/oddjob/config.toml`. `${VAR}` placeholders are expanded
 from the environment (and a `.env` file); write a literal `$` as `$$`.
 
 ```toml
@@ -190,7 +190,7 @@ summarize = "Summarize the text the user sends as bullet points. {length}"
 `rewrite` and `describe`, `{length}` in `summarize` and `expand`, `{language}` in
 `translate`; a literal brace is `{{` or `}}`.
 
-Backend selection: `-b`, then `GLADOS_<TASK>_BACKEND`, then `[tasks]`, then the only
+Backend selection: `-b`, then `ODDJOB_<TASK>_BACKEND`, then `[tasks]`, then the only
 installed backend; with several backends installed for a task (both whisper ones for
 `transcribe`, or the three text backends), that task needs one of those. Backend options: the backend's defaults, then `[backends.<name>]`, then
 `[backends.<name>.tasks.<task>]` (only when that backend runs that task), then CLI
@@ -206,7 +206,7 @@ percentage lines at INFO, shown with `-v`.
 
 ## File commands
 
-File utilities without backends or config, run as `glados <command>`:
+File utilities without backends or config, run as `oddjob <command>`:
 
 | Command                     | What it does                                                          |
 | :-------------------------- | :-------------------------------------------------------------------- |
@@ -229,9 +229,9 @@ File utilities without backends or config, run as `glados <command>`:
 | `cleanup PATH...`        | remove macOS, Windows and KDE leftovers (`.DS_Store`, `._NAME`, `Thumbs.db`, `.Trash-<uid>`...); `--perms`: chmod files 644, directories 755 |
 
 ```sh
-uv run glados jpgize -n ~/Pictures/import     # print the planned conversions
-uv run glados motionphotos merge -y --rm ~/DCIM
-uv run glados img-duplicates ~/Pictures -x "echo"
+uv run oddjob jpgize -n ~/Pictures/import     # print the planned conversions
+uv run oddjob motionphotos merge -y --rm ~/DCIM
+uv run oddjob img-duplicates ~/Pictures -x "echo"
 ```
 
 Commands that change files (`jpgize`, `mp4ize`, `motionphotos merge`, `img-trim`,
@@ -244,8 +244,8 @@ without `-o` always do (they write in place, and refuse up front without it).
 `NAME.description.txt`. Commands taking `PATH...`
 keep going when one input fails (exit 1 at the end); on success, commands that write
 files print nothing (`-v` logs `wrote <dest>` for each). Logging options (`-v`, `-q`,
-`--log-level`, `GLADOS_LOG_LEVEL`) are the same as the tasks' and go after the command
-name: `glados jpgize -v ...`.
+`--log-level`, `ODDJOB_LOG_LEVEL`) are the same as the tasks' and go after the command
+name: `oddjob jpgize -v ...`.
 
 ## Development
 
@@ -259,7 +259,7 @@ Unit tests use fake executables and a local fake HTTP server, so they need no se
 Each backend also has an integration test against the real thing (`whisper-cli`, `llm`,
 an Ollama server, an OpenAI-compatible API), skipped until it is configured: copy
 `tests/integration.env.example` to `tests/integration.env` (git-ignored, it holds
-secrets) and fill in the backends to test. `GLADOS_TEST_*` environment variables
+secrets) and fill in the backends to test. `ODDJOB_TEST_*` environment variables
 override the file. The file commands' integration tests run the real ImageMagick, exiftool
 and ffmpeg, and skip when they are not on `PATH`.
 
@@ -269,7 +269,7 @@ backend, and [docs/decisions/](docs/decisions/) for recorded decisions.
 ## Roadmap
 
 - **whisper.cpp on the AMD Ryzen AI NPU.** whisper.cpp ≥ 1.9 can offload the encoder
-  to the XDNA NPU via VitisAI (`-DWHISPER_VITISAI=1`); no glados change is needed,
+  to the XDNA NPU via VitisAI (`-DWHISPER_VITISAI=1`); no oddjob change is needed,
   only the host setup:
   - `amdxdna` kernel driver (mainline since 6.14, or AMD's out-of-tree `xdna-driver`)
     and the NPU firmware for the chip revision (`/usr/lib/firmware/amdnpu/17f0_20`);

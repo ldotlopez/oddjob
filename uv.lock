@@ -164,42 +164,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "glados"
-version = "0.1.0"
-source = { editable = "." }
-dependencies = [
-    { name = "foundation" },
-    { name = "langcodes", extra = ["data"] },
-    { name = "platformdirs" },
-    { name = "pydantic" },
-    { name = "python-dotenv" },
-    { name = "requests" },
-    { name = "rich" },
-    { name = "rich-click" },
-]
-
-[package.optional-dependencies]
-images = [
-    { name = "pillow" },
-    { name = "pillow-heif" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "foundation", git = "https://github.com/ldotlopez/foundation.git?branch=main" },
-    { name = "langcodes", extras = ["data"], specifier = ">=3.5.1" },
-    { name = "pillow", marker = "extra == 'images'", specifier = ">=13.0.0" },
-    { name = "pillow-heif", marker = "extra == 'images'", specifier = ">=1.8.1" },
-    { name = "platformdirs", specifier = ">=4.0" },
-    { name = "pydantic", specifier = ">=2.14.3" },
-    { name = "python-dotenv", specifier = ">=1.2.4" },
-    { name = "requests", specifier = ">=2.34.2" },
-    { name = "rich", specifier = ">=13.0" },
-    { name = "rich-click", specifier = ">=1.9" },
-]
-provides-extras = ["images"]
-
-[[package]]
 name = "idna"
 version = "3.20"
 source = { registry = "https://pypi.org/simple" }
@@ -298,6 +262,42 @@ sdist = { url = "https://files.pythonhosted.org/packages/d6/54/cfe61301667036ec9
 wheels = [
     { url = "https://files.pythonhosted.org/packages/b3/38/89ba8ad64ae25be8de66a6d463314cf1eb366222074cfda9ee839c56a4b4/mdurl-0.1.2-py3-none-any.whl", hash = "sha256:84008a41e51615a49fc9966191ff91509e3c40b939176e643fd50a5c2196b8f8", size = 9979, upload-time = "2022-08-14T12:40:09.779Z" },
 ]
+
+[[package]]
+name = "oddjob"
+version = "0.1.0"
+source = { editable = "." }
+dependencies = [
+    { name = "foundation" },
+    { name = "langcodes", extra = ["data"] },
+    { name = "platformdirs" },
+    { name = "pydantic" },
+    { name = "python-dotenv" },
+    { name = "requests" },
+    { name = "rich" },
+    { name = "rich-click" },
+]
+
+[package.optional-dependencies]
+images = [
+    { name = "pillow" },
+    { name = "pillow-heif" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "foundation", git = "https://github.com/ldotlopez/foundation.git?branch=main" },
+    { name = "langcodes", extras = ["data"], specifier = ">=3.5.1" },
+    { name = "pillow", marker = "extra == 'images'", specifier = ">=13.0.0" },
+    { name = "pillow-heif", marker = "extra == 'images'", specifier = ">=1.8.1" },
+    { name = "platformdirs", specifier = ">=4.0" },
+    { name = "pydantic", specifier = ">=2.14.3" },
+    { name = "python-dotenv", specifier = ">=1.2.4" },
+    { name = "requests", specifier = ">=2.34.2" },
+    { name = "rich", specifier = ">=13.0" },
+    { name = "rich-click", specifier = ">=1.9" },
+]
+provides-extras = ["images"]
 
 [[package]]
 name = "pillow"

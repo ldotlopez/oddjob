@@ -14,9 +14,9 @@ from support import NullReporter
 
 from filejobs.inputs import media_type_filter
 from filejobs.progress import ProgressEvent, ProgressStream
-from glados.commands.audio_grep import audio_grep_cmd
-from glados.core.cache import open_user_cache
-from glados.lib.audio_grep import (
+from oddjob.commands.audio_grep import audio_grep_cmd
+from oddjob.core.cache import open_user_cache
+from oddjob.lib.audio_grep import (
     CachedTranscripts,
     Transcript,
     TranscriptionSettings,
@@ -26,8 +26,8 @@ from glados.lib.audio_grep import (
     split_command_line,
     transcript_key,
 )
-from glados.lib.grep import GrepRunner
-from glados.lib.protocols import TranscriptSegment
+from oddjob.lib.grep import GrepRunner
+from oddjob.lib.protocols import TranscriptSegment
 
 SEGMENTS = [
     TranscriptSegment(start=1.0, end=2.5, text=" The Budget for Q3"),
@@ -167,7 +167,7 @@ class CachedTranscriptsTests(unittest.TestCase):
 
     def test_an_unreadable_entry_is_transcribed_again(self) -> None:
         self.store.set(transcript_key(self.media, DEFAULTS), b"garbage")
-        with self.assertLogs("glados.lib.audio_grep", "WARNING"):
+        with self.assertLogs("oddjob.lib.audio_grep", "WARNING"):
             self.assertEqual(
                 self.source().segments(self.media, NullReporter()), SEGMENTS
             )

@@ -1,5 +1,5 @@
 """OpenAI backend: unit tests against a fake `/chat/completions`, and an
-integration test against a real endpoint (GLADOS_TEST_OPENAI_* settings)."""
+integration test against a real endpoint (ODDJOB_TEST_OPENAI_* settings)."""
 
 from __future__ import annotations
 
@@ -20,14 +20,14 @@ from support import (
     require_settings,
 )
 
-from glados.lib.protocols import (
+from oddjob.lib.protocols import (
     Describer,
     Expander,
     Rewriter,
     Summarizer,
     Translator,
 )
-from glados.plugins.openai import OpenAIOptions, OpenAITransport, __glados_plugin__
+from oddjob.plugins.openai import OpenAIOptions, OpenAITransport, __oddjob_plugin__
 
 PING_SYSTEM = "Reply with exactly one word: pong. No punctuation."
 
@@ -159,7 +159,7 @@ class OpenAITransportTest(unittest.TestCase):
 
 class OpenAIPluginTest(unittest.TestCase):
     def test_implements_text_tasks(self) -> None:
-        triples = __glados_plugin__("openai", {"api_key": "sk-test"})
+        triples = __oddjob_plugin__("openai", {"api_key": "sk-test"})
 
         self.assertEqual(
             [(task, protocol) for task, protocol, _ in triples],
@@ -186,21 +186,21 @@ class OpenAIPluginTest(unittest.TestCase):
 
     def test_rejects_unknown_options(self) -> None:
         with self.assertRaises(pydantic.ValidationError):
-            __glados_plugin__("openai", {"organization": "org-1"})
+            __oddjob_plugin__("openai", {"organization": "org-1"})
 
 
 class OpenAIIntegrationTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
-        cls.settings = require_settings("GLADOS_TEST_OPENAI_API_KEY")
+        cls.settings = require_settings("ODDJOB_TEST_OPENAI_API_KEY")
 
     def test_completes(self) -> None:
         defaults = OpenAIOptions(api_key=None)
         options = OpenAIOptions(
-            api_key=self.settings["GLADOS_TEST_OPENAI_API_KEY"],
-            model=self.settings.get("GLADOS_TEST_OPENAI_MODEL", defaults.model),
+            api_key=self.settings["ODDJOB_TEST_OPENAI_API_KEY"],
+            model=self.settings.get("ODDJOB_TEST_OPENAI_MODEL", defaults.model),
             base_url=self.settings.get(
-                "GLADOS_TEST_OPENAI_BASE_URL", defaults.base_url
+                "ODDJOB_TEST_OPENAI_BASE_URL", defaults.base_url
             ),
             timeout=120,
         )

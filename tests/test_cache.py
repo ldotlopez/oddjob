@@ -8,7 +8,7 @@ from unittest import mock
 
 from foundation.cache import MissingKeyError, SizeEvictionPolicy
 
-from glados.core.cache import CACHE_MAX_BYTES, open_user_cache
+from oddjob.core.cache import CACHE_MAX_BYTES, open_user_cache
 
 
 class UserCacheTests(unittest.TestCase):
@@ -18,12 +18,12 @@ class UserCacheTests(unittest.TestCase):
             mock.patch.dict(os.environ, {"XDG_CACHE_HOME": str(self.tmp)})
         )
 
-    def test_lives_in_the_glados_cache_directory_and_is_limited_to_1_gib(self) -> None:
+    def test_lives_in_the_oddjob_cache_directory_and_is_limited_to_1_gib(self) -> None:
         with open_user_cache() as cache:
             cache.set("tool/key", b"value")
             self.assertEqual(cache.get("tool/key"), b"value")
             policy = cache.eviction_policy
-        self.assertTrue((self.tmp / "glados" / "entries").is_dir())
+        self.assertTrue((self.tmp / "oddjob" / "entries").is_dir())
         self.assertIsInstance(policy, SizeEvictionPolicy)
         self.assertEqual(CACHE_MAX_BYTES, 1024**3)
 

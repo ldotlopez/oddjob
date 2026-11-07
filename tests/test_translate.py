@@ -11,9 +11,9 @@ from click.testing import CliRunner
 from support import write_executable
 from test_llm import ECHO_LLM
 
-from glados.commands import translate
-from glados.core.config import Prompts
-from glados.lib.translate import language_infix
+from oddjob.commands import translate
+from oddjob.core.config import Prompts
+from oddjob.lib.translate import language_infix
 
 
 class LanguageInfixTests(unittest.TestCase):
@@ -52,9 +52,9 @@ class TranslateCommandTests(unittest.TestCase):
         self.runner = CliRunner()
         self.no_backend = {
             "XDG_CONFIG_HOME": str(self.tmp / "config"),
-            "GLADOS_TRANSLATE_BACKEND": None,
+            "ODDJOB_TRANSLATE_BACKEND": None,
         }
-        for name in ("filejobs", "glados"):
+        for name in ("filejobs", "oddjob"):
             logger = logging.getLogger(name)
             self.addCleanup(logger.setLevel, logger.level)
 
@@ -80,7 +80,7 @@ class TranslateCommandTests(unittest.TestCase):
     def with_fake_llm(self) -> dict[str, str | None]:
         """The environment of a run whose config selects a fake llm CLI."""
         llm = write_executable(self.tmp, "llm", ECHO_LLM)
-        config = self.tmp / "config" / "glados"
+        config = self.tmp / "config" / "oddjob"
         config.mkdir(parents=True)
         (config / "config.toml").write_text(
             f'[tasks]\ntranslate = "llm"\n\n[backends.llm]\nbinary = "{llm}"\n',

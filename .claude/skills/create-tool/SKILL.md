@@ -1,9 +1,9 @@
 ---
 name: create-tool
-description: Design and build a brand-new glados command from an idea or a need, with no existing script to port: a task (model/service-backed, replaceable backends), a plain file command, or a mixed one. Settles the spec with the user, checks no existing command already does it, picks name, panel and shape, writes tests from the spec, then builds it to the repository's conventions. Use whenever the user wants to create, write, add, design or "make" a new tool, command, subcommand, task or backend-backed command for glados, or asks "can glados do X" for something it cannot do yet, even if they do not name this skill. For porting an existing script or ocdutils leftover, use absorb-tool instead.
+description: Design and build a brand-new oddjob command from an idea or a need, with no existing script to port: a task (model/service-backed, replaceable backends), a plain file command, or a mixed one. Settles the spec with the user, checks no existing command already does it, picks name, panel and shape, writes tests from the spec, then builds it to the repository's conventions. Use whenever the user wants to create, write, add, design or "make" a new tool, command, subcommand, task or backend-backed command for oddjob, or asks "can oddjob do X" for something it cannot do yet, even if they do not name this skill. For porting an existing script or ocdutils leftover, use absorb-tool instead.
 ---
 
-# Create a new glados tool
+# Create a new oddjob tool
 
 A new tool follows the same conventions as an absorbed one; only the
 starting point differs. With no source to read, the behavior comes from
@@ -16,17 +16,17 @@ repeated here. Read them before starting:
   **2. Classify**, **3. Pick the command shape**, **5. Test**,
   **6. Checklist** and **7. Propose documentation**.
 - `.claude/skills/absorb-tool/references/file-command.md` and
-  `references/glados-task.md`: how to build each kind.
+  `references/oddjob-task.md`: how to build each kind.
 
 Also read `README.md`, `docs/ARCHITECTURE.md` and `docs/decisions/`
-(project rule), and `.claude/rules/glados.md` for the current command list.
+(project rule), and `.claude/rules/oddjob.md` for the current command list.
 
 One tool per commit. Write no code before step 4 is approved.
 
 ## 1. Check it does not exist yet
 
-Look up the commands in `.claude/rules/glados.md` and `PANELS` in
-`glados/cli.py`. If one already covers most of the need, an option or a
+Look up the commands in `.claude/rules/oddjob.md` and `PANELS` in
+`oddjob/cli.py`. If one already covers most of the need, an option or a
 subcommand on it is usually better than a new command (edit over create):
 propose that to the user and stop here unless they want a separate command.
 
@@ -37,7 +37,7 @@ answers; ask only what is the user's call, most foundational first, since
 early answers remove later questions:
 
 1. **What it does**, as one example invocation and its effect
-   (`uv run glados <name> ~/Pictures` → ...).
+   (`uv run oddjob <name> ~/Pictures` → ...).
 2. **Effect on files**: new file per input, rewrite in place, rename/move,
    or only a report. This picks the shape (absorb-tool, step 3).
 3. **Model, service or CLI with alternatives?** This picks the
@@ -68,10 +68,10 @@ Propose these with the spec; ask only if there is a genuine alternative.
   `fix-extensions`, `cleanup`), a bare verb for tasks (`summarize`, `translate`). Several
   operations on one subject become a group with subcommands
   (`motionphotos`, `sidecars`).
-- **Module**: `glados/commands/<area>.py` (an existing area module if the
+- **Module**: `oddjob/commands/<area>.py` (an existing area module if the
   tool belongs to it), object `<name>_cmd` with hyphens as underscores;
-  domain code in `glados/lib/<area>.py`.
-- **Panel**: one of `PANELS` in `glados/cli.py` (Text, Audio, Images,
+  domain code in `oddjob/lib/<area>.py`.
+- **Panel**: one of `PANELS` in `oddjob/cli.py` (Text, Audio, Images,
   Media, Files). A new panel needs the user's yes.
 
 ## 4. Confirm the spec
@@ -114,10 +114,10 @@ a task also gets its entry-point group in `pyproject.toml` and `uv sync`.
 - absorb-tool's step 6 checklist, without the inventory row (a new tool has
   none in `docs/plans/absorbing-tools.md`).
 - ruff and the full test suite green.
-- Run it once for real on a scratch directory: `uv run glados <name>
+- Run it once for real on a scratch directory: `uv run oddjob <name>
   --help`, then `-n`, then the real run, and check stdout is only what the
   spec says.
 - Propose documentation as in absorb-tool step 7 (README, ARCHITECTURE,
-  `.claude/rules/glados.md`, `pyproject.toml` description, a decision
+  `.claude/rules/oddjob.md`, `pyproject.toml` description, a decision
   record only if the tool changes an approach). Edit nothing until the user
   says yes.

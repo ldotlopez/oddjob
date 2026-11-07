@@ -1,14 +1,14 @@
 """Import boundaries of the repository.
 
-- filejobs, the backend-free core, imports nothing from glados.
-- glados.lib, the domain modules, knows nothing about config, backends or
-  the CLI: it imports none of glados.core, glados.plugins and
-  glados.commands. glados.plugins (the backends) build on glados.lib only,
-  never on glados.core or glados.commands.
+- filejobs, the backend-free core, imports nothing from oddjob.
+- oddjob.lib, the domain modules, knows nothing about config, backends or
+  the CLI: it imports none of oddjob.core, oddjob.plugins and
+  oddjob.commands. oddjob.plugins (the backends) build on oddjob.lib only,
+  never on oddjob.core or oddjob.commands.
 - `cli.py` holds the click group and `commands/<command>.py` one click
   command each; every other module is domain or core code with no CLI. So
   click is imported only there and in the shared CLI plumbing
-  (`filejobs/cli_*.py`, `glados/core/cli_*.py`).
+  (`filejobs/cli_*.py`, `oddjob/core/cli_*.py`).
 """
 
 import ast
@@ -17,10 +17,10 @@ from collections.abc import Iterator
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-PACKAGES = ("filejobs", "glados")
+PACKAGES = ("filejobs", "oddjob")
 
 # Packages whose modules may import click: plumbing named `cli_*.py`.
-CLI_PLUMBING = (Path("filejobs"), Path("glados/core"))
+CLI_PLUMBING = (Path("filejobs"), Path("oddjob/core"))
 
 CLICK_MODULES = ("click", "rich_click")
 
@@ -67,16 +67,16 @@ def may_import_click(relative: Path) -> bool:
 
 
 class BoundaryTests(unittest.TestCase):
-    def test_filejobs_imports_no_glados(self) -> None:
-        self.assertEqual(violations("filejobs", ("glados",)), [])
+    def test_filejobs_imports_no_oddjob(self) -> None:
+        self.assertEqual(violations("filejobs", ("oddjob",)), [])
 
     def test_lib_knows_no_config_backends_or_cli(self) -> None:
-        forbidden = ("glados.core", "glados.plugins", "glados.commands")
-        self.assertEqual(violations("glados/lib", forbidden), [])
+        forbidden = ("oddjob.core", "oddjob.plugins", "oddjob.commands")
+        self.assertEqual(violations("oddjob/lib", forbidden), [])
 
     def test_plugins_build_on_lib_only(self) -> None:
-        forbidden = ("glados.core", "glados.commands")
-        self.assertEqual(violations("glados/plugins", forbidden), [])
+        forbidden = ("oddjob.core", "oddjob.commands")
+        self.assertEqual(violations("oddjob/plugins", forbidden), [])
 
     def test_click_only_in_entry_points_and_commands(self) -> None:
         found = [

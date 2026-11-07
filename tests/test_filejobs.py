@@ -1,4 +1,4 @@
-"""Unit tests for the backend-free core shared by glados' task and
+"""Unit tests for the backend-free core shared by oddjob's task and
 file commands: input expansion, batch runs, BytesStep, run_jobs and the
 multiple-input task commands."""
 
@@ -35,7 +35,7 @@ from filejobs.progress import (
     ProgressEvent,
     ProgressStream,
 )
-from glados.commands import rewrite, transcribe
+from oddjob.commands import rewrite, transcribe
 
 
 def make_tmp(test: unittest.TestCase) -> Path:
@@ -375,7 +375,7 @@ class MultipleInputTaskTests(unittest.TestCase):
         runner = CliRunner()
         no_backend = {
             "XDG_CONFIG_HOME": str(tmp / "config"),
-            "GLADOS_REWRITE_BACKEND": None,
+            "ODDJOB_REWRITE_BACKEND": None,
         }
         result = runner.invoke(rewrite.rewrite_cmd, ["-n", str(tmp)], env=no_backend)
         self.assertEqual(result.exit_code, 0, result.output)

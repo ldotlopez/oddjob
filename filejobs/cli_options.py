@@ -1,7 +1,7 @@
 """Click options and job runners with no backend knowledge.
 
-Shared by glados' task and file commands; nothing here imports the
-backend registry or the glados config (those live in glados/core/cli_common.py).
+Shared by oddjob's task and file commands; nothing here imports the
+backend registry or the oddjob config (those live in oddjob/core/cli_common.py).
 """
 
 from __future__ import annotations

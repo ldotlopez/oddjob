@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING
 
 from foundation.cache import UserCache
 
-from glados.lib import (
+from oddjob.lib import (
     captions,
     cleanup,
     dates,
@@ -196,7 +196,7 @@ class ImageHashTests(unittest.TestCase):
         gradient.rotate(180).save(self.tmp / "b.png")
 
     def test_near_duplicates_are_grouped(self) -> None:
-        from glados.lib import imghash
+        from oddjob.lib import imghash
 
         hasher = imghash.ImageHasher(16, cache=None)
         hashes = [(p, hasher.hash(p)) for p in sorted(self.tmp.iterdir())]
@@ -205,7 +205,7 @@ class ImageHashTests(unittest.TestCase):
         self.assertEqual(groups, [[self.tmp / "a.png", self.tmp / "a_low.jpg"]])
 
     def test_groups_are_connected_components(self) -> None:
-        from glados.lib import imghash
+        from oddjob.lib import imghash
 
         hashes = [(Path("a"), "00"), (Path("b"), "03"), (Path("c"), "0f")]
         self.assertEqual(
@@ -215,9 +215,9 @@ class ImageHashTests(unittest.TestCase):
         self.assertEqual(imghash.duplicate_groups(hashes, max_distance=1), [])
 
     def test_hashes_are_cached_by_content_not_path(self) -> None:
-        from glados.lib import imghash
+        from oddjob.lib import imghash
 
-        cache = UserCache(app="glados", base_dir=self.tmp / "cache")
+        cache = UserCache(app="oddjob", base_dir=self.tmp / "cache")
         self.addCleanup(cache.close)
         hasher = imghash.ImageHasher(16, cache)
         image = self.tmp / "a.png"
@@ -231,7 +231,7 @@ class ImageHashTests(unittest.TestCase):
         self.assertEqual(len(list(cache.iter())), 3)
 
     def test_decode_problem(self) -> None:
-        from glados.lib import imghash
+        from oddjob.lib import imghash
 
         whole = self.tmp / "a.jpg"
         (self.tmp / "a_low.jpg").rename(whole)
@@ -245,7 +245,7 @@ class ImageHashTests(unittest.TestCase):
         self.assertIn("cannot identify", imghash.decode_problem(garbage) or "")
 
     def test_an_unreadable_file_is_not_a_decode_problem(self) -> None:
-        from glados.lib import imghash
+        from oddjob.lib import imghash
 
         with self.assertRaises(FileNotFoundError):
             imghash.decode_problem(self.tmp / "missing.png")
@@ -266,7 +266,7 @@ class ImageEditTests(unittest.TestCase):
 
         from PIL import Image
 
-        from glados.lib import imgedit
+        from oddjob.lib import imgedit
 
         image = Image.new("RGBA", (40, 30), (0, 0, 0, 0))
         image.paste((255, 0, 0, 255), (5, 10, 15, 25))
@@ -280,7 +280,7 @@ class ImageEditTests(unittest.TestCase):
     def test_autocrop_needs_transparent_and_visible_pixels(self) -> None:
         from PIL import Image
 
-        from glados.lib import imgedit
+        from oddjob.lib import imgedit
 
         opaque = self.encoded(Image.new("RGB", (4, 4)), "PNG")
         empty = self.encoded(Image.new("RGBA", (4, 4), (0, 0, 0, 0)), "PNG")
@@ -290,7 +290,7 @@ class ImageEditTests(unittest.TestCase):
             imgedit.autocrop(empty)
 
     def test_reduced_size_keeps_the_aspect_ratio(self) -> None:
-        from glados.lib import imgedit
+        from oddjob.lib import imgedit
 
         self.assertEqual(imgedit.reduced_size((4000, 3000), 2160), (2160, 1620))
         self.assertEqual(imgedit.reduced_size((3000, 4000), 2160), (1620, 2160))
@@ -302,7 +302,7 @@ class ImageEditTests(unittest.TestCase):
 
         from PIL import Image
 
-        from glados.lib import imgedit
+        from oddjob.lib import imgedit
 
         exif = Image.Exif()
         exif[0x010E] = "a description"  # ImageDescription
@@ -314,7 +314,7 @@ class ImageEditTests(unittest.TestCase):
     def test_reduce_refuses_animations_and_images_that_fit(self) -> None:
         from PIL import Image
 
-        from glados.lib import imgedit
+        from oddjob.lib import imgedit
 
         frames = [Image.new("RGB", (40, 40), color) for color in ("red", "blue")]
         animated = self.encoded(

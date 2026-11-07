@@ -7,12 +7,12 @@ import unittest
 
 import pydantic
 
-from glados.cli import TASK_COMMANDS
-from glados.core.backends import check_config, resolve, tasks
-from glados.core.config import Config, ConfigError
-from glados.lib.protocols import Describer, Translator
+from oddjob.cli import TASK_COMMANDS
+from oddjob.core.backends import check_config, resolve, tasks
+from oddjob.core.config import Config, ConfigError
+from oddjob.lib.protocols import Describer, Translator
 
-BACKEND_ENVVAR = re.compile(r"^GLADOS_(\w+)_BACKEND$")
+BACKEND_ENVVAR = re.compile(r"^ODDJOB_(\w+)_BACKEND$")
 
 
 class TaskListTests(unittest.TestCase):

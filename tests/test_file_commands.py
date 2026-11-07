@@ -1,4 +1,4 @@
-"""glados' file commands through click's CliRunner."""
+"""oddjob's file commands through click's CliRunner."""
 
 import json
 import logging
@@ -17,8 +17,8 @@ from test_conversions import FAKE_WRITER
 from test_file_domain import HAS_PILLOW, JPEG, MP4
 from test_llm import ECHO_LLM
 
-from glados.cli import cli
-from glados.lib import motionphotos, renamers
+from oddjob.cli import cli
+from oddjob.lib import motionphotos, renamers
 
 
 def wrote(records: list[logging.LogRecord]) -> list[Path]:
@@ -35,7 +35,7 @@ class CommandTests(unittest.TestCase):
     def setUp(self) -> None:
         self.tmp = Path(self.enterContext(tempfile.TemporaryDirectory()))
         self.runner = CliRunner()
-        for name in ("filejobs", "glados"):  # -v changes them process-wide
+        for name in ("filejobs", "oddjob"):  # -v changes them process-wide
             logger = logging.getLogger(name)
             self.addCleanup(logger.setLevel, logger.level)
 
@@ -262,7 +262,7 @@ class AutocropCommandTests(unittest.TestCase):
         logo.save(self.tmp / "logo.png")
         Image.new("RGB", (4, 4)).save(self.tmp / "photo.jpg")
         self.runner = CliRunner()
-        for name in ("filejobs", "glados"):
+        for name in ("filejobs", "oddjob"):
             logger = logging.getLogger(name)
             self.addCleanup(logger.setLevel, logger.level)
 
@@ -319,7 +319,7 @@ class ImgReduceCommandTests(unittest.TestCase):
         Image.new("RGB", (40, 20), (200, 10, 10)).save(self.tmp / "big.jpg")
         Image.new("RGB", (8, 8)).save(self.tmp / "small.png")
         self.runner = CliRunner()
-        for name in ("filejobs", "glados"):
+        for name in ("filejobs", "oddjob"):
             logger = logging.getLogger(name)
             self.addCleanup(logger.setLevel, logger.level)
 
@@ -390,7 +390,7 @@ class ImgEmbedDescriptionCommandTests(unittest.TestCase):
 
     def with_fake_llm(self) -> Path:
         llm = write_executable(self.bin, "llm", ECHO_LLM)
-        config = self.tmp / "config" / "glados"
+        config = self.tmp / "config" / "oddjob"
         config.mkdir(parents=True)
         (config / "config.toml").write_text(
             f'[tasks]\ndescribe = "llm"\n\n[backends.llm]\nbinary = "{llm}"\n',

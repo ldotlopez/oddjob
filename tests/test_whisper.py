@@ -1,5 +1,5 @@
 """whisper.cpp (`whisper_cpp`) backend: unit tests against a fake whisper-cli, and an
-integration test against the real one (GLADOS_TEST_WHISPER_CPP_* settings)."""
+integration test against the real one (ODDJOB_TEST_WHISPER_CPP_* settings)."""
 
 from __future__ import annotations
 
@@ -12,11 +12,11 @@ from pathlib import Path
 import pydantic
 from support import drain, recorded_argv, require_settings, write_executable
 
-from glados.lib.protocols import Transcriber, TranscriptSegment
-from glados.plugins.whisper import (
+from oddjob.lib.protocols import Transcriber, TranscriptSegment
+from oddjob.plugins.whisper import (
     WhisperCppBackend,
     WhisperCppOptions,
-    __glados_plugin__,
+    __oddjob_plugin__,
 )
 
 FAKE_WHISPER = """
@@ -127,7 +127,7 @@ class WhisperCppBackendTest(unittest.TestCase):
 
 class WhisperCppPluginTest(unittest.TestCase):
     def test_implements_transcribe(self) -> None:
-        [(task, protocol, backend)] = __glados_plugin__("whisper_cpp", {})
+        [(task, protocol, backend)] = __oddjob_plugin__("whisper_cpp", {})
 
         self.assertEqual((task, protocol), ("transcribe", Transcriber))
         self.assertIsInstance(backend, Transcriber)
@@ -139,27 +139,27 @@ class WhisperCppPluginTest(unittest.TestCase):
 
     def test_rejects_unknown_options(self) -> None:
         with self.assertRaises(pydantic.ValidationError):
-            __glados_plugin__("whisper_cpp", {"modle": "typo.bin"})
+            __oddjob_plugin__("whisper_cpp", {"modle": "typo.bin"})
 
     def test_rejects_unknown_backend(self) -> None:
         with self.assertRaisesRegex(ValueError, "provides no backend 'whisperx'"):
-            __glados_plugin__("whisperx", {})
+            __oddjob_plugin__("whisperx", {})
 
 
 class WhisperCppIntegrationTest(unittest.TestCase):
-    """Runs the real whisper-cli. Without GLADOS_TEST_WHISPER_CPP_AUDIO it
+    """Runs the real whisper-cli. Without ODDJOB_TEST_WHISPER_CPP_AUDIO it
     transcribes a generated tone and only checks the call succeeds."""
 
     @classmethod
     def setUpClass(cls) -> None:
-        cls.settings = require_settings("GLADOS_TEST_WHISPER_CPP_MODEL")
+        cls.settings = require_settings("ODDJOB_TEST_WHISPER_CPP_MODEL")
         if shutil.which("ffmpeg") is None:
             raise unittest.SkipTest("ffmpeg not on PATH")
 
     def test_transcribes(self) -> None:
         workdir = Path(self.enterContext(tempfile.TemporaryDirectory()))
         wav = workdir / "audio.wav"
-        source = self.settings.get("GLADOS_TEST_WHISPER_CPP_AUDIO")
+        source = self.settings.get("ODDJOB_TEST_WHISPER_CPP_AUDIO")
         ffmpeg_input = (
             ["-i", str(Path(source).expanduser())]
             if source
@@ -172,21 +172,21 @@ class WhisperCppIntegrationTest(unittest.TestCase):
         )
         options = WhisperCppOptions.model_validate(
             {
-                "model": self.settings["GLADOS_TEST_WHISPER_CPP_MODEL"],
+                "model": self.settings["ODDJOB_TEST_WHISPER_CPP_MODEL"],
                 "binary": self.settings.get(
-                    "GLADOS_TEST_WHISPER_CPP_BINARY", "whisper-cli"
+                    "ODDJOB_TEST_WHISPER_CPP_BINARY", "whisper-cli"
                 ),
             }
         )
 
         _, segments = drain(
             WhisperCppBackend(options).transcribe(
-                wav, language=self.settings.get("GLADOS_TEST_WHISPER_CPP_LANGUAGE")
+                wav, language=self.settings.get("ODDJOB_TEST_WHISPER_CPP_LANGUAGE")
             )
         )
 
         self.assertIsInstance(segments, list)
-        expected = self.settings.get("GLADOS_TEST_WHISPER_CPP_EXPECT")
+        expected = self.settings.get("ODDJOB_TEST_WHISPER_CPP_EXPECT")
         if expected:
             transcript = " ".join(segment.text for segment in segments or [])
             self.assertIn(expected.lower(), transcript.lower())

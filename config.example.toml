@@ -1,6 +1,6 @@
-# glados sample configuration.
+# oddjob sample configuration.
 #
-# Copy to XDG_CONFIG_HOME/glados/config.toml (usually ~/.config/glados/config.toml).
+# Copy to XDG_CONFIG_HOME/oddjob/config.toml (usually ~/.config/oddjob/config.toml).
 # The file is optional, and every setting below is optional too: the values shown are
 # mostly the defaults, so keep only what you want to change.
 #
@@ -9,7 +9,7 @@
 # in comments too, and a variable that is not set is an error. Write a literal dollar
 # sign as two. Keep secrets in the environment or in .env, never in this file.
 #
-# Backend selection per task: -b on the command line, then GLADOS_<TASK>_BACKEND, then
+# Backend selection per task: -b on the command line, then ODDJOB_<TASK>_BACKEND, then
 # [tasks] below, then the only installed backend. Backend options: the backend's
 # defaults, then [backends.<name>], then [backends.<name>.tasks.<task>], then -m.
 

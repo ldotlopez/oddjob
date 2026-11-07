@@ -1,28 +1,28 @@
 ---
 name: absorb-tool
-description: Bring an outside tool (a script, an ocdutils leftover, a one-off utility) into this repository as a glados command, either a task (model/service-backed, with replaceable backends) or a plain file command, following decisions 0004-0011. Use whenever the user wants to port, absorb, migrate or "bring in" an existing tool, script or command to glados, or asks where such a tool should go, even if they do not name this skill. Its classification, command shapes, test and docs rules are also the conventions the create-tool skill follows; for a new tool designed from scratch (no source to port), use create-tool instead.
+description: Bring an outside tool (a script, an ocdutils leftover, a one-off utility) into this repository as an oddjob command, either a task (model/service-backed, with replaceable backends) or a plain file command, following decisions 0004-0011. Use whenever the user wants to port, absorb, migrate or "bring in" an existing tool, script or command to oddjob, or asks where such a tool should go, even if they do not name this skill. Its classification, command shapes, test and docs rules are also the conventions the create-tool skill follows; for a new tool designed from scratch (no source to port), use create-tool instead.
 ---
 
-# Absorb a tool into glados
+# Absorb a tool into oddjob
 
-The repository is one tool, `glados` (decision 0011), in two packages, with
+The repository is one tool, `oddjob` (decision 0011), in two packages, with
 one way of doing things. Every new tool must fit it without changing it:
 
 - `filejobs/`: backend-free core (`Job`, steps, destination policies,
   `JOB_ERRORS`, `run_batch`, `run_jobs`, input expansion, shared click
-  options, progress, ffmpeg runner). Imports nothing from `glados`.
-- `glados/`: `cli.py` is the one group (help panels by subject),
+  options, progress, ffmpeg runner). Imports nothing from `oddjob`.
+- `oddjob/`: `cli.py` is the one group (help panels by subject),
   `commands/<command>.py` is wiring only, `lib/` holds the domain modules
   (no config, backends or CLI), `core/` the backend machinery, `plugins/`
   the backends. Commands are **tasks** (task Protocol + backends in
-  `glados/plugins/` declared through entry points + config, reached through
-  `pass_glados`) or **plain file commands** (one implementation, no
-  backends, never `pass_glados`).
+  `oddjob/plugins/` declared through entry points + config, reached through
+  `pass_session`) or **plain file commands** (one implementation, no
+  backends, never `pass_session`).
 
 One batch policy (0004). `tests/test_boundaries.py` enforces imports and
 where click may be imported.
 
-A tool is **absorbed** when it runs as a `glados` command, follows 0004's
+A tool is **absorbed** when it runs as a `oddjob` command, follows 0004's
 policies, has tests, and the docs describing it have been proposed (and
 edited only after approval).
 
@@ -59,18 +59,18 @@ Read the tool's source and fill its row in the inventory of
    as long as a second is plausible. Otherwise rule 3.
 3. **Plain file command**: deterministic file operation, one implementation.
    External programs are adapters, not backends.
-4. **filejobs**: a generic piece moves there only once it is not glados-
-   specific and a second consumer needs it. Never imports `glados`; click
+4. **filejobs**: a generic piece moves there only once it is not oddjob-
+   specific and a second consumer needs it. Never imports `oddjob`; click
    only in `filejobs/cli_*.py`.
 
 **Mixed tools** (model part + file part, decision 0011): one command may do
-both. It takes `pass_glados` and resolves the backend for its model part,
-and reuses the domain code in `glados/lib/` for the file part (e.g. a
+both. It takes `pass_session` and resolves the backend for its model part,
+and reuses the domain code in `oddjob/lib/` for the file part (e.g. a
 describe step followed by `CaptionStep`). The model part still gets a task
 (Protocol, entry-point group, backends), so its backend is replaceable.
 Split it into two commands only when each half is useful on its own.
 
-**Naming**: command names are unique. Only `glados` is installed, so
+**Naming**: command names are unique. Only `oddjob` is installed, so
 commands get no standalone script. Keep the source name unless it clashes or
 misdescribes (precedent: `renamers` → `rename-by-hash`).
 
@@ -117,9 +117,9 @@ Rules for every shape:
 
 ### 4. Port
 
-- Task or backend → follow `references/glados-task.md`.
+- Task or backend → follow `references/oddjob-task.md`.
 - Plain file command → follow `references/file-command.md`.
-- Mixed command → both: the task part from `glados-task.md`, the file part
+- Mixed command → both: the task part from `oddjob-task.md`, the file part
   from `file-command.md`.
 
 Read the existing command closest to the new one first (`rewrite.py` /
@@ -135,13 +135,13 @@ unittest discover -s tests` must be green. Each tool needs:
   or `test_<task>.py`).
 - **Adapter/backend unit tests**: fake executables via
   `support.write_executable` (record argv, mimic output and failures) or
-  `support.FakeHTTPServer`; never real services. glados backends are tested
-  directly (options model, adapter, `__glados_plugin__`), not through the CLI.
+  `support.FakeHTTPServer`; never real services. oddjob backends are tested
+  directly (options model, adapter, `__oddjob_plugin__`), not through the CLI.
 - **CLI tests** with `CliRunner`: `-n` prints the plan with no backend
   configured and no binary; on success empty stdout and a `wrote <dest>`
   record (`assertLogs("filejobs", "INFO")`); exit 1 with `N done, M failed`
   when one input fails.
-- **Integration**: `*IntegrationTest` classes. glados reads `GLADOS_TEST_*`
+- **Integration**: `*IntegrationTest` classes. oddjob reads `ODDJOB_TEST_*`
   from `tests/integration.env` (git-ignored, secrets: never print or commit
   it) and skips when unconfigured; file commands skip when a binary is missing
   from PATH; tests needing the extra skip without it.
@@ -168,7 +168,7 @@ List the affected files with a one- or two-line summary each, then wait:
 - `README.md`: the command, its options, runtime binaries.
 - `docs/ARCHITECTURE.md`: module tree; a data-flow section if the tool adds
   a new kind of flow.
-- `.claude/rules/glados.md`: implemented tasks or file commands list,
+- `.claude/rules/oddjob.md`: implemented tasks or file commands list,
   runtime binaries, any new extra.
 - `pyproject.toml` description: the tool list.
 - `docs/decisions/`: a new record only if the port changes an approach

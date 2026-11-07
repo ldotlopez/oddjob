@@ -14,16 +14,16 @@ from test_llm import ECHO_LLM
 
 from filejobs.pipeline import Job, suffix_destination
 from filejobs.progress import ProgressEvent, ProgressStream
-from glados.commands import describe
-from glados.core.config import Prompts
-from glados.lib.describe import (
+from oddjob.commands import describe
+from oddjob.core.config import Prompts
+from oddjob.lib.describe import (
     DESCRIPTION_EXTENSION,
     CachedDescriber,
     DescribeStep,
     DescriptionSettings,
     describe_image,
 )
-from glados.lib.language import language_name, locale_language
+from oddjob.lib.language import language_name, locale_language
 
 
 class FakeDescriber:
@@ -104,7 +104,7 @@ class CachedDescriberTests(unittest.TestCase):
         self.describe(self.cached())
         (key,) = self.store.entries
         self.store.entries[key] = b"\xff"
-        with self.assertLogs("glados.lib.describe", "WARNING"):
+        with self.assertLogs("oddjob.lib.describe", "WARNING"):
             self.assertEqual(self.describe(self.cached()), "a cat")
         self.assertEqual(len(self.describer.calls), 2)
 
@@ -167,7 +167,7 @@ class DescribeCommandTests(unittest.TestCase):
         (self.tmp / "cat.jpg").write_bytes(b"jpeg")
         (self.tmp / "notes.txt").write_text("not an image", encoding="utf-8")
         self.runner = CliRunner()
-        for name in ("filejobs", "glados"):
+        for name in ("filejobs", "oddjob"):
             logger = logging.getLogger(name)
             self.addCleanup(logger.setLevel, logger.level)
 
@@ -175,7 +175,7 @@ class DescribeCommandTests(unittest.TestCase):
         no_backend = {
             "XDG_CONFIG_HOME": str(self.tmp / "config"),
             "XDG_CACHE_HOME": str(self.tmp / "cache"),
-            "GLADOS_DESCRIBE_BACKEND": None,
+            "ODDJOB_DESCRIBE_BACKEND": None,
         }
         result = self.runner.invoke(
             describe.describe_cmd, ["-n", "-w", str(self.tmp)], env=no_backend
@@ -189,7 +189,7 @@ class DescribeCommandTests(unittest.TestCase):
     def with_fake_llm(self) -> tuple[Path, dict[str, str | None]]:
         """A fake llm CLI and the environment whose config selects it."""
         llm = write_executable(self.tmp, "llm", ECHO_LLM)
-        config = self.tmp / "config" / "glados"
+        config = self.tmp / "config" / "oddjob"
         config.mkdir(parents=True)
         (config / "config.toml").write_text(
             f'[tasks]\ndescribe = "llm"\n\n[backends.llm]\nbinary = "{llm}"\n',
@@ -295,7 +295,7 @@ class DescribeCommandTests(unittest.TestCase):
 
     def test_a_configured_model_change_misses_the_cache(self) -> None:
         llm, env = self.with_fake_llm()
-        config = self.tmp / "config" / "glados" / "config.toml"
+        config = self.tmp / "config" / "oddjob" / "config.toml"
         image = str(self.tmp / "cat.jpg")
         self.runner.invoke(describe.describe_cmd, [image], env=env)
         config.write_text(

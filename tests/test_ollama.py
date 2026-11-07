@@ -1,5 +1,5 @@
 """Ollama backend: unit tests against a fake `/api/chat`, and an integration
-test against a real server (GLADOS_TEST_OLLAMA_* settings)."""
+test against a real server (ODDJOB_TEST_OLLAMA_* settings)."""
 
 from __future__ import annotations
 
@@ -19,14 +19,14 @@ from support import (
     require_settings,
 )
 
-from glados.lib.protocols import (
+from oddjob.lib.protocols import (
     Describer,
     Expander,
     Rewriter,
     Summarizer,
     Translator,
 )
-from glados.plugins.ollama import OllamaOptions, OllamaTransport, __glados_plugin__
+from oddjob.plugins.ollama import OllamaOptions, OllamaTransport, __oddjob_plugin__
 
 PING_SYSTEM = "Reply with exactly one word: pong. No punctuation."
 
@@ -150,7 +150,7 @@ class OllamaTransportTest(unittest.TestCase):
 
 class OllamaPluginTest(unittest.TestCase):
     def test_implements_text_tasks(self) -> None:
-        triples = __glados_plugin__("ollama", {})
+        triples = __oddjob_plugin__("ollama", {})
 
         self.assertEqual(
             [(task, protocol) for task, protocol, _ in triples],
@@ -167,7 +167,7 @@ class OllamaPluginTest(unittest.TestCase):
 
     def test_rejects_unknown_options(self) -> None:
         with self.assertRaises(pydantic.ValidationError):
-            __glados_plugin__("ollama", {"num_ctx": 8192})
+            __oddjob_plugin__("ollama", {"num_ctx": 8192})
 
     def test_api_key_hidden_in_repr(self) -> None:
         self.assertNotIn("ol-secret", repr(OllamaOptions(api_key="ol-secret")))
@@ -176,16 +176,16 @@ class OllamaPluginTest(unittest.TestCase):
 class OllamaIntegrationTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
-        cls.settings = require_settings("GLADOS_TEST_OLLAMA_MODEL")
+        cls.settings = require_settings("ODDJOB_TEST_OLLAMA_MODEL")
 
     def test_completes(self) -> None:
         options = OllamaOptions(
-            model=self.settings["GLADOS_TEST_OLLAMA_MODEL"],
+            model=self.settings["ODDJOB_TEST_OLLAMA_MODEL"],
             base_url=self.settings.get(
-                "GLADOS_TEST_OLLAMA_BASE_URL", OllamaOptions().base_url
+                "ODDJOB_TEST_OLLAMA_BASE_URL", OllamaOptions().base_url
             ),
             options={"temperature": 0},
-            api_key=self.settings.get("GLADOS_TEST_OLLAMA_API_KEY"),
+            api_key=self.settings.get("ODDJOB_TEST_OLLAMA_API_KEY"),
         )
 
         _, result = drain(OllamaTransport(options).complete(PING_SYSTEM, "ping"))

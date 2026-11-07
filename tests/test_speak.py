@@ -14,8 +14,8 @@ from test_piper import FAKE_PIPER
 
 from filejobs.pipeline import Job, suffix_destination
 from filejobs.progress import ProgressEvent, ProgressStream
-from glados.commands import speak
-from glados.lib.speak import (
+from oddjob.commands import speak
+from oddjob.lib.speak import (
     FileSource,
     SourceError,
     SpeakStep,
@@ -139,7 +139,7 @@ class SpeakCommandTests(unittest.TestCase):
         self.note = self.tmp / "note.txt"
         self.note.write_text("Hello from a file", encoding="utf-8")
         self.runner = CliRunner()
-        for name in ("filejobs", "glados"):
+        for name in ("filejobs", "oddjob"):
             logger = logging.getLogger(name)
             self.addCleanup(logger.setLevel, logger.level)
 
@@ -149,7 +149,7 @@ class SpeakCommandTests(unittest.TestCase):
         piper = write_executable(self.tmp, "piper", FAKE_PIPER)
         voice = self.tmp / "voice.onnx"
         voice.touch()
-        config = self.tmp / "config" / "glados"
+        config = self.tmp / "config" / "oddjob"
         config.mkdir(parents=True)
         (config / "config.toml").write_text(
             f'[tasks]\nspeak = "piper"\n\n[backends.piper]\n'
@@ -158,7 +158,7 @@ class SpeakCommandTests(unittest.TestCase):
         )
         return piper, {
             "XDG_CONFIG_HOME": str(self.tmp / "config"),
-            "GLADOS_SPEAK_BACKEND": None,
+            "ODDJOB_SPEAK_BACKEND": None,
         }
 
     def invoke(

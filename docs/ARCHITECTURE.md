@@ -1,11 +1,11 @@
 # Architecture
 
-The repository holds one command-line tool, `glados`, whose commands are of two
+The repository holds one command-line tool, `oddjob`, whose commands are of two
 kinds ([decision 0011](decisions/0011-one-tool.md)):
 
 - **Tasks**: file-based work backed by models. Each task is a click command that
   builds a `Job` from pipeline steps, gets a backend for its task Protocol through
-  `pass_glados`, and runs the job over every input with progress reporting.
+  `pass_session`, and runs the job over every input with progress reporting.
 - **File commands**: file utilities (sidecars, motion photos, conversions, image hashes
   and edits, renames, dates, cleanup) with no backends or config (see
   [File commands](#file-commands)).
@@ -16,15 +16,15 @@ A command may be both: resolve a backend and do file work. Every command builds 
 Every command takes several files and directories (see [Inputs](#inputs)).
 
 ```
-filejobs/             backend-free core: no backends, config or glados imports
+filejobs/             backend-free core: no backends, config or oddjob imports
   cli_options.py      backend-free click options, run_jobs/job_action, print_plan (-n), finish_batch
   inputs.py           PATH... expansion into input files, per-command file filters
   batch.py            run_batch: one action per input, failures logged and collected
   pipeline.py         Job, consume_stream, ProgressStep Protocol, TextStep, land_text_stream, BytesStep, destination policies, JOB_ERRORS
   progress.py         ProgressEvent/ProgressStream, rich and plain reporters
   runners.py          FFMpegRunner (ffmpeg/ffprobe subprocess with progress)
-glados/
-  cli.py              entry point: the `glados` group, every command, help panels by subject
+oddjob/
+  cli.py              entry point: the `oddjob` group, every command, help panels by subject
   commands/           one module per command or command family (wiring only):
                       tasks: transcribe, speak, rewrite, summarize, expand, translate, describe, audio_grep;
                       file commands: sidecars, motionphotos, conversions (jpgize, mp4ize),
@@ -49,9 +49,9 @@ glados/
                       takes), external.py (ImageMagick and exiftool adapters, user commands),
                       shotwell.py (read-only adapter for a Shotwell library, for date-copy)
   core/               backend machinery
-    session.py        Glados: config and backends without click
+    session.py        Session: config and backends without click
     describing.py     describe's language, prompt and cached backend, shared with img-embed-description
-    cli_common.py     pass_glados (injects Glados), backend/model options, the logging options
+    cli_common.py     pass_session (injects the Session), backend/model options, the logging options
     config.py         Config model, config file loading and validation
     backends.py       backend discovery (entry-point metadata), selection, loading
   plugins/            backend modules, each providing one or more backends (only backends live here)
@@ -65,22 +65,22 @@ tests/                unittest suite: one module per backend module or command a
 
 ## Layers
 
-- **Entry points**: `glados/cli.py` (the click group; the only installed script) and
-  `glados/commands/` (one click command or command family each)
+- **Entry points**: `oddjob/cli.py` (the click group; the only installed script) and
+  `oddjob/commands/` (one click command or command family each)
   ([decision 0005](decisions/0005-one-command-layout.md), 0011). Commands only parse
-  options, expand inputs, wire adapters (tasks: the backend, from `Glados`) and
+  options, expand inputs, wire adapters (tasks: the backend, from `Session`) and
   hand the work to `run_jobs` or `run_batch`. click is imported only in `cli.py`,
-  `commands/`, `filejobs/cli_*.py` and `glados/core/cli_*.py`;
+  `commands/`, `filejobs/cli_*.py` and `oddjob/core/cli_*.py`;
   `tests/test_boundaries.py` enforces it.
-- **Domain** (`glados/lib/`): steps, formatters, parsing and planning, with no config,
+- **Domain** (`oddjob/lib/`): steps, formatters, parsing and planning, with no config,
   backends or CLI. A command that only wires shared core pieces (the text tasks: one
   `TextStep`) has no domain module.
 - **Core**: orchestration with no task knowledge, in two packages. `filejobs/`
   (`pipeline`, `progress`, `runners`, `inputs`, `batch`, `cli_options`) is the
   backend-free part: `Job` chains `ProgressStep[Path]` steps, each consuming the previous
   step's output path, and moves the last result to the destination; intermediates are
-  deleted. `glados/core/` (`backends`, `config`, `session`, `cli_common`) is the backend
-  part, reached only by commands that take `pass_glados`.
+  deleted. `oddjob/core/` (`backends`, `config`, `session`, `cli_common`) is the backend
+  part, reached only by commands that take `pass_session`.
 - **Contracts** (`lib/protocols.py`): one `Protocol` per task (`Transcriber`,
   `Rewriter`, `Summarizer`, `Expander`) plus `TranscriptSegment`. Backends satisfy them
   structurally.
@@ -115,7 +115,7 @@ counts as done. On success nothing is printed
 ([decision 0007](decisions/0007-silent-on-success.md)).
 
 `-n/--dry-run` (every command that changes files) prints the plan and returns before
-any tool or backend is resolved: `input -> destination` for glados' tasks
+any tool or backend is resolved: `input -> destination` for oddjob's tasks
 (`print_plan`), each planned operation for the file commands'. The one exception is
 `date-copy --from exif`, whose plan needs the dates, so `-n` runs exiftool to read
 them (it writes nothing).
@@ -134,7 +134,7 @@ place (`motionphotos merge`, `strip -y`).
 ```
 transcribe PATH...
   -> inputs = expand_inputs(PATH..., audio/video)
-  -> Glados.backend("transcribe", Transcriber, -b, {"model": -m})
+  -> Session.backend("transcribe", Transcriber, -b, {"model": -m})
        config (lazy) -> backends.select -> backends.load -> e.g. WhisperCppBackend
   -> Job([AudioExtractor, TranscribeStep], dest = INPUT.<format> or -o)
        AudioExtractor: ffmpeg -> temp mono 16 kHz WAV
@@ -151,7 +151,7 @@ audio-grep ARGUMENTS...
   -> run_batch: per input, CachedTranscripts.segments
        key = audio-grep/ + sha256(content sha256, mtime_ns, --backend, --model, --language)
        shared user cache (core/cache.py) hit -> segments
-       miss -> Glados.backend("transcribe", ...) (first miss only)
+       miss -> Session.backend("transcribe", ...) (first miss only)
             -> AudioExtractor -> Transcriber.transcribe -> segments -> cache
   -> grep_transcripts: FORMATTERS[--transcript-format] -> one temp file per input
        -> GrepRunner: grep GREP_ARGS TEMP... -> temp paths in its output replaced by media paths
@@ -164,7 +164,7 @@ audio-grep ARGUMENTS...
 rewrite PATH... -i INSTRUCTIONS
   -> inputs = expand_inputs(PATH..., text files except *.rewrite.*)
   -> prompt = config.prompts.render_rewrite(INSTRUCTIONS)     ([prompts] or default)
-  -> Glados.backend("rewrite", Rewriter, -b, {"model": -m}) -> TextBackend
+  -> Session.backend("rewrite", Rewriter, -b, {"model": -m}) -> TextBackend
   -> Job([TextStep(text -> Rewriter.rewrite(text, prompt=prompt))],
          dest = INPUT.rewrite.<ext> or -o)
        TextStep: read UTF-8 -> transport.complete(prompt, text) streams the reply -> temp file
@@ -188,8 +188,8 @@ describe PATH... -i INSTRUCTIONS [-l LANGUAGE] [-w | -o FILE]
   -> inputs = expand_inputs(PATH..., images)
   -> language = language_name(-l) or the system locale's (commands/describe.py reads it)
   -> prompt = config.prompts.render_describe(INSTRUCTIONS, language)  (appends "Reply in <language>.")
-  -> Glados.backend_options("describe", -b, {"model": -m}) -> (backend, options), nothing loaded
-  -> describer = CachedDescriber(shared cache, lazy Glados.backend("describe", ...))
+  -> Session.backend_options("describe", -b, {"model": -m}) -> (backend, options), nothing loaded
+  -> describer = CachedDescriber(shared cache, lazy Session.backend("describe", ...))
        key = describe/ + sha256(image content sha256, prompt, backend, options minus api_key)
        hit -> text; miss -> TextBackend (built on the first miss) -> text -> cache
        (--no-cache: the TextBackend directly)
@@ -214,7 +214,7 @@ In a batch, `run_batch` shows one overall bar and hands each input a reporter th
 ## File commands
 
 File commands have no backends, entry-point groups or config: they never take
-`pass_glados`, so they never load the config. They use filejobs: `Job` and `run_jobs`
+`pass_session`, so they never load the config. They use filejobs: `Job` and `run_jobs`
 for every command that writes a file, plain functions under `run_batch` for reports,
 renames and checks, and `cli_options` for `PATH...`, `-y` and `-n`; logging comes from
 `cli_common.logging_options`, as for the tasks.
@@ -246,14 +246,14 @@ renames and checks, and `cli_options` for `PATH...`, `-y` and `-n`; logging come
   without a `NAME.description.txt` (or with `--redescribe`) is first described by a
   `DescribeStep` Job landing the sidecar, through the same describer as `describe`.
 - `img-hash`, `img-duplicates`, `img-check`, `img-trim` and `img-reduce` need the `images` extra
-  (Pillow, pillow-heif); `glados.lib.imghash` and `glados.lib.imgedit` are imported
+  (Pillow, pillow-heif); `oddjob.lib.imghash` and `oddjob.lib.imgedit` are imported
   through `load_extra_module` only when one of them runs. `img-hash` caches hashes in
   the shared cache (`img-hash/` keys: content digest and hash size).
 - `img-check` is a report: the problems on stdout, exit 1 if there were any.
 
 Boundaries ([decision 0011](decisions/0011-one-tool.md)): filejobs imports nothing
-from glados; `glados.lib` imports none of `glados.core`, `glados.plugins` and
-`glados.commands`; `glados.plugins` imports only `glados.lib`.
+from oddjob; `oddjob.lib` imports none of `oddjob.core`, `oddjob.plugins` and
+`oddjob.commands`; `oddjob.plugins` imports only `oddjob.lib`.
 `tests/test_boundaries.py` checks them, and `tests/test_session.py` runs a file command
 with a config loader that always fails.
 
@@ -267,32 +267,32 @@ point's name is the backend; its value names the module, and one module may prov
 several backends:
 
 ```toml
-[project.entry-points."glados.backends.transcribe"]
-whisper = "glados.plugins.whisper:__glados_plugin__"
-whisper_cpp = "glados.plugins.whisper:__glados_plugin__"
+[project.entry-points."oddjob.backends.transcribe"]
+whisper = "oddjob.plugins.whisper:__oddjob_plugin__"
+whisper_cpp = "oddjob.plugins.whisper:__oddjob_plugin__"
 ```
 
 Only the selected backend's module is imported, through `foundation.plugin.Register`.
-Its `__glados_plugin__(backend, options)` builds only the named backend, validates the
+Its `__oddjob_plugin__(backend, options)` builds only the named backend, validates the
 merged options with that backend's own pydantic model (`extra="forbid"`) and returns
 `(task, Protocol, object)` triples.
 
-To add a backend: in a new or existing `glados/plugins/<module>.py`, add its options
-model, have `__glados_plugin__` build it under its name, add one entry-point line per
+To add a backend: in a new or existing `oddjob/plugins/<module>.py`, add its options
+model, have `__oddjob_plugin__` build it under its name, add one entry-point line per
 task it implements, then `uv sync`.
 
 ## Tests
 
 `uv run python -m unittest discover -s tests` (stdlib `unittest`, no test dependency).
 Tests exercise backends directly (options model, transport/backend object,
-`__glados_plugin__`), not through the CLI:
+`__oddjob_plugin__`), not through the CLI:
 
 - **Unit tests** replace the outside world, not the code: subprocess backends run a fake
   executable written by `support.write_executable` (a Python script that records its argv
   and mimics the real CLI's output and failure modes); HTTP backends talk to
   `support.FakeHTTPServer`, which answers with a canned response and records requests.
 - **Integration tests** (`*IntegrationTest`) run against the real CLI or service. They
-  read `GLADOS_TEST_*` settings from `tests/integration.env` (git-ignored; template in
+  read `ODDJOB_TEST_*` settings from `tests/integration.env` (git-ignored; template in
   `integration.env.example`), overridden by the environment, and skip their class when
   the backend's enabling setting is empty.
 - **File commands** are tested through their domain modules (`test_file_domain.py`),
@@ -303,15 +303,15 @@ Tests exercise backends directly (options model, transport/backend object,
   ffmpeg and skip when a tool is not on `PATH`; the image-hash tests skip without the
   `images` extra.
 - **Boundaries** (`tests/test_boundaries.py`) parse the sources with `ast`: the
-  import boundaries of filejobs, `glados.lib` and `glados.plugins`, and where click may
+  import boundaries of filejobs, `oddjob.lib` and `oddjob.plugins`, and where click may
   be imported.
 
 The OpenAI `whisper` backend has no tests yet.
 
 ## Configuration
 
-`Glados.config()` (`core/session.py`) loads the config on first use (never at import): `.env`, then
-`$XDG_CONFIG_HOME/glados/config.toml` with `${VAR}` expansion, validated into the frozen
+`Session.config()` (`core/session.py`) loads the config on first use (never at import): `.env`, then
+`$XDG_CONFIG_HOME/oddjob/config.toml` with `${VAR}` expansion, validated into the frozen
 `Config` model (`tasks`, `backends`, `prompts`) and checked against the installed
 backends. A missing file is an empty config. A backend's options for a task are
 `[backends.<name>]` with `[backends.<name>.tasks.<task>]` on top
@@ -326,9 +326,9 @@ Both come from `foundation`:
   reporter logs its lines at INFO on `filejobs.progress`, so they show only with `-v`.
 - `cli_common.logging_options` adds `--log-level`/`-v`/`-q` to every command, after
   its name (`audio-grep`: `--log-level` only; the group takes none), and
-  calls `foundation.loglib.setup_logger_from_click("glados", ...)`. Without flags the
-  level comes from `GLADOS_LOG_LEVEL`, else `warning`. It is
-  `cli_options.logging_options_for("glados")`. The shared `filejobs`
+  calls `foundation.loglib.setup_logger_from_click("oddjob", ...)`. Without flags the
+  level comes from `ODDJOB_LOG_LEVEL`, else `warning`. It is
+  `cli_options.logging_options_for("oddjob")`. The shared `filejobs`
   logger gets the app logger's level, so `-v` and a bare `--log-level info` reach it
   (a bare level alone would only set the app logger); an explicit `filejobs:<level>`
   rule in `--log-level` wins. Modules log via
