@@ -152,6 +152,16 @@ class BytesStepAndRunJobsTests(unittest.TestCase):
         self.assertEqual(result.stdout, "")
         self.assertIn("1 done, 1 failed", result.stderr)
 
+    def test_run_jobs_action_returning_none_wrote_nothing(self) -> None:
+        @click.command()
+        def command() -> None:
+            run_jobs(self.inputs, lambda _item, _reporter: None, "Testing")
+
+        with self.assertNoLogs("filejobs.cli_options", "INFO"):
+            result = CliRunner().invoke(command, [])
+        self.assertEqual(result.exit_code, 0, result.output)
+        self.assertEqual(result.output, "")
+
     def test_destination_helpers(self) -> None:
         produced, dest = self.tmp / "new", self.tmp / "dest"
         produced.write_text("new")

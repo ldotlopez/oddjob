@@ -306,6 +306,42 @@ class ImageEditTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "fully transparent"):
             imgedit.autocrop(empty)
 
+    def test_reduced_size_keeps_the_aspect_ratio(self) -> None:
+        from multitool import imgedit
+
+        self.assertEqual(imgedit.reduced_size((4000, 3000), 2160), (2160, 1620))
+        self.assertEqual(imgedit.reduced_size((3000, 4000), 2160), (1620, 2160))
+        self.assertEqual(imgedit.reduced_size((5000, 1), 10), (10, 1))
+        self.assertIsNone(imgedit.reduced_size((2160, 100), 2160))
+
+    def test_reduce_keeps_format_and_exif(self) -> None:
+        from io import BytesIO
+
+        from PIL import Image
+
+        from multitool import imgedit
+
+        exif = Image.Exif()
+        exif[0x010E] = "a description"  # ImageDescription
+        content = self.encoded(Image.new("RGB", (30, 60)), "JPEG", exif=exif)
+        with Image.open(BytesIO(imgedit.reduce(content, 20))) as reduced:
+            self.assertEqual((reduced.format, reduced.size), ("JPEG", (10, 20)))
+            self.assertEqual(reduced.getexif()[0x010E], "a description")
+
+    def test_reduce_refuses_animations_and_images_that_fit(self) -> None:
+        from PIL import Image
+
+        from multitool import imgedit
+
+        frames = [Image.new("RGB", (40, 40), color) for color in ("red", "blue")]
+        animated = self.encoded(
+            frames[0], "WEBP", save_all=True, append_images=frames[1:]
+        )
+        with self.assertRaisesRegex(ValueError, "animated"):
+            imgedit.reduce(animated, 10)
+        with self.assertRaisesRegex(ValueError, "already fits"):
+            imgedit.reduce(self.encoded(frames[0], "PNG"), 40)
+
 
 class CleanupTests(unittest.TestCase):
     def setUp(self) -> None:

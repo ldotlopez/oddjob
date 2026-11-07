@@ -39,6 +39,27 @@ def converts_to_mp4(path: Path) -> bool:
 CROPPED_INFIX = "cropped"
 
 
+def is_output_of(path: Path, infix: str) -> bool:
+    """Whether `path` is NAME.<infix>.<ext>, an earlier output of a command
+    writing through infix_destination(infix)."""
+    return path.stem.endswith(f".{infix}")
+
+
 def is_autocrop_input(path: Path) -> bool:
     """Images, except earlier autocrop outputs (NAME.cropped.<ext>)."""
-    return is_image(path) and not path.stem.endswith(f".{CROPPED_INFIX}")
+    return is_image(path) and not is_output_of(path, CROPPED_INFIX)
+
+
+# `img-reduce` writes NAME.<REDUCED_INFIX>.<ext>, in a format Pillow can
+# write back.
+REDUCED_INFIX = "reduced"
+REDUCIBLE_EXTENSIONS = frozenset(
+    {".jpg", ".jpeg", ".png", ".webp", ".tif", ".tiff", ".bmp", ".heic", ".heif"}
+)
+
+
+def is_img_reduce_input(path: Path) -> bool:
+    """Raster images, except earlier img-reduce outputs (NAME.reduced.<ext>)."""
+    return path.suffix.lower() in REDUCIBLE_EXTENSIONS and not is_output_of(
+        path, REDUCED_INFIX
+    )

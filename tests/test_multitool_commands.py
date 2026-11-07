@@ -256,6 +256,87 @@ class AutocropCommandTests(unittest.TestCase):
         self.assertFalse((self.tmp / "photo.cropped.jpg").exists())
 
 
+class ImgReduceDryRunTests(unittest.TestCase):
+    def test_dry_run_prints_the_plan_without_decoding(self) -> None:
+        tmp = Path(self.enterContext(tempfile.TemporaryDirectory()))
+        for name in ("a.jpg", "a.reduced.jpg", "b.gif", "notes.txt"):
+            (tmp / name).write_bytes(b"not decoded by -n")
+        runner = CliRunner()
+        result = runner.invoke(cli, ["img-reduce", "-n", str(tmp)])
+        self.assertEqual(result.exit_code, 0, result.output)
+        self.assertEqual(result.stdout, f"{tmp / 'a.jpg'} -> {tmp / 'a.reduced.jpg'}\n")
+        in_place = runner.invoke(cli, ["img-reduce", "-n", "--in-place", str(tmp)])
+        self.assertEqual(in_place.stdout, f"{tmp / 'a.jpg'} -> {tmp / 'a.jpg'}\n")
+
+    def test_in_place_excludes_output(self) -> None:
+        tmp = Path(self.enterContext(tempfile.TemporaryDirectory()))
+        (tmp / "a.jpg").write_bytes(b"x")
+        result = CliRunner().invoke(
+            cli, ["img-reduce", "--in-place", "-o", str(tmp / "b.jpg"), str(tmp)]
+        )
+        self.assertEqual(result.exit_code, 2, result.output)
+        self.assertIn("mutually exclusive", result.output)
+
+
+@unittest.skipUnless(HAS_PILLOW, "needs the multitool extra (Pillow)")
+class ImgReduceCommandTests(unittest.TestCase):
+    def setUp(self) -> None:
+        from PIL import Image
+
+        self.tmp = Path(self.enterContext(tempfile.TemporaryDirectory()))
+        Image.new("RGB", (40, 20), (200, 10, 10)).save(self.tmp / "big.jpg")
+        Image.new("RGB", (8, 8)).save(self.tmp / "small.png")
+        self.runner = CliRunner()
+        for name in ("filejobs", "multitool"):
+            logger = logging.getLogger(name)
+            self.addCleanup(logger.setLevel, logger.level)
+
+    def size_of(self, path: Path) -> tuple[int, int]:
+        from PIL import Image
+
+        with Image.open(path) as image:
+            return image.size
+
+    def test_writes_reduced_images_and_skips_the_ones_that_fit(self) -> None:
+        with self.assertLogs("filejobs", "INFO") as logs:
+            result = self.runner.invoke(
+                cli, ["-v", "img-reduce", "--max-size", "10", str(self.tmp)]
+            )
+        self.assertEqual(result.exit_code, 0, result.output)
+        self.assertEqual(result.stdout, "")
+        reduced = self.tmp / "big.reduced.jpg"
+        self.assertEqual(wrote(logs.records), [reduced])
+        self.assertEqual(self.size_of(reduced), (10, 5))
+        self.assertEqual(self.size_of(self.tmp / "big.jpg"), (40, 20))
+        self.assertFalse((self.tmp / "small.reduced.png").exists())
+
+    def test_in_place_replaces_the_input(self) -> None:
+        big = self.tmp / "big.jpg"
+        result = self.runner.invoke(
+            cli, ["img-reduce", "--in-place", "--max-size", "10", str(big)]
+        )
+        self.assertEqual(result.exit_code, 0, result.output)
+        self.assertEqual(self.size_of(big), (10, 5))
+        self.assertEqual(
+            sorted(p.name for p in self.tmp.iterdir()), ["big.jpg", "small.png"]
+        )
+
+    def test_existing_output_needs_y_and_an_undecodable_image_fails(self) -> None:
+        (self.tmp / "big.reduced.jpg").write_bytes(b"old")
+        (self.tmp / "broken.jpg").write_bytes(b"not an image")
+        failed = self.runner.invoke(
+            cli, ["img-reduce", "--max-size", "10", str(self.tmp)]
+        )
+        self.assertEqual(failed.exit_code, 1, failed.output)
+        self.assertIn("1 done, 2 failed", failed.stderr)
+        self.assertEqual((self.tmp / "big.reduced.jpg").read_bytes(), b"old")
+        replaced = self.runner.invoke(
+            cli, ["img-reduce", "-y", "--max-size", "10", str(self.tmp / "big.jpg")]
+        )
+        self.assertEqual(replaced.exit_code, 0, replaced.output)
+        self.assertEqual(self.size_of(self.tmp / "big.reduced.jpg"), (10, 5))
+
+
 class SrtGrepCommandTests(unittest.TestCase):
     def setUp(self) -> None:
         self.tmp = Path(self.enterContext(tempfile.TemporaryDirectory()))

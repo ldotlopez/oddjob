@@ -15,7 +15,7 @@ from filejobs.cli_options import logging_options_for
 from multitool.commands.captions import img_caption_cmd
 from multitool.commands.cleanup import fs_cleanup_cmd
 from multitool.commands.conversions import jpgize_cmd, mp4ize_cmd
-from multitool.commands.imgedit import autocrop_cmd
+from multitool.commands.imgedit import autocrop_cmd, img_reduce_cmd
 from multitool.commands.imghash import (
     img_check_cmd,
     img_duplicates_cmd,
@@ -37,6 +37,7 @@ COMMANDS = [
     img_duplicates_cmd,
     img_check_cmd,
     autocrop_cmd,
+    img_reduce_cmd,
     img_caption_cmd,
     hash_rename_cmd,
     fix_extensions_cmd,

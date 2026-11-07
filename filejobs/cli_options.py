@@ -134,7 +134,7 @@ def print_plan(inputs: Sequence[Path], dest_fn: DestinationFn) -> None:
         click.echo(f"{input_path} -> {dest_fn(input_path)}")
 
 
-type JobAction[T] = Callable[[T, BaseProgressReporter], Path]
+type JobAction[T] = Callable[[T, BaseProgressReporter], Path | None]
 
 
 def job_action(job: Job, overwrite: bool) -> JobAction[Path]:
@@ -153,10 +153,12 @@ def run_jobs[T](
     label: Callable[[T], str] = str,
 ) -> None:
     """Run `action` on every item, logging each path it wrote at INFO, then
-    the batch summary (only on failure, decision 0007)."""
+    the batch summary (only on failure, decision 0007). An action returning
+    None had nothing to write for that item, which still counts as done."""
 
     def run(item: T, reporter: BaseProgressReporter) -> None:
-        LOGGER.info("wrote %s", action(item, reporter))
+        if (written := action(item, reporter)) is not None:
+            LOGGER.info("wrote %s", written)
 
     report = run_batch(items, run, description=description, label=label)
     finish_batch(report)
