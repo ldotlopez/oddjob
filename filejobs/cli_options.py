@@ -95,19 +95,28 @@ def logging_options_for[F: Callable[..., object]](app_logger: str) -> Decorator[
             quiet: int,
             **kwargs: object,
         ) -> object:
-            def setup() -> logging.Logger:
-                return setup_logger_from_click(
-                    app_logger, log_level=log_level, verbose=verbose, quiet=quiet
-                )
-
-            logging.getLogger(SHARED_LOGGER).setLevel(setup().getEffectiveLevel())
-            if log_level is not None:
-                setup()
+            setup_logging(app_logger, log_level, verbose, quiet)
             return func(*args, **kwargs)
 
         return wrapper  # type: ignore[return-value]
 
     return decorator
+
+
+def setup_logging(
+    app_logger: str, log_level: str | None, verbose: int, quiet: int
+) -> None:
+    """Set up `app_logger` and give the shared `filejobs` logger its level
+    (see logging_options_for). For commands that cannot take -v/-q."""
+
+    def setup() -> logging.Logger:
+        return setup_logger_from_click(
+            app_logger, log_level=log_level, verbose=verbose, quiet=quiet
+        )
+
+    logging.getLogger(SHARED_LOGGER).setLevel(setup().getEffectiveLevel())
+    if log_level is not None:
+        setup()
 
 
 def check_single_output(output: Path | None, inputs: Sequence[Path]) -> None:

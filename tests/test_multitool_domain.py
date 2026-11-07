@@ -19,7 +19,6 @@ from multitool import (
     motionphotos,
     renamers,
     sidecars,
-    subtitles,
 )
 
 if TYPE_CHECKING:
@@ -164,43 +163,6 @@ class CaptionPlanTests(unittest.TestCase):
         caption = captions.Caption(tmp / "a.jpg", tmp / "a.description.txt")
         with self.assertRaisesRegex(ValueError, "empty description"):
             caption.text()
-
-
-SRT = """\ufeff1
-00:00:01,000 --> 00:00:02,500
-The Budget
-for Q3
-
-2
-00:00:03,000 --> 00:00:04,000
-something else
-"""
-
-
-class SubtitleTests(unittest.TestCase):
-    def test_parse_srt(self) -> None:
-        self.assertEqual(
-            subtitles.parse_srt(SRT.replace("\n", "\r\n")),
-            [
-                subtitles.Cue(start="00:00:01,000", text="The Budget for Q3"),
-                subtitles.Cue(start="00:00:03,000", text="something else"),
-            ],
-        )
-
-    def test_a_block_without_timing_is_an_error(self) -> None:
-        with self.assertRaises(ValueError):
-            subtitles.parse_srt("1\nno timing here\n")
-
-    def test_matching_ignores_case(self) -> None:
-        cues = subtitles.parse_srt(SRT)
-        self.assertEqual(
-            [cue.start for cue in subtitles.matching_cues(cues, "budget")],
-            ["00:00:01,000"],
-        )
-
-    def test_subtitle_path(self) -> None:
-        self.assertEqual(subtitles.subtitle_path(Path("a/m.mp4")), Path("a/m.srt"))
-        self.assertEqual(subtitles.subtitle_path(Path("a/m.SRT")), Path("a/m.SRT"))
 
 
 @unittest.skipUnless(HAS_PILLOW, "needs the multitool extra (Pillow)")

@@ -25,6 +25,7 @@ summarize = "glados.commands.summarize:cli"
 expand = "glados.commands.expand:cli"
 translate = "glados.commands.translate:cli"
 describe = "glados.commands.describe:cli"
+audio-grep = "glados.commands.audio_grep:cli"
 # File utilities without the backend registry (docs/decisions/0003).
 multitool = "multitool.cli:cli"
 

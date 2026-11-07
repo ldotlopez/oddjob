@@ -25,7 +25,6 @@ from multitool.commands.imghash import (
 from multitool.commands.motionphotos import motionphotos_cmd
 from multitool.commands.renames import fix_extensions_cmd, hash_rename_cmd
 from multitool.commands.sidecars import sidecars_cmd
-from multitool.commands.subtitles import srt_grep_cmd
 
 APP_LOGGER = "multitool"
 
@@ -44,7 +43,6 @@ COMMANDS = [
     fix_extensions_cmd,
     date_sync_cmd,
     fs_cleanup_cmd,
-    srt_grep_cmd,
 ]
 
 
