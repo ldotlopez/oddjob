@@ -52,6 +52,7 @@ multitool/
                       planning, SRT parsing and search
   media.py            which files are images/videos and which ones each converter takes
   external.py         ImageMagick and exiftool adapters, user commands
+  shotwell.py         read-only adapter for a Shotwell library (SQLite), for date-sync
 tests/                unittest suite: one module per backend module or tool area; support.py: shared fakes
 ```
 
@@ -197,10 +198,13 @@ functions under `run_batch` for reports, renames and checks, and `cli_options` f
   `plan_rename`, `plan_extension_fix`, `dates.plan_change`, `cleanup.plan_cleanup`, or a
   destination per input), then apply, so `-n` prints the plan without touching anything
   or requiring the extra, and the external tools only for `date-sync --from exif`.
-- `date-sync` reads every date first (`dates.DateReader`, under one `run_batch`), then
+- `date-sync` reads every date first (a `dates.DateSource`, under one `run_batch`), then
   applies the planned `Rename`, `SetMtime` or `SetExifDate` changes under a second one.
-  EXIF and QuickTime dates go through exiftool (`-api QuickTimeUTC`, so video dates are
-  local time); dates are aware datetimes in the local zone.
+  The command picks the source for `--from` (`MtimeDates`, `NameDates`, `ExifDates`,
+  `ShotwellDates`), wrapped in `MtimeFallback` with `--mtime-fallback`. EXIF and
+  QuickTime dates go through exiftool (`-api QuickTimeUTC`, so video dates are local
+  time); Shotwell's exposure times come from its database, opened read-only. Shotwell is
+  a source only. Dates are aware datetimes in the local zone.
 - `fs-cleanup` walks the trees itself (`cleanup.plan_cleanup`) instead of using
   `filejobs.inputs.expand_inputs`, since it removes and chmods directories as well as
   files; it does not descend into junk directories or follow symlinks.

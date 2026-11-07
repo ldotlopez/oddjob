@@ -171,7 +171,7 @@ File utilities without backends or config, run as `multitool <command>`:
 | `img-caption PATH...`       | write each `NAME.description.txt` (from `glados describe -w`) into the image's XMP and EXIF description |
 | `hash-rename PATH...`       | rename each file to `<digest of its content>.<ext>` (`--algo`)        |
 | `fix-extensions PATH...`    | lowercase extensions; `jpeg` → `jpg`, `mpeg` → `mpg`, `tif` → `tiff`  |
-| `date-sync PATH...`         | copy each image's or video's date `--from` exif/mtime/name `--to` another; `--to name` renames to `YYYY-mm-dd HH.MM.SS <crc32>.<ext>` (`--name-format`, `--mtime-fallback`) |
+| `date-sync PATH...`         | copy each image's or video's date `--from` exif/mtime/name/shotwell `--to` exif/mtime/name; `--to name` renames to `YYYY-mm-dd HH.MM.SS <crc32>.<ext>` (`--name-format`, `--shotwell-db`, `--mtime-fallback`) |
 | `fs-cleanup PATH...`        | remove macOS, Windows and KDE leftovers (`.DS_Store`, `._NAME`, `Thumbs.db`, `.Trash-<uid>`...); `--perms`: chmod files 644, directories 755 |
 | `srt-grep PATTERN PATH...`  | cues containing PATTERN in `.srt` files (a media file means its `NAME.srt`; exit 1 if none) |
 

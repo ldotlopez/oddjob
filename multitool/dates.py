@@ -1,5 +1,6 @@
 """date-sync: copy a file's date from one place to another, among its
-EXIF/QuickTime metadata, its modification time and its name.
+EXIF/QuickTime metadata, its modification time and its name; a Shotwell
+library can also be read as the source.
 
 Cameras record wall-clock times without a zone; they are read as local
 time (aware datetimes in the system's zone). A dated name is
@@ -16,9 +17,11 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Protocol
 
 from multitool import media, renamers
 from multitool.external import EXIF_DATE_FORMAT, ExifTool
+from multitool.shotwell import ShotwellLibrary
 
 
 class DateNotFoundError(ValueError):
@@ -29,6 +32,10 @@ class Place(enum.StrEnum):
     EXIF = "exif"
     MTIME = "mtime"
     NAME = "name"
+    SHOTWELL = "shotwell"  # a source only: the library is never written
+
+
+TARGETS = (Place.EXIF, Place.MTIME, Place.NAME)
 
 
 # Read in this order of preference: when the shot was taken, then when it
@@ -147,47 +154,60 @@ class SetExifDate:
 type DateChange = renamers.Rename | SetMtime | SetExifDate
 
 
-class DateReader:
-    """Reads the date of a file from one Place."""
-
-    def __init__(
-        self,
-        source: Place,
-        exiftool: ExifTool | None,
-        name_format: str,
-        mtime_fallback: bool,
-    ) -> None:
-        if source is Place.EXIF and exiftool is None:
-            raise ValueError("reading EXIF dates needs exiftool")
-        self.source = source
-        self.exiftool = exiftool
-        self.pattern = name_pattern(name_format)
-        self.mtime_fallback = mtime_fallback
-
+class DateSource(Protocol):
     def read(self, path: Path) -> datetime:
-        try:
-            return self._read_source(path)
-        except DateNotFoundError:
-            if not self.mtime_fallback:
-                raise
+        """`path`'s date; DateNotFoundError when this source has none."""
+        ...
+
+
+class MtimeDates:
+    def read(self, path: Path) -> datetime:
         return date_from_mtime(path)
 
-    def _read_source(self, path: Path) -> datetime:
-        match self.source:
-            case Place.MTIME:
-                return date_from_mtime(path)
-            case Place.NAME:
-                return date_from_name(path.name, self.pattern)
-            case Place.EXIF:
-                return self._read_exif(path)
 
-    def _read_exif(self, path: Path) -> datetime:
-        if self.exiftool is None:
-            raise ValueError("reading EXIF dates needs exiftool")
+class NameDates:
+    def __init__(self, name_format: str) -> None:
+        self.pattern = name_pattern(name_format)
+
+    def read(self, path: Path) -> datetime:
+        return date_from_name(path.name, self.pattern)
+
+
+class ExifDates:
+    def __init__(self, exiftool: ExifTool) -> None:
+        self.exiftool = exiftool
+
+    def read(self, path: Path) -> datetime:
         when = date_from_tags(self.exiftool.read_dates(path, EXIF_READ_TAGS))
         if when is None:
             raise DateNotFoundError("no date in its metadata")
         return when
+
+
+class ShotwellDates:
+    """Exposure times from a Shotwell library, matched by the file's path."""
+
+    def __init__(self, library: ShotwellLibrary) -> None:
+        self.library = library
+
+    def read(self, path: Path) -> datetime:
+        exposure = self.library.exposure_time(path)
+        if exposure is None:
+            raise DateNotFoundError("not in the Shotwell library, or no time there")
+        return datetime.fromtimestamp(exposure, tz=UTC).astimezone()
+
+
+class MtimeFallback:
+    """`source`'s date, or the modification time when it has none."""
+
+    def __init__(self, source: DateSource) -> None:
+        self.source = source
+
+    def read(self, path: Path) -> datetime:
+        try:
+            return self.source.read(path)
+        except DateNotFoundError:
+            return date_from_mtime(path)
 
 
 def plan_change(path: Path, when: datetime, target: Place) -> DateChange | None:
@@ -200,6 +220,8 @@ def plan_change(path: Path, when: datetime, target: Place) -> DateChange | None:
             return None if date_from_mtime(path) == when else SetMtime(path, when)
         case Place.EXIF:
             return SetExifDate(path, when)
+        case Place.SHOTWELL:
+            raise ValueError("the Shotwell library can only be read")
 
 
 def apply_change(

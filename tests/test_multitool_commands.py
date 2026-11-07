@@ -3,8 +3,10 @@
 import json
 import logging
 import os
+import sqlite3
 import tempfile
 import unittest
+from contextlib import closing
 from datetime import datetime
 from pathlib import Path
 
@@ -428,6 +430,23 @@ else:
 """
 
 
+def make_shotwell_db(
+    database: Path, photos: dict[Path, int], videos: dict[Path, int]
+) -> Path:
+    """A minimal Shotwell library: the two tables date-sync reads."""
+    with closing(sqlite3.connect(database)) as connection, connection:
+        for table, rows in (("PhotoTable", photos), ("VideoTable", videos)):
+            connection.execute(
+                f"CREATE TABLE {table} (id INTEGER PRIMARY KEY, filename TEXT,"
+                " exposure_time INTEGER)"
+            )
+            connection.executemany(
+                f"INSERT INTO {table} (filename, exposure_time) VALUES (?, ?)",
+                [(str(path.absolute()), time) for path, time in rows.items()],
+            )
+    return database
+
+
 class DateSyncCommandTests(unittest.TestCase):
     def setUp(self) -> None:
         self.tmp = Path(self.enterContext(tempfile.TemporaryDirectory()))
@@ -510,6 +529,41 @@ class DateSyncCommandTests(unittest.TestCase):
         self.assertEqual(photo.stat().st_mtime, self.when.timestamp())
         again = self.invoke(*args, "-n")
         self.assertEqual((again.exit_code, again.stdout), (0, ""))
+
+    def test_from_shotwell_reads_the_library_read_only(self) -> None:
+        listed = self.photo("a.jpg")
+        unlisted = self.photo("b.mp4")
+        clip = self.photo("c.mp4")
+        database = make_shotwell_db(
+            self.tmp / "photo.db",
+            photos={listed: int(self.when.timestamp())},
+            videos={clip: 0},  # Shotwell's "no time"
+        )
+        before = database.read_bytes()
+        args = ("--from", "shotwell", "--to", "mtime", "--shotwell-db", str(database))
+        planned = self.invoke(*args, "-n")
+        self.assertEqual(planned.exit_code, 1, planned.output)
+        self.assertEqual(
+            planned.stdout,
+            f"touch -m -d '2019-07-14 18:03:22' {listed}\n",
+        )
+        self.assertIn("1 done, 2 failed", planned.stderr)
+        done = self.invoke(*args, "--mtime-fallback")
+        self.assertEqual(done.exit_code, 0, done.output)
+        self.assertEqual(listed.stat().st_mtime, self.when.timestamp())
+        self.assertEqual(unlisted.stat().st_mtime, 0)
+        self.assertEqual(database.read_bytes(), before)
+
+    def test_shotwell_is_only_a_source_and_needs_its_database(self) -> None:
+        self.photo("a.jpg")
+        as_target = self.invoke("--from", "mtime", "--to", "shotwell")
+        self.assertEqual(as_target.exit_code, 2, as_target.output)
+        missing = self.invoke(
+            "--from", "shotwell", "--to", "mtime",
+            "--shotwell-db", str(self.tmp / "nope.db"),
+        )  # fmt: skip
+        self.assertEqual(missing.exit_code, 1, missing.output)
+        self.assertIn("Shotwell database not found", missing.output)
 
     def test_usage_errors(self) -> None:
         same = self.invoke("--from", "name", "--to", "name")

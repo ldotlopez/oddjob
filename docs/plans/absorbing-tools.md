@@ -68,7 +68,7 @@ Settled with the user (2026-11-07). Already covered, so not ported:
 |---|---|---|---|---|---|---|---|
 | `deosxfy` + `perms` | `oc/fsjanitor.py` | deletes OS junk files; `--perms` chmods (files 644, dirs 755) | no | — | — | multitool `fs-cleanup` (macOS, Windows, KDE junk; opt-in `--perms`), one plan of removals and chmods | `d31882a` |
 | `image-reduce` | `oc/fsjanitor.py` | new file per input (`NAME.reduced.<ext>`), or the original atomically with `--in-place` | no | — | — (Pillow, `multitool` extra) | multitool `img-reduce`, file producer | `aed78c3` |
-| `dtnamer` + `uniqnamer` | `oc/dtnamer.py`, `oc/uniqnamer.py` | renames, rewrites EXIF in place, or sets mtime | no | `exiftool` | — (no `piexif`, `dateutil`) | multitool `date-sync --from exif\|mtime\|name --to exif\|mtime\|name`; names are `YYYY-mm-dd HH.MM.SS <crc32>.<ext>`; Shotwell source dropped (machine-specific) | `ea95343` |
+| `dtnamer` + `uniqnamer` | `oc/dtnamer.py`, `oc/uniqnamer.py` | renames, rewrites EXIF in place, or sets mtime | no | `exiftool` | — (no `piexif`, `dateutil`) | multitool `date-sync --from exif\|mtime\|name --to exif\|mtime\|name`; names are `YYYY-mm-dd HH.MM.SS <crc32>.<ext>`; `--from shotwell` reads a Shotwell library (`--shotwell-db`, read-only) | `ea95343` |
 | `sidecars` (video prune) | `oc/sidecars.py` | deletes the video sidecars of images | no | — | — | not absorbed: `motionphotos merge --rm` (after `jpgize`/`mp4ize`) does it without losing the video | |
 | `mdupes` | `oc/mdupes.py` | only reports | second `img-duplicates` method | — | `opencv`, `python-magic` | not absorbed: decision 0003 chose the average hash | |
 | `checksumrenamer` | `oc/checksumrenamer.py` | — | — | — | — | not absorbed: an unfinished stub | |
@@ -364,6 +364,29 @@ Edge cases:
 - **`date-sync` and DST.** A wall-clock time in the repeated hour at the
   end of daylight saving is ambiguous. `astimezone()` takes the first one,
   so `--to mtime` may be an hour off for such files.
+
+Tests:
+
+- **Integration tests on real files.** Today's integration tests build
+  their fixtures (ImageMagick gradients, ffmpeg test patterns, a minimal
+  Shotwell schema), so device quirks go untested. Add a sample set that is
+  never committed (privacy, size): a directory named by
+  `MULTITOOL_TEST_SAMPLES` in `tests/integration.env`, with
+  `*IntegrationTest` classes that skip when it is unset. Candidate files,
+  to confirm with the user before collecting them:
+  - an iPhone Live Photo export, as both HEIC + MOV and JPEG + MOV
+    (`motionphotos`, `jpgize`, `mp4ize`, the iOS item above);
+  - a Samsung or Google motion photo JPEG (`motionphotos check/split/strip`);
+  - camera and phone JPEGs with `DateTimeOriginal` and `OffsetTimeOriginal`,
+    and a phone MP4/MOV with QuickTime dates (`date-sync`);
+  - a large JPEG/HEIC (over 2160 px) with EXIF orientation, an ICC profile
+    and XMP/IPTC (`img-reduce`, `autocrop`, the image-metadata item);
+  - an animated GIF or WebP, a transparent PNG, a truncated JPEG
+    (`img-reduce`, `autocrop`, `img-check`);
+  - a copy of a real Shotwell `photo.db` with the matching files
+    (`date-sync --from shotwell`);
+  - a folder copied from macOS and Windows with `.DS_Store`, `._NAME`,
+    `Thumbs.db` and `desktop.ini` (`fs-cleanup`).
 
 ## Order
 
