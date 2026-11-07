@@ -5,8 +5,9 @@ Status: draft (2026-11-07).
 ## Context
 
 Every glados command gets its config and backend through
-`GladosContext` (`glados/core/cli_common.py`), a click context object that
-loads the config on first use and turns `ConfigError`/`BackendError` into
+`GladosContext` (`glados/core/cli_common.py`), click's per-run context
+object (`ctx.obj`, injected by `pass_glados_context`). It loads the config
+on first use and turns `ConfigError`/`BackendError` into
 `click.ClickException`. The pieces it wraps (`load_dotenv`, `config_path`,
 `load_config`, `check_config`, `core.backends.resolve`) are already
 click-free, but the only way to get them together, lazily and cached, is
@@ -18,10 +19,14 @@ second option parses argv, raises `SystemExit`/`ClickException`, re-runs
 logging setup and returns files instead of values.
 
 This plan adds the missing piece: a plain object, `Glados`, that owns the
-lazy config and hands out typed backends, with `GladosContext` reduced to
-an adapter over it. It changes no behavior and adds no composed command;
-it only makes the domain layer (`glados.tasks.*`, task Protocols) reachable
-from Python with a backend in hand.
+lazy config and hands out typed backends. `GladosContext` goes away: once
+`Glados` holds the state, all that is left for click is converting errors,
+and that belongs in the decorator that injects the object, not in a second
+class with a misleading name. The plan changes no CLI behavior and adds no
+composed command.
+
+The plan also fixes a `Job.run` bug found in the same review (step 4): a
+step whose output is its own input gets that file deleted or moved away.
 
 ## Goals
 
@@ -32,9 +37,12 @@ from Python with a backend in hand.
   `$XDG_CONFIG_HOME/glados/config.toml`, `${VAR}` expansion, validation,
   `check_config`).
 - Errors as the existing specific exceptions (`ConfigError`,
-  `BackendError`); only the click adapter turns them into exit codes.
+  `BackendError`); only the click decorator turns them into exit codes.
 - Testable without patching: the config source is injected.
+- One name per concept: `Glados` is the state, `pass_glados` is the click
+  glue.
 - CLI behavior, messages and exit codes unchanged.
+- `Job.run` never deletes or moves a file it did not create.
 
 ## Non-goals
 
@@ -46,8 +54,6 @@ this plan:
   models).
 - One source for the task list (`core.backends.TASKS` vs entry-point
   groups).
-- `Job.run` unlinking a step's output that is the job's input
-  (pass-through steps).
 - A `prompts` helper on the facade: callers keep using
   `glados.config().prompts.render_*`.
 - Caching backend objects: `backend()` resolves on every call, as
@@ -108,55 +114,96 @@ Decisions inside the design:
   patching. `load_default_config` keeps today's sequence verbatim, moved
   out of `GladosContext.config`.
 - **A failed load is not cached.** `_config` is set only on success, so a
-  second call retries. Today's CLI calls `config()` once per run, so this
-  only matters for Python callers.
+  second call retries. A CLI run exits on the first error, so this only
+  matters for Python callers.
 - **`load_dotenv` stays in the default loader.** It mutates `os.environ`,
   so it is a side effect of the first `config()` call, as today. Injected
   loaders don't run it.
 - **Module name `session`**, not `glados.core.glados`, so the import line
   doesn't stutter: `from glados.core.session import Glados`.
 
-### `glados/core/cli_common.py`: `GladosContext` becomes an adapter
+### `glados/core/cli_common.py`: `pass_glados` replaces `GladosContext`
+
+`GladosContext` and `pass_glados_context` are removed. `Glados` itself is
+click's `ctx.obj`:
 
 ```python
-@dataclass(slots=True)
-class GladosContext:
-    """Click adapter over Glados: the same calls, with config and backend
-    errors turned into a clean message and exit code."""
+def pass_glados[**P, R](func: Callable[Concatenate[Glados, P], R]) -> Callable[P, R]:
+    """Passes the run's Glados as the first argument (the one the `glados`
+    group's context already holds, or a new one when the command runs
+    standalone) and turns ConfigError/BackendError into ClickException."""
 
-    glados: Glados = field(default_factory=Glados)
-
-    def config(self) -> Config:
+    @functools.wraps(func)
+    def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
+        glados = click.get_current_context().ensure_object(Glados)
         try:
-            return self.glados.config()
+            return func(glados, *args, **kwargs)
         except (ConfigError, BackendError) as exc:
             raise click.ClickException(str(exc)) from exc
 
-    def backend[T](self, task, protocol, choice, overrides) -> T:
-        try:
-            return self.glados.backend(task, protocol, choice, overrides)
-        except (ConfigError, BackendError) as exc:
-            raise click.ClickException(str(exc)) from exc
+    return wrapper
 ```
 
-- `pass_glados_context` (`make_pass_decorator(..., ensure=True)`) still
-  builds a default instance, so standalone scripts (`uv run transcribe`)
-  keep working with no group.
-- `backend()` now also catches `ConfigError`. Today a config error is
-  raised from `config()` inside `backend()` and already becomes a
-  `ClickException`, so the result is the same; the catch only makes it
-  explicit.
+- **Placement:** `@pass_glados` goes where `@pass_glados_context` is today,
+  as the decorator nearest the function. `functools.wraps` copies the
+  function's `__dict__`, so options collected so far
+  (`__click_params__`) carry over, as with click's own
+  `make_pass_decorator`.
+- **Standalone scripts** (`uv run transcribe`) keep working:
+  `ensure_object` creates the `Glados` when no group did.
+- **Same errors converted as today.** In all six commands the backend is
+  resolved in the command body before `run_jobs`, and per-input failures
+  are `JOB_ERRORS`, handled inside `run_jobs`. Catching around the whole
+  body converts exactly the `ConfigError`/`BackendError` that
+  `GladosContext` converted, with the same message.
 - The `load_dotenv`/`config_path`/`load_config`/`check_config` imports
-  leave `cli_common.py`.
-- No command module changes.
+  leave `cli_common.py`. `backend_option`, `model_option` and
+  `logging_options` stay.
+
+### Commands (`glados/commands/*.py`, six modules)
+
+A mechanical change in each: `@pass_glados_context` becomes
+`@pass_glados`; `ctx: GladosContext` becomes `glados: Glados`;
+`ctx.config()`/`ctx.backend(...)` become
+`glados.config()`/`glados.backend(...)`. No other edits.
+
+### `Job.run` (`filejobs/pipeline.py`): only touch files the job created
+
+Today every step output goes into `intermediates`. After the run, all of
+them are unlinked except the one moved to `dest`, and the last one is
+moved with `move_to_destination`. A step that returns its own input
+unchanged (a pass-through, e.g. a "skip if already done" step) breaks
+both:
+
+- a pass-through **before** a producing step puts `input_path` (or an
+  earlier temp file) in `intermediates`, so the user's input is
+  **deleted** on cleanup, on success and on failure alike;
+- a pass-through as the **last** step makes `current == input_path`, so
+  the input is **moved** (renamed) to `dest`, leaving nothing where it
+  was.
+
+Fix:
+
+- Record a step's output as an intermediate only if it differs from that
+  step's input and from `input_path`. Then `intermediates` holds only
+  temp files the steps created, each once.
+- At the end, if `current == input_path` (no step produced anything):
+  when `dest == input_path` there is nothing to move; otherwise
+  `copy_into_place(input_path, dest)`, after the same `check_destination`
+  re-check that `move_to_destination` does. Otherwise move `current` as
+  today.
+- Cleanup unlinks every intermediate except the one moved to `dest`.
+
+Steps that produce a new temp file, which is all of them today, behave
+exactly as before.
 
 ## Steps
 
 1. **Add `glados/core/session.py`** with `load_default_config` and
    `Glados` as above. It imports no click, so `tests/test_boundaries.py`
    covers it with no change (it is not a `cli_*.py` module).
-2. **Make `GladosContext` delegate to `Glados`** (as above) and drop the
-   loading code from `cli_common.py`.
+2. **Replace `GladosContext` with `pass_glados`** in `cli_common.py`, and
+   update the six command modules as above.
 3. **Add `tests/test_session.py`** (stdlib unittest, no real services):
    - `Glados(load)` does not call `load` at construction; `config()` calls
      it once and returns the same object on later calls.
@@ -170,22 +217,34 @@ class GladosContext:
      install. Building the openai backend only validates `OpenAIOptions`;
      the API key is checked on the first `complete()` call
      (`glados/plugins/openai.py`), so the test needs no network or key.
-   - `GladosContext` turns a loader's `ConfigError` into
-     `click.ClickException` with the same message (a `GladosContext` built
-     with an injected `Glados`).
-4. **Check.** `uv run ruff check --fix .`, `uv run ruff format .`,
+   - `pass_glados`: a throwaway click command decorated with it, run with
+     a context whose `obj` is a `Glados` with a raising loader, exits 1
+     with the loader's message. Run without an `obj`, it receives a new
+     `Glados`.
+4. **Fix `Job.run`** as above, with regression tests in
+   `tests/test_filejobs.py`:
+   - a pass-through step followed by a producing step: the input still
+     exists after success, and after the producing step fails;
+   - a pass-through as the only step, `dest != input_path`: `dest` is a
+     copy, and the input is still in place;
+   - the same, `dest == input_path`: nothing is moved and the input is
+     unchanged;
+   - existing tests: intermediate temp files are still removed.
+5. **Check.** `uv run ruff check --fix .`, `uv run ruff format .`,
    `uv run python -m unittest discover -s tests`, and a manual run
    showing that a broken config gives the same message and exit code as
    before: `XDG_CONFIG_HOME=<dir with bad config.toml> uv run glados
    summarize x.txt`, and the same through `uv run summarize`.
-5. **Docs (ask first, per CLAUDE.md).** Proposed edits, applied only after
+6. **Docs (ask first, per CLAUDE.md).** Proposed edits, applied only after
    a yes:
    - `docs/ARCHITECTURE.md`: add `session.py` to the `core/` tree
-     ("`Glados`: config and backends without click"); in "Configuration",
-     the config is loaded on first use by `Glados.config()`, which
-     `GladosContext` wraps.
+     ("`Glados`: config and backends without click"); `cli_common.py`'s
+     entry says `pass_glados` instead of `GladosContext`; the data-flow
+     lines `GladosContext.backend(...)` become `Glados.backend(...)`; in
+     "Configuration", the config is loaded on first use by
+     `Glados.config()`.
    - `.claude/rules/glados.md`: "read on first use in `GladosContext`"
-     becomes "in `Glados` (`core/session.py`), wrapped by `GladosContext`".
+     becomes "in `Glados` (`core/session.py`), injected by `pass_glados`".
    - No decision record: this adds a module inside an existing boundary
      and reverses nothing.
 
@@ -205,11 +264,14 @@ text = describe_image(describer, prompt, image, reporter)
 ## Risks
 
 - **Hidden behavior in the move.** The debug log line and the order
-  (`load_dotenv` before `config_path`) must move verbatim; step 4's manual
+  (`load_dotenv` before `config_path`) must move verbatim; step 5's manual
   run checks the error path.
-- **Mutable default in dataclass.** `GladosContext.glados` uses
-  `field(default_factory=Glados)`, not `= Glados()`. A shared default
-  instance would cache one config across contexts, which tests building
-  several contexts would notice.
+- **Decorator order.** `@pass_glados` must stay the decorator nearest the
+  function, as `@pass_glados_context` is now; above a click option it
+  would shift arguments. Every command is covered by step 5's suite and
+  manual run.
 - **Callers outside click get raw exceptions.** That's the intent. Python
   callers handle `ConfigError`/`BackendError` themselves.
+- **`Job.run` behavior change for pass-through steps.** Intended: no step
+  does this today, so no current command changes behavior; the new tests
+  pin the new behavior.
