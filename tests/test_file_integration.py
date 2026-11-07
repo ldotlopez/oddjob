@@ -1,7 +1,7 @@
-"""multitool's commands against the real ImageMagick, exiftool and ffmpeg.
+"""glados' file commands against the real ImageMagick, exiftool and ffmpeg.
 
 Each class skips when a tool it needs is not on PATH; img-duplicates also
-needs the multitool extra (Pillow)."""
+needs the images extra (Pillow)."""
 
 import importlib.util
 import shutil
@@ -63,7 +63,7 @@ class IntegrationCase(unittest.TestCase):
         self.tmp = Path(self.enterContext(tempfile.TemporaryDirectory()))
         self.runner = CliRunner()
 
-    def multitool(self, *args: str | Path) -> Result:
+    def glados(self, *args: str | Path) -> Result:
         result = self.runner.invoke(cli, [str(arg) for arg in args])
         self.assertEqual(result.exit_code, 0, result.output)
         return result
@@ -81,7 +81,7 @@ class JpgizeIntegrationTest(IntegrationCase):
             "exiftool", "-q", "-overwrite_original",
             "-PNG:Artist=Tester", "-EXIF:Orientation#=6", source,
         )  # fmt: skip
-        self.multitool("jpgize", "--rm", self.tmp)
+        self.glados("jpgize", "--rm", self.tmp)
         converted = self.tmp / "photo.jpg"
         self.assertFalse(source.exists())
         self.assertEqual(exif_tag(converted, "IFD0:Artist"), "Tester")
@@ -94,7 +94,7 @@ class Mp4izeIntegrationTest(IntegrationCase):
     def test_remuxes_without_reencoding_video(self) -> None:
         source = self.tmp / "clip.mkv"
         make_video(source)
-        self.multitool("mp4ize", source)
+        self.glados("mp4ize", source)
         remuxed = self.tmp / "clip.mp4"
         self.assertTrue(source.exists())
         self.assertEqual(stream_codecs(remuxed)[0], "mpeg4")
@@ -113,23 +113,21 @@ class MotionPhotoIntegrationTest(IntegrationCase):
         magick("-size", "64x48", "gradient:red-blue", still)
         make_video(clip)
         joined = self.tmp / "motion.jpg"
-        self.multitool(
-            "motionphotos", "join", "-i", still, "--video", clip, "-o", joined
-        )
-        self.multitool("motionphotos", "check", joined)
+        self.glados("motionphotos", "join", "-i", still, "--video", clip, "-o", joined)
+        self.glados("motionphotos", "check", joined)
         magick(joined, self.tmp / "decoded.png")  # still a readable JPEG
 
         image, video = self.tmp / "out.jpg", self.tmp / "out.mp4"
-        self.multitool("motionphotos", "split", joined, "-i", image, "--video", video)
+        self.glados("motionphotos", "split", joined, "-i", image, "--video", video)
         self.assertEqual(image.read_bytes(), still.read_bytes())
         self.assertEqual(video.read_bytes(), clip.read_bytes())
         self.assertEqual(stream_codecs(video), stream_codecs(clip))
 
-        self.multitool("motionphotos", "strip", "-y", joined)
+        self.glados("motionphotos", "strip", "-y", joined)
         self.assertIsNone(motionphotos.MotionPhoto.parse(joined.read_bytes()).video)
 
 
-@unittest.skipUnless(HAS_PILLOW, "needs the multitool extra (Pillow)")
+@unittest.skipUnless(HAS_PILLOW, "needs the images extra (Pillow)")
 @unittest.skipIf(missing("magick", "convert"), "needs ImageMagick")
 class ImgDuplicatesIntegrationTest(IntegrationCase):
     def test_groups_a_reencoded_copy(self) -> None:
@@ -139,7 +137,7 @@ class ImgDuplicatesIntegrationTest(IntegrationCase):
         magick(
             "-size", "64x48", "gradient:red-blue", "-rotate", "180", self.tmp / "b.png"
         )
-        result = self.multitool("img-duplicates", "--no-cache", self.tmp)
+        result = self.glados("img-duplicates", "--no-cache", self.tmp)
         groups = result.output.split("group ")[1:]
         self.assertEqual(len(groups), 1, result.output)
         self.assertIn(str(original), groups[0])
@@ -156,7 +154,7 @@ class ImgCaptionIntegrationTest(IntegrationCase):
         image = self.tmp / "a.jpg"
         magick("-size", "16x16", "xc:red", image)
         (self.tmp / "a.description.txt").write_text("Un gato, señor", encoding="utf-8")
-        self.multitool("img-caption", "-y", self.tmp)
+        self.glados("img-caption", "-y", self.tmp)
         self.assertEqual(exif_tag(image, "XMP-dc:Description"), "Un gato, señor")
         self.assertEqual(exif_tag(image, "EXIF:ImageDescription"), "Un gato, señor")
 
@@ -175,7 +173,7 @@ class DateSyncIntegrationTest(IntegrationCase):
         image, video = self.tmp / f"{stem}.jpg", self.tmp / f"{stem}.mp4"
         magick("-size", "64x48", "gradient:red-blue", image)
         make_video(video)
-        self.multitool("date-sync", "--from", "name", "--to", "exif", "-y", self.tmp)
+        self.glados("date-sync", "--from", "name", "--to", "exif", "-y", self.tmp)
         self.assertEqual(exif_tag(image, "DateTimeOriginal"), "2019:07:14 18:03:22")
         # QuickTime stores UTC: written and read back as local time.
         local = run_tool(
@@ -184,7 +182,7 @@ class DateSyncIntegrationTest(IntegrationCase):
         )  # fmt: skip
         self.assertEqual(local.strip(), "2019:07:14 18:03:22")
 
-        self.multitool("date-sync", "--from", "exif", "--to", "name", self.tmp)
+        self.glados("date-sync", "--from", "exif", "--to", "name", self.tmp)
         names = sorted(path.name for path in self.tmp.iterdir())
         self.assertEqual(len(names), 2)
         for name in names:

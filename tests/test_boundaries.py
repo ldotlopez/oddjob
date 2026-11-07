@@ -17,7 +17,7 @@ from collections.abc import Iterator
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-PACKAGES = ("filejobs", "glados", "multitool")
+PACKAGES = ("filejobs", "glados")
 
 # Packages whose modules may import click: plumbing named `cli_*.py`.
 CLI_PLUMBING = (Path("filejobs"), Path("glados/core"))
@@ -68,7 +68,7 @@ def may_import_click(relative: Path) -> bool:
 
 class BoundaryTests(unittest.TestCase):
     def test_filejobs_imports_no_glados(self) -> None:
-        self.assertEqual(violations("filejobs", ("glados", "multitool")), [])
+        self.assertEqual(violations("filejobs", ("glados",)), [])
 
     def test_lib_knows_no_config_backends_or_cli(self) -> None:
         forbidden = ("glados.core", "glados.plugins", "glados.commands")

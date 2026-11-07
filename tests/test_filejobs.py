@@ -1,5 +1,5 @@
-"""Unit tests for the backend-free core shared by glados' tasks and
-multitool: input expansion, batch runs, BytesStep, run_jobs and the
+"""Unit tests for the backend-free core shared by glados' task and
+file commands: input expansion, batch runs, BytesStep, run_jobs and the
 multiple-input task commands."""
 
 import logging

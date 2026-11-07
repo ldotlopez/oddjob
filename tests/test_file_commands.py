@@ -1,4 +1,4 @@
-"""multitool commands through click's CliRunner."""
+"""glados' file commands through click's CliRunner."""
 
 import json
 import logging
@@ -13,8 +13,8 @@ from pathlib import Path
 import rich_click as click
 from click.testing import CliRunner, Result
 from support import recorded_argv, write_executable
-from test_multitool_conversions import FAKE_WRITER
-from test_multitool_domain import HAS_PILLOW, JPEG, MP4
+from test_conversions import FAKE_WRITER
+from test_file_domain import HAS_PILLOW, JPEG, MP4
 
 from glados.cli import cli
 from glados.lib import motionphotos, renamers
@@ -187,7 +187,7 @@ class CommandTests(unittest.TestCase):
         self.assertEqual(result.stdout, "")
 
 
-@unittest.skipUnless(HAS_PILLOW, "needs the multitool extra (Pillow)")
+@unittest.skipUnless(HAS_PILLOW, "needs the images extra (Pillow)")
 class ImageCheckCommandTests(unittest.TestCase):
     def setUp(self) -> None:
         from PIL import Image
@@ -225,7 +225,7 @@ class AutocropDryRunTests(unittest.TestCase):
         )
 
 
-@unittest.skipUnless(HAS_PILLOW, "needs the multitool extra (Pillow)")
+@unittest.skipUnless(HAS_PILLOW, "needs the images extra (Pillow)")
 class AutocropCommandTests(unittest.TestCase):
     def setUp(self) -> None:
         from PIL import Image
@@ -284,7 +284,7 @@ class ImgReduceDryRunTests(unittest.TestCase):
         self.assertIn("mutually exclusive", result.output)
 
 
-@unittest.skipUnless(HAS_PILLOW, "needs the multitool extra (Pillow)")
+@unittest.skipUnless(HAS_PILLOW, "needs the images extra (Pillow)")
 class ImgReduceCommandTests(unittest.TestCase):
     def setUp(self) -> None:
         from PIL import Image

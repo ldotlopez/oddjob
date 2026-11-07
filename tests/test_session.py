@@ -2,11 +2,14 @@
 config loaded once on first use, typed backends, and the click glue that
 turns their errors into a clean exit."""
 
+import tempfile
 import unittest
+from pathlib import Path
 
 import rich_click as click
 from click.testing import CliRunner
 
+from glados.cli import cli
 from glados.core.backends import BackendError
 from glados.core.cli_common import pass_glados
 from glados.core.config import Config, ConfigError
@@ -108,6 +111,31 @@ class PassGladosTests(unittest.TestCase):
         result = CliRunner().invoke(command, [])
         self.assertEqual(result.exit_code, 0, result.output)
         self.assertIsInstance(seen[0], Glados)
+
+
+class FileCommandsIgnoreConfigTests(unittest.TestCase):
+    """A command without pass_glados never loads config, so a broken one
+    cannot break it; a task command on the same Glados reports the error."""
+
+    def setUp(self) -> None:
+        self.tmp = Path(self.enterContext(tempfile.TemporaryDirectory()))
+        (self.tmp / "note.txt").write_text("hello", encoding="utf-8")
+        self.loader = CountingLoader(Config(), ConfigError("bad config"), 99)
+
+    def test_file_command_runs_without_loading_config(self) -> None:
+        result = CliRunner().invoke(
+            cli, ["sidecars", "scan", str(self.tmp)], obj=Glados(self.loader)
+        )
+        self.assertEqual(result.exit_code, 0, result.output)
+        self.assertEqual(self.loader.calls, 0)
+
+    def test_task_command_reports_the_broken_config(self) -> None:
+        result = CliRunner().invoke(
+            cli, ["summarize", str(self.tmp / "note.txt")], obj=Glados(self.loader)
+        )
+        self.assertEqual(result.exit_code, 1, result.output)
+        self.assertIn("bad config", result.output)
+        self.assertEqual(self.loader.calls, 1)
 
 
 if __name__ == "__main__":

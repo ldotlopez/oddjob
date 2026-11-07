@@ -1,4 +1,4 @@
-"""Unit tests for multitool's conversion steps, run as Jobs against fake
+"""Unit tests for the conversion steps, run as Jobs against fake
 ImageMagick, exiftool and ffmpeg executables."""
 
 import os

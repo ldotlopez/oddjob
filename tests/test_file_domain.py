@@ -1,4 +1,4 @@
-"""Unit tests for multitool's domain modules: media types, sidecars, motion
+"""Unit tests for the file commands' domain modules: media types, sidecars, motion
 photos, renames and image hashes."""
 
 import importlib.util
@@ -165,7 +165,7 @@ class CaptionPlanTests(unittest.TestCase):
             caption.text()
 
 
-@unittest.skipUnless(HAS_PILLOW, "needs the multitool extra (Pillow)")
+@unittest.skipUnless(HAS_PILLOW, "needs the images extra (Pillow)")
 class ImageHashTests(unittest.TestCase):
     def setUp(self) -> None:
         from PIL import Image
@@ -232,7 +232,7 @@ class ImageHashTests(unittest.TestCase):
             imghash.decode_problem(self.tmp / "missing.png")
 
 
-@unittest.skipUnless(HAS_PILLOW, "needs the multitool extra (Pillow)")
+@unittest.skipUnless(HAS_PILLOW, "needs the images extra (Pillow)")
 class ImageEditTests(unittest.TestCase):
     @staticmethod
     def encoded(image: "PIL.Image.Image", image_format: str, **params: object) -> bytes:
