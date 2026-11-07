@@ -68,7 +68,7 @@ Settled with the user (2026-11-07). Already covered, so not ported:
 |---|---|---|---|---|---|---|---|
 | `deosxfy` + `perms` | `oc/fsjanitor.py` | deletes OS junk files; `--perms` chmods (files 644, dirs 755) | no | — | — | multitool `fs-cleanup` (macOS, Windows, KDE junk; opt-in `--perms`), one plan of removals and chmods | `d31882a` |
 | `image-reduce` | `oc/fsjanitor.py` | new file per input (`NAME.reduced.<ext>`), or the original atomically with `--in-place` | no | — | — (Pillow, `multitool` extra) | multitool `img-reduce`, file producer | `aed78c3` |
-| `dtnamer` + `uniqnamer` | `oc/dtnamer.py`, `oc/uniqnamer.py` | renames, rewrites EXIF in place, or sets mtime | no | `exiftool` | — (no `piexif`, `dateutil`) | multitool `date-sync --from exif\|mtime\|name --to exif\|mtime\|name`; names are `YYYY-mm-dd HH.MM.SS <crc32>.<ext>`; `--from shotwell` reads a Shotwell library (`--shotwell-db`, read-only) | `ea95343` |
+| `dtnamer` + `uniqnamer` | `oc/dtnamer.py`, `oc/uniqnamer.py` | renames, rewrites EXIF in place, or sets mtime | no | `exiftool` | — (no `piexif`, `dateutil`) | multitool `date-sync --from exif\|mtime\|name --to exif\|mtime\|name`; names are `YYYY-mm-dd HH.MM.SS <crc32>.<ext>`; `--from shotwell` reads a Shotwell library (`--shotwell-db`, read-only) | `1d48c7d`, `fa63539` |
 | `sidecars` (video prune) | `oc/sidecars.py` | deletes the video sidecars of images | no | — | — | not absorbed: `motionphotos merge --rm` (after `jpgize`/`mp4ize`) does it without losing the video | |
 | `mdupes` | `oc/mdupes.py` | only reports | second `img-duplicates` method | — | `opencv`, `python-magic` | not absorbed: decision 0003 chose the average hash | |
 | `checksumrenamer` | `oc/checksumrenamer.py` | — | — | — | — | not absorbed: an unfinished stub | |
