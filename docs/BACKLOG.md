@@ -42,6 +42,15 @@ option set or an approach is settled in a decision record before it is built.
     `merge` remux a `.mov` sidecar through `Mp4RemuxStep` before joining.
     HEIC stays a `jpgize` step before `merge`.
 
+- **Text input for the text tasks.** `rewrite`, `summarize`, `expand` and
+  `translate` take only `PATH...` today. Let them also take stdin (`-`, or a
+  pipe) and text from the command line (`--text`/`-t`), as `speak` already
+  does (`commands/speak.py`). Unlike `speak`'s WAV, text output can go to
+  stdout, so `-o` need not be required for stdin and `--text`. Share the
+  input handling between the five commands instead of copying `speak`'s. It
+  adds an input shape to 0004's command shapes, so it needs its own decision
+  record.
+
 ## Inconsistencies
 
 - **Plans that cannot know the outcome.** Without the `images` extra, `-n`
