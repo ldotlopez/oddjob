@@ -109,16 +109,49 @@ def _length_sentence(words: int | None) -> str:
     return f"Keep it to about {words} words." if words else ""
 
 
+TASK_OPTIONS_KEY = "tasks"
+
+
 class Config(pydantic.BaseModel):
     """`tasks` maps a task name to the backend that runs it; `backends`
     maps a backend name to its global options, validated by the backend
-    itself when it loads; `prompts` holds the text tasks' prompts."""
+    itself when it loads, with per-task options in its `tasks` table
+    (`[backends.<name>.tasks.<task>]`); `prompts` holds the text tasks'
+    prompts."""
 
     model_config = pydantic.ConfigDict(extra="forbid", frozen=True)
 
     tasks: dict[str, str] = {}
     backends: dict[str, dict[str, Any]] = {}
     prompts: Prompts = Prompts()
+
+    @pydantic.field_validator("backends")
+    @classmethod
+    def _check_task_tables(
+        cls, value: dict[str, dict[str, Any]]
+    ) -> dict[str, dict[str, Any]]:
+        for name, table in value.items():
+            per_task = table.get(TASK_OPTIONS_KEY, {})
+            if not isinstance(per_task, dict) or not all(
+                isinstance(options, dict) for options in per_task.values()
+            ):
+                raise ValueError(
+                    f"{name}.{TASK_OPTIONS_KEY} must hold one"
+                    f" [backends.{name}.{TASK_OPTIONS_KEY}.<task>] table per task"
+                )
+        return value
+
+    def task_tables(self, backend: str) -> dict[str, dict[str, Any]]:
+        """`[backends.<backend>.tasks]`: per-task options, by task."""
+        return self.backends.get(backend, {}).get(TASK_OPTIONS_KEY, {})
+
+    def backend_options(self, backend: str, task: str) -> dict[str, Any]:
+        """The configured options of `backend` when it runs `task`:
+        `[backends.<backend>]`, then `[backends.<backend>.tasks.<task>]` on
+        top. The `tasks` table itself is not an option."""
+        table = self.backends.get(backend, {})
+        shared = {key: value for key, value in table.items() if key != TASK_OPTIONS_KEY}
+        return {**shared, **self.task_tables(backend).get(task, {})}
 
 
 def config_path() -> Path:

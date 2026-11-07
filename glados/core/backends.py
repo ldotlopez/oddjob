@@ -5,7 +5,7 @@ metadata (one group per task, see pyproject.toml), so nothing is imported to
 know it. Several backends may live in one module: each entry point's value
 names the module (`glados.plugins.<module>:__glados_plugin__`). Only the
 selected backend's module is imported, through foundation.plugin.Register:
-its entry point receives the backend name and its global options and returns
+its entry point receives the backend name and its options and returns
 `(task name, task Protocol, object)` triples. See docs/decisions/0002 for
 why, and how to change it.
 """
@@ -21,9 +21,12 @@ from typing import Any
 import pydantic
 from foundation.plugin import PluginError, Register
 
-from glados.core.config import Config, ConfigError, validation_message
-
-TASKS = ("transcribe", "rewrite", "summarize", "expand", "translate", "describe")
+from glados.core.config import (
+    TASK_OPTIONS_KEY,
+    Config,
+    ConfigError,
+    validation_message,
+)
 
 PLUGINS_NAMESPACE = "glados.plugins"
 PLUGIN_ENTRY_POINT = "__glados_plugin__"
@@ -37,6 +40,17 @@ LOGGER = logging.getLogger(__name__)
 
 class BackendError(Exception):
     """No usable backend for a task, or the selected one failed to load."""
+
+
+def tasks() -> list[str]:
+    """The sorted task names: one per installed entry-point group
+    `glados.backends.<task>` (pyproject.toml), the only list of tasks.
+    Imports nothing."""
+    return sorted(
+        group.removeprefix(_GROUP_PREFIX)
+        for group in entry_points().groups
+        if group.startswith(_GROUP_PREFIX)
+    )
 
 
 def _modules(task: str) -> dict[str, str]:
@@ -67,10 +81,13 @@ def check_config(cfg: Config) -> None:
     implements. Backend options are not checked here: that needs loading
     the backend."""
     _check_one_module_per_backend()
-    available = {task: implementors(task) for task in TASKS}
+    known_tasks = tasks()
+    available = {task: implementors(task) for task in known_tasks}
     for task, name in cfg.tasks.items():
         if task not in available:
-            raise ConfigError(f"tasks.{task}: unknown task (known: {', '.join(TASKS)})")
+            raise ConfigError(
+                f"tasks.{task}: unknown task (known: {', '.join(known_tasks)})"
+            )
         if name not in available[task]:
             raise ConfigError(
                 f"tasks.{task}: {_not_implemented(name, task, available[task])}"
@@ -82,6 +99,16 @@ def check_config(cfg: Config) -> None:
                 f"backends.{name}: unknown backend"
                 f" (known: {', '.join(sorted(known)) or 'none'})"
             )
+        for task in cfg.task_tables(name):
+            where = f"backends.{name}.{TASK_OPTIONS_KEY}.{task}"
+            if task not in available:
+                raise ConfigError(
+                    f"{where}: unknown task (known: {', '.join(known_tasks)})"
+                )
+            if name not in available[task]:
+                raise ConfigError(
+                    f"{where}: {_not_implemented(name, task, available[task])}"
+                )
 
 
 def select(task: str, choice: str | None, cfg: Config) -> str:
@@ -141,12 +168,13 @@ def resolve[T](
     cfg: Config,
     overrides: Mapping[str, Any],
 ) -> T:
-    """Select the backend for `task` and load it with its global options:
-    the backend's defaults, then `[backends.<name>]`, then `overrides`
-    (CLI flags; None means not given)."""
+    """Select the backend for `task` and load it with its options: the
+    backend's defaults, then `[backends.<name>]`, then
+    `[backends.<name>.tasks.<task>]`, then `overrides` (CLI flags; None
+    means not given)."""
     name = select(task, choice, cfg)
     options = {
-        **cfg.backends.get(name, {}),
+        **cfg.backend_options(name, task),
         **{key: value for key, value in overrides.items() if value is not None},
     }
     return load(name, task, protocol, options)
@@ -154,7 +182,7 @@ def resolve[T](
 
 def _check_one_module_per_backend() -> None:
     seen: dict[str, tuple[str, str]] = {}
-    for task in TASKS:
+    for task in tasks():
         for name, module in _modules(task).items():
             first_task, first_module = seen.setdefault(name, (task, module))
             if module != first_module:
