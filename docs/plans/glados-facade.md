@@ -151,16 +151,21 @@ def pass_glados[**P, R](func: Callable[Concatenate[Glados, P], R]) -> Callable[P
   `make_pass_decorator`.
 - **Standalone scripts** (`uv run transcribe`) keep working:
   `ensure_object` creates the `Glados` when no group did.
-- **Same errors converted as today.** In all six commands the backend is
-  resolved in the command body before `run_jobs`, and per-input failures
-  are `JOB_ERRORS`, handled inside `run_jobs`. Catching around the whole
-  body converts exactly the `ConfigError`/`BackendError` that
-  `GladosContext` converted, with the same message.
+- **Same errors converted as today.** Six commands resolve the backend in
+  the command body before `run_jobs`; per-input failures are
+  `JOB_ERRORS`, handled inside `run_jobs`. `audio-grep` resolves it
+  lazily, on the first cache miss inside `run_batch` (`make_transcriber`
+  in `CachedTranscripts`). `ConfigError` and `BackendError` subclass
+  `Exception` and are not `JOB_ERRORS`, so there, as with today's
+  `ClickException`, the error escapes `run_batch` and aborts the run on
+  that first item. Catching around the whole body therefore converts
+  exactly the errors `GladosContext` converted, at the same point and with
+  the same message.
 - The `load_dotenv`/`config_path`/`load_config`/`check_config` imports
   leave `cli_common.py`. `backend_option`, `model_option` and
   `logging_options` stay.
 
-### Commands (`glados/commands/*.py`, six modules)
+### Commands (`glados/commands/*.py`, seven modules)
 
 A mechanical change in each: `@pass_glados_context` becomes
 `@pass_glados`; `ctx: GladosContext` becomes `glados: Glados`;
@@ -203,7 +208,8 @@ exactly as before.
    `Glados` as above. It imports no click, so `tests/test_boundaries.py`
    covers it with no change (it is not a `cli_*.py` module).
 2. **Replace `GladosContext` with `pass_glados`** in `cli_common.py`, and
-   update the six command modules as above.
+   update the seven command modules as above (the six text and transcribe
+   tasks and `audio_grep.py`).
 3. **Add `tests/test_session.py`** (stdlib unittest, no real services):
    - `Glados(load)` does not call `load` at construction; `config()` calls
      it once and returns the same object on later calls.
@@ -234,7 +240,9 @@ exactly as before.
    `uv run python -m unittest discover -s tests`, and a manual run
    showing that a broken config gives the same message and exit code as
    before: `XDG_CONFIG_HOME=<dir with bad config.toml> uv run glados
-   summarize x.txt`, and the same through `uv run summarize`.
+   summarize x.txt`, the same through `uv run summarize`, and
+   `uv run audio-grep -b nope word talk.mp3` on an uncached file
+   (lazy resolution).
 6. **Docs (ask first, per CLAUDE.md).** Proposed edits, applied only after
    a yes:
    - `docs/ARCHITECTURE.md`: add `session.py` to the `core/` tree
