@@ -46,9 +46,9 @@ Backends:
 - `describe`: a backend model that takes images (e.g. `gpt-4.1-mini`, or an Ollama
   vision model such as `llama3.2-vision` via `-m`).
 - For the file commands: ImageMagick (`magick` or `convert`) and `exiftool` for `jpgize`,
-  `exiftool` for `img-caption` and for `date-sync` with `exif`, `ffmpeg`/`ffprobe` for
+  `exiftool` for `img-embed-description` and for `date-copy` with `exif`, `ffmpeg`/`ffprobe` for
   `mp4ize`, and the `images` extra (Pillow, pillow-heif) for `img-hash`,
-  `img-duplicates`, `img-check`, `autocrop` and `img-reduce`.
+  `img-duplicates`, `img-check`, `img-trim` and `img-reduce`.
 
 ## Install
 
@@ -220,13 +220,13 @@ File utilities without backends or config, run as `glados <command>`:
 | `img-hash PATH...`          | print each image's average hash (cached by content; `--no-cache`)    |
 | `img-duplicates PATH...`    | groups of near-duplicate images (`--max-distance`, `-x CMD` per group) |
 | `img-check PATH...`         | list the images that cannot be fully decoded, with the reason (exit 1 if any) |
-| `autocrop PATH...`          | crop images to their non-transparent pixels → `NAME.cropped.<ext>`     |
+| `img-trim PATH...`          | crop images to their non-transparent pixels → `NAME.cropped.<ext>`     |
 | `img-reduce PATH...`        | downscale images whose longest side exceeds `--max-size` (2160) → `NAME.reduced.<ext>` (`--in-place`: replace the original) |
-| `img-caption PATH...`       | write each `NAME.description.txt` (from `glados describe -w`) into the image's XMP and EXIF description |
-| `hash-rename PATH...`       | rename each file to `<digest of its content>.<ext>` (`--algo`)        |
+| `img-embed-description PATH...` | write each `NAME.description.txt` into the image's XMP and EXIF description; images without one are described first (`--redescribe`: all of them) |
+| `rename-by-hash PATH...`       | rename each file to `<digest of its content>.<ext>` (`--algo`)        |
 | `fix-extensions PATH...`    | lowercase extensions; `jpeg` → `jpg`, `mpeg` → `mpg`, `tif` → `tiff`  |
-| `date-sync PATH...`         | copy each image's or video's date `--from` exif/mtime/name/shotwell `--to` exif/mtime/name; `--to name` renames to `YYYY-mm-dd HH.MM.SS <crc32>.<ext>` (`--name-format`, `--shotwell-db`, `--mtime-fallback`) |
-| `fs-cleanup PATH...`        | remove macOS, Windows and KDE leftovers (`.DS_Store`, `._NAME`, `Thumbs.db`, `.Trash-<uid>`...); `--perms`: chmod files 644, directories 755 |
+| `date-copy PATH...`         | copy each image's or video's date `--from` exif/mtime/name/shotwell `--to` exif/mtime/name; `--to name` renames to `YYYY-mm-dd HH.MM.SS <crc32>.<ext>` (`--name-format`, `--shotwell-db`, `--mtime-fallback`) |
+| `cleanup PATH...`        | remove macOS, Windows and KDE leftovers (`.DS_Store`, `._NAME`, `Thumbs.db`, `.Trash-<uid>`...); `--perms`: chmod files 644, directories 755 |
 
 ```sh
 uv run glados jpgize -n ~/Pictures/import     # print the planned conversions
@@ -234,14 +234,14 @@ uv run glados motionphotos merge -y --rm ~/DCIM
 uv run glados img-duplicates ~/Pictures -x "echo"
 ```
 
-Commands that change files (`jpgize`, `mp4ize`, `motionphotos merge`, `autocrop`,
-`img-reduce`, `img-caption`, `hash-rename`, `fix-extensions`, `date-sync`, `fs-cleanup`)
+Commands that change files (`jpgize`, `mp4ize`, `motionphotos merge`, `img-trim`,
+`img-reduce`, `img-embed-description`, `rename-by-hash`, `fix-extensions`, `date-copy`, `cleanup`)
 take `-n/--dry-run`; commands that would replace an existing file need `-y/--overwrite`,
-and `img-caption`, `date-sync --to exif`, `motionphotos merge` and `motionphotos strip`
+and `img-embed-description`, `date-copy --to exif`, `motionphotos merge` and `motionphotos strip`
 without `-o` always do (they write in place, and refuse up front without it).
-`img-hash`, `img-duplicates`, `img-check`, `autocrop` and `img-reduce` need the
-`images` extra (`uv sync --extra images`). `img-caption` pairs with
-`glados describe -w`. Commands taking `PATH...`
+`img-hash`, `img-duplicates`, `img-check`, `img-trim` and `img-reduce` need the
+`images` extra (`uv sync --extra images`). `img-embed-description` calls the `describe` backend for images without a
+`NAME.description.txt`. Commands taking `PATH...`
 keep going when one input fails (exit 1 at the end); on success, commands that write
 files print nothing (`-v` logs `wrote <dest>` for each). Logging options (`-v`, `-q`,
 `--log-level`, `GLADOS_LOG_LEVEL`) are the same as the tasks' and go after the command

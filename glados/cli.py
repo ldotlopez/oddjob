@@ -14,16 +14,16 @@ from __future__ import annotations
 import rich_click as click
 
 from glados.commands.audio_grep import audio_grep_cmd
-from glados.commands.captions import img_caption_cmd
-from glados.commands.cleanup import fs_cleanup_cmd
+from glados.commands.captions import img_embed_description_cmd
+from glados.commands.cleanup import cleanup_cmd
 from glados.commands.conversions import jpgize_cmd, mp4ize_cmd
-from glados.commands.dates import date_sync_cmd
+from glados.commands.dates import date_copy_cmd
 from glados.commands.describe import describe_cmd
 from glados.commands.expand import expand_cmd
-from glados.commands.imgedit import autocrop_cmd, img_reduce_cmd
+from glados.commands.imgedit import img_reduce_cmd, img_trim_cmd
 from glados.commands.imghash import img_check_cmd, img_duplicates_cmd, img_hash_cmd
 from glados.commands.motionphotos import motionphotos_cmd
-from glados.commands.renames import fix_extensions_cmd, hash_rename_cmd
+from glados.commands.renames import fix_extensions_cmd, rename_by_hash_cmd
 from glados.commands.rewrite import rewrite_cmd
 from glados.commands.sidecars import sidecars_cmd
 from glados.commands.speak import speak_cmd
@@ -50,30 +50,31 @@ FILE_COMMANDS: list[click.Command] = [
     img_hash_cmd,
     img_duplicates_cmd,
     img_check_cmd,
-    autocrop_cmd,
+    img_trim_cmd,
     img_reduce_cmd,
-    img_caption_cmd,
-    hash_rename_cmd,
+    img_embed_description_cmd,
+    rename_by_hash_cmd,
     fix_extensions_cmd,
-    date_sync_cmd,
-    fs_cleanup_cmd,
+    date_copy_cmd,
+    cleanup_cmd,
 ]
 
 # `glados --help` sections, by what a command works on.
 PANELS: dict[str, list[str]] = {
-    "Text": ["rewrite", "summarize", "expand", "translate", "describe"],
+    "Text": ["rewrite", "summarize", "expand", "translate"],
     "Audio": ["transcribe", "speak", "audio-grep"],
     "Images": [
         "img-hash",
         "img-duplicates",
         "img-check",
-        "autocrop",
+        "img-trim",
         "img-reduce",
-        "img-caption",
-        "jpgize",
+        "img-embed-description",
+        "describe",
     ],
-    "Media": ["mp4ize", "motionphotos", "sidecars", "date-sync"],
-    "Files": ["hash-rename", "fix-extensions", "fs-cleanup"],
+    "Formats": ["jpgize", "mp4ize"],
+    "Media": ["motionphotos", "date-copy"],
+    "Files": ["rename-by-hash", "fix-extensions", "cleanup", "sidecars"],
 }
 
 
@@ -88,7 +89,7 @@ def add_panels[F](func: F) -> F:
 def cli() -> None:
     """Apply model backends and file utilities to files: transcribe,
     rewrite, summarize, translate and describe; convert, hash, crop,
-    caption, rename, date-sync and clean up."""
+    caption, rename, date-copy and clean up."""
 
 
 for command in TASK_COMMANDS + FILE_COMMANDS:

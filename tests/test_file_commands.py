@@ -15,6 +15,7 @@ from click.testing import CliRunner, Result
 from support import recorded_argv, write_executable
 from test_conversions import FAKE_WRITER
 from test_file_domain import HAS_PILLOW, JPEG, MP4
+from test_llm import ECHO_LLM
 
 from glados.cli import cli
 from glados.lib import motionphotos, renamers
@@ -41,7 +42,7 @@ class CommandTests(unittest.TestCase):
     def test_hash_rename_dry_run_changes_nothing(self) -> None:
         file = self.tmp / "x.txt"
         file.write_bytes(b"hello")
-        result = self.runner.invoke(cli, ["hash-rename", "-n", str(self.tmp)])
+        result = self.runner.invoke(cli, ["rename-by-hash", "-n", str(self.tmp)])
         self.assertEqual(result.exit_code, 0, result.output)
         self.assertIn(f"mv {file} {self.tmp / '3610a686.txt'}", result.output)
         self.assertTrue(file.exists())
@@ -50,7 +51,7 @@ class CommandTests(unittest.TestCase):
         for name in ("a.txt", "b.txt"):
             (self.tmp / name).write_bytes(b"same")
         (self.tmp / "c.dat").write_bytes(b"other")
-        result = self.runner.invoke(cli, ["hash-rename", str(self.tmp)])
+        result = self.runner.invoke(cli, ["rename-by-hash", str(self.tmp)])
         self.assertEqual(result.exit_code, 1, result.output)
         names = {p.name for p in self.tmp.iterdir()}
         self.assertIn(renamers.file_digest(self.tmp / "b.txt", "crc32") + ".txt", names)
@@ -59,9 +60,9 @@ class CommandTests(unittest.TestCase):
 
     def test_clean_tree_is_silent(self) -> None:
         (self.tmp / "a.jpg").write_bytes(b"a")
-        for command in ("fix-extensions", "hash-rename"):
+        for command in ("fix-extensions", "rename-by-hash"):
             with self.subTest(command=command):
-                if command == "hash-rename":
+                if command == "rename-by-hash":
                     name = renamers.file_digest(self.tmp / "a.jpg", "crc32") + ".jpg"
                     (self.tmp / "a.jpg").rename(self.tmp / name)
                 result = self.runner.invoke(cli, [command, str(self.tmp)])
@@ -243,7 +244,7 @@ class AutocropDryRunTests(unittest.TestCase):
         tmp = Path(self.enterContext(tempfile.TemporaryDirectory()))
         for name in ("logo.png", "logo.cropped.png", "notes.txt"):
             (tmp / name).write_bytes(b"not decoded by -n")
-        result = CliRunner().invoke(cli, ["autocrop", "-n", str(tmp)])
+        result = CliRunner().invoke(cli, ["img-trim", "-n", str(tmp)])
         self.assertEqual(result.exit_code, 0, result.output)
         self.assertEqual(
             result.stdout, f"{tmp / 'logo.png'} -> {tmp / 'logo.cropped.png'}\n"
@@ -270,7 +271,7 @@ class AutocropCommandTests(unittest.TestCase):
 
         with self.assertLogs("filejobs", "INFO") as logs:
             result = self.runner.invoke(
-                cli, ["autocrop", "-v", str(self.tmp / "logo.png")]
+                cli, ["img-trim", "-v", str(self.tmp / "logo.png")]
             )
         self.assertEqual(result.exit_code, 0, result.output)
         self.assertEqual(result.stdout, "")
@@ -280,7 +281,7 @@ class AutocropCommandTests(unittest.TestCase):
             self.assertEqual(image.size, (4, 6))
 
     def test_an_image_without_transparency_fails_and_the_rest_runs(self) -> None:
-        result = self.runner.invoke(cli, ["autocrop", str(self.tmp)])
+        result = self.runner.invoke(cli, ["img-trim", str(self.tmp)])
         self.assertEqual(result.exit_code, 1, result.output)
         self.assertIn("1 done, 1 failed", result.stderr)
         self.assertTrue((self.tmp / "logo.cropped.png").exists())
@@ -368,39 +369,92 @@ class ImgReduceCommandTests(unittest.TestCase):
         self.assertEqual(self.size_of(self.tmp / "big.reduced.jpg"), (10, 5))
 
 
-class ImgCaptionCommandTests(unittest.TestCase):
+class ImgEmbedDescriptionCommandTests(unittest.TestCase):
     def setUp(self) -> None:
         self.tmp = Path(self.enterContext(tempfile.TemporaryDirectory()))
         self.image = self.tmp / "a.jpg"
         self.image.write_bytes(JPEG)
-        (self.tmp / "a.description.txt").write_text("a cat\n", encoding="utf-8")
-        (self.tmp / "b.jpg").write_bytes(JPEG)
+        self.sidecar = self.tmp / "a.description.txt"
+        self.sidecar.write_text("a cat\n", encoding="utf-8")
+        self.bare = self.tmp / "b.jpg"
+        self.bare.write_bytes(JPEG)
         self.bin = self.tmp / "bin"
         self.bin.mkdir()
         self.runner = CliRunner()
+        self.env = {
+            "PATH": str(self.bin),
+            "XDG_CONFIG_HOME": str(self.tmp / "config"),
+            "XDG_CACHE_HOME": str(self.tmp / "cache"),
+            "LC_ALL": "C",
+        }
 
-    def test_dry_run_needs_no_exiftool(self) -> None:
+    def with_fake_llm(self) -> Path:
+        llm = write_executable(self.bin, "llm", ECHO_LLM)
+        config = self.tmp / "config" / "glados"
+        config.mkdir(parents=True)
+        (config / "config.toml").write_text(
+            f'[tasks]\ndescribe = "llm"\n\n[backends.llm]\nbinary = "{llm}"\n',
+            encoding="utf-8",
+        )
+        return llm
+
+    def test_dry_run_needs_no_exiftool_or_backend(self) -> None:
         result = self.runner.invoke(
-            cli, ["img-caption", "-n", str(self.tmp)], env={"PATH": str(self.bin)}
+            cli, ["img-embed-description", "-n", str(self.tmp)], env=self.env
         )
         self.assertEqual(result.exit_code, 0, result.output)
         self.assertEqual(
             result.stdout,
-            f"caption {self.image} from {self.tmp / 'a.description.txt'}\n",
+            f"embed {self.sidecar} into {self.image}\n"
+            f"describe {self.bare} into {self.tmp / 'b.description.txt'},"
+            " then embed it\n",
         )
 
     def test_in_place_needs_overwrite(self) -> None:
         write_executable(self.bin, "exiftool", FAKE_WRITER)
-        env = {"PATH": str(self.bin)}
-        refused = self.runner.invoke(cli, ["img-caption", str(self.tmp)], env=env)
+        refused = self.runner.invoke(
+            cli, ["img-embed-description", str(self.tmp)], env=self.env
+        )
         self.assertEqual(refused.exit_code, 2, refused.output)
         self.assertIn("add -y", refused.stderr)
         self.assertEqual(self.image.read_bytes(), JPEG)
-        done = self.runner.invoke(cli, ["img-caption", "-y", str(self.tmp)], env=env)
+
+    def test_embeds_existing_sidecars_and_describes_the_rest(self) -> None:
+        write_executable(self.bin, "exiftool", FAKE_WRITER)
+        self.with_fake_llm()
+        done = self.runner.invoke(
+            cli, ["img-embed-description", "-y", str(self.tmp)], env=self.env
+        )
         self.assertEqual(done.exit_code, 0, done.output)
         self.assertEqual(done.stdout, "")
         self.assertEqual(self.image.read_bytes(), b"converted")
-        self.assertEqual((self.tmp / "b.jpg").read_bytes(), JPEG)
+        self.assertEqual(self.bare.read_bytes(), b"converted")
+        self.assertEqual(self.sidecar.read_text(encoding="utf-8"), "a cat\n")
+        generated = (self.tmp / "b.description.txt").read_text(encoding="utf-8")
+        self.assertTrue(generated.startswith("Describe the image"))
+
+    def test_no_backend_is_needed_when_every_image_has_a_sidecar(self) -> None:
+        write_executable(self.bin, "exiftool", FAKE_WRITER)
+        self.bare.unlink()
+        done = self.runner.invoke(
+            cli, ["img-embed-description", "-y", str(self.tmp)], env=self.env
+        )
+        self.assertEqual(done.exit_code, 0, done.output)
+        self.assertEqual(self.image.read_bytes(), b"converted")
+
+    def test_redescribe_replaces_the_sidecar(self) -> None:
+        write_executable(self.bin, "exiftool", FAKE_WRITER)
+        self.with_fake_llm()
+        self.bare.unlink()
+        done = self.runner.invoke(
+            cli,
+            ["img-embed-description", "-y", "--redescribe", str(self.tmp)],
+            env=self.env,
+        )
+        self.assertEqual(done.exit_code, 0, done.output)
+        self.assertTrue(
+            self.sidecar.read_text(encoding="utf-8").startswith("Describe the image")
+        )
 
 
 # exiftool keeping each file's tags in `<file>.tags` (JSON): -json prints
@@ -426,7 +480,7 @@ else:
 def make_shotwell_db(
     database: Path, photos: dict[Path, int], videos: dict[Path, int]
 ) -> Path:
-    """A minimal Shotwell library: the two tables date-sync reads."""
+    """A minimal Shotwell library: the two tables date-copy reads."""
     with closing(sqlite3.connect(database)) as connection, connection:
         for table, rows in (("PhotoTable", photos), ("VideoTable", videos)):
             connection.execute(
@@ -463,7 +517,7 @@ class DateSyncCommandTests(unittest.TestCase):
 
     def invoke(self, *args: str) -> Result:
         return self.runner.invoke(
-            cli, ["date-sync", *args, str(self.photos)], env={"PATH": str(self.bin)}
+            cli, ["date-copy", *args, str(self.photos)], env={"PATH": str(self.bin)}
         )
 
     def dated(self, path: Path) -> Path:
@@ -578,7 +632,7 @@ class FsCleanupCommandTests(unittest.TestCase):
         (self.tmp / ".Spotlight-V100" / "store.db").write_bytes(b"junk")
 
     def test_dry_run_prints_the_plan_and_changes_nothing(self) -> None:
-        result = self.runner.invoke(cli, ["fs-cleanup", "-n", "--perms", str(self.tmp)])
+        result = self.runner.invoke(cli, ["cleanup", "-n", "--perms", str(self.tmp)])
         self.assertEqual(result.exit_code, 0, result.output)
         self.assertEqual(
             result.stdout.splitlines(),
@@ -593,16 +647,16 @@ class FsCleanupCommandTests(unittest.TestCase):
         self.assertEqual((self.tmp / "a.jpg").stat().st_mode & 0o777, 0o600)
 
     def test_removes_junk_silently_and_keeps_modes_without_perms(self) -> None:
-        result = self.runner.invoke(cli, ["fs-cleanup", str(self.tmp)])
+        result = self.runner.invoke(cli, ["cleanup", str(self.tmp)])
         self.assertEqual(result.exit_code, 0, result.output)
         self.assertEqual(result.output, "")
         self.assertEqual([p.name for p in self.tmp.iterdir()], ["a.jpg"])
         self.assertEqual((self.tmp / "a.jpg").stat().st_mode & 0o777, 0o600)
-        again = self.runner.invoke(cli, ["fs-cleanup", str(self.tmp)])
+        again = self.runner.invoke(cli, ["cleanup", str(self.tmp)])
         self.assertEqual(again.output, "")
 
     def test_perms_chmods(self) -> None:
-        result = self.runner.invoke(cli, ["fs-cleanup", "--perms", str(self.tmp)])
+        result = self.runner.invoke(cli, ["cleanup", "--perms", str(self.tmp)])
         self.assertEqual(result.exit_code, 0, result.output)
         self.assertEqual((self.tmp / "a.jpg").stat().st_mode & 0o777, 0o644)
 
@@ -612,7 +666,7 @@ class FsCleanupCommandTests(unittest.TestCase):
         (locked / "Thumbs.db").write_bytes(b"junk")
         locked.chmod(0o500)
         self.addCleanup(locked.chmod, 0o755)
-        result = self.runner.invoke(cli, ["fs-cleanup", str(self.tmp)])
+        result = self.runner.invoke(cli, ["cleanup", str(self.tmp)])
         self.assertEqual(result.exit_code, 1, result.output)
         self.assertIn("2 done, 1 failed", result.stderr)
         self.assertFalse((self.tmp / ".DS_Store").exists())

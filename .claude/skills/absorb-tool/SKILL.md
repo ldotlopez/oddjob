@@ -72,7 +72,7 @@ Split it into two commands only when each half is useful on its own.
 
 **Naming**: command names are unique. Only `glados` is installed, so
 commands get no standalone script. Keep the source name unless it clashes or
-misdescribes (precedent: `renamers` → `hash-rename`).
+misdescribes (precedent: `renamers` → `rename-by-hash`).
 
 ### 3. Pick the command shape (decision 0004)
 
@@ -101,7 +101,7 @@ Rules for every shape:
 - `-y/--overwrite` (`overwrite_option`); writing in place always needs `-y`,
   checked up front with `require_overwrite` (skipped under `-n`).
 - `-n/--dry-run` on every command that changes files: plan first, run
-  nothing that writes. Read-only tools the plan needs may run (`date-sync
+  nothing that writes. Read-only tools the plan needs may run (`date-copy
   --from exif -n` reads with exiftool); return before resolving anything
   only the writes need. Destination-only plan → `print_plan`; more than one
   action per item → frozen dataclasses with `describe()` (`Conversion`,

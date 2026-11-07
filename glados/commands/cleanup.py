@@ -1,4 +1,4 @@
-"""`glados fs-cleanup`: plan every removal (and chmod) first, then apply."""
+"""`glados cleanup`: plan every removal (and chmod) first, then apply."""
 
 from __future__ import annotations
 
@@ -13,7 +13,7 @@ from glados.core.cli_common import logging_options
 from glados.lib import cleanup
 
 
-@click.command("fs-cleanup")
+@click.command("cleanup")
 @paths_argument
 @click.option(
     "--perms",
@@ -23,9 +23,7 @@ from glados.lib import cleanup
 )
 @dry_run_option
 @logging_options
-def fs_cleanup_cmd(
-    paths: tuple[Path, ...], fix_permissions: bool, dry_run: bool
-) -> None:
+def cleanup_cmd(paths: tuple[Path, ...], fix_permissions: bool, dry_run: bool) -> None:
     """Remove OS leftovers in PATH...: macOS (.DS_Store, ._NAME next to NAME,
     Icon\\r, .Spotlight-V100, .Trashes, .fseventsd, .TemporaryItems,
     .AppleDouble), Windows (Thumbs.db, ehthumbs.db, desktop.ini, $RECYCLE.BIN),

@@ -10,8 +10,8 @@
   `audio-grep` (system grep over cached transcripts, through the `transcribe`
   backends; decision 0009).
 - File commands (no backends or config): `sidecars`, `motionphotos`, `jpgize`, `mp4ize`, `img-hash`,
-  `img-duplicates`, `img-check`, `autocrop`, `img-reduce`, `img-caption`,
-  `hash-rename`, `fix-extensions`, `date-sync`, `fs-cleanup`.
+  `img-duplicates`, `img-check`, `img-trim`, `img-reduce`, `img-embed-description`,
+  `rename-by-hash`, `fix-extensions`, `date-copy`, `cleanup`.
 - One tool (`docs/decisions/0011`): run every command as `uv run glados <command>
   PATH...`; `glados` is the only installed script. A command may resolve a backend
   and do file work in one run.
@@ -32,7 +32,7 @@
   `pass_glados` reach config or backends; file commands never do.
 - File commands' runtime binaries: ImageMagick (`magick`/`convert`), `exiftool`,
   `ffmpeg`/`ffprobe`. The Pillow code (`imghash`, `imgedit`: `img-hash`,
-  `img-duplicates`, `img-check`, `autocrop`, `img-reduce`) and its tests need the extra:
+  `img-duplicates`, `img-check`, `img-trim`, `img-reduce`) and its tests need the extra:
   `uv sync --extra images`; commands load it through `load_extra_module`.
 - Runtime needs `ffmpeg` and `ffprobe` on PATH, plus the selected transcribe
   backend's CLI: `whisper-cli` (`whisper_cpp`) or `whisper` from `openai-whisper`

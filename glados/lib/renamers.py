@@ -1,4 +1,4 @@
-"""Renames: hash-rename names each file after a digest of its content,
+"""Renames: rename-by-hash names each file after a digest of its content,
 fix-extensions normalizes extensions."""
 
 from __future__ import annotations

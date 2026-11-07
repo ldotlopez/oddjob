@@ -1,4 +1,4 @@
-"""`glados hash-rename` and `fix-extensions`: plan every rename first, then
+"""`glados rename-by-hash` and `fix-extensions`: plan every rename first, then
 apply them."""
 
 from __future__ import annotations
@@ -49,7 +49,7 @@ def rename_planned(
     finish_batch(planning, renaming)
 
 
-@click.command("hash-rename")
+@click.command("rename-by-hash")
 @paths_argument
 @click.option(
     "--algo",
@@ -60,7 +60,7 @@ def rename_planned(
 @overwrite_option
 @dry_run_option
 @logging_options
-def hash_rename_cmd(
+def rename_by_hash_cmd(
     paths: tuple[Path, ...], algo: str, overwrite: bool, dry_run: bool
 ) -> None:
     """Rename each file in PATH... to <digest of its content>.<ext>."""

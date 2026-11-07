@@ -1,4 +1,4 @@
-"""`glados autocrop` and `img-reduce` (need the `images` extra;
+"""`glados img-trim` and `img-reduce` (need the `images` extra;
 glados.lib.imgedit is imported only when they run, after -n)."""
 
 from __future__ import annotations
@@ -29,12 +29,12 @@ LOGGER = logging.getLogger(__name__)
 DEFAULT_MAX_SIZE = 2160
 
 
-@click.command("autocrop")
+@click.command("img-trim")
 @paths_argument
 @common_file_options
 @dry_run_option
 @logging_options
-def autocrop_cmd(
+def img_trim_cmd(
     paths: tuple[Path, ...], output: Path | None, overwrite: bool, dry_run: bool
 ) -> None:
     """Crop each image in PATH... to its non-transparent pixels, writing

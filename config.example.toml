@@ -116,11 +116,11 @@ summarize = "Summarize the text the user sends as bullet points. {length}"
 # Tools the commands run, not configured here
 # --------------------------------------------------------------------------
 # Needed on PATH by the file commands and by transcribe:
-#   ffmpeg, ffprobe   https://ffmpeg.org           transcribe, mp4ize, date-sync
+#   ffmpeg, ffprobe   https://ffmpeg.org           transcribe, mp4ize, date-copy
 #   ImageMagick       https://imagemagick.org      jpgize
-#   exiftool          https://exiftool.org         jpgize, img-caption, date-sync
+#   exiftool          https://exiftool.org         jpgize, img-embed-description, date-copy
 #   grep              https://www.gnu.org/software/grep/   audio-grep
 # Python libraries behind the images extra (uv sync --extra images), used by img-hash,
-# img-duplicates, img-check, autocrop and img-reduce:
+# img-duplicates, img-check, img-trim and img-reduce:
 #   Pillow            https://python-pillow.org
 #   pillow-heif       https://github.com/bigcat88/pillow_heif

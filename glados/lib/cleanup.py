@@ -1,4 +1,4 @@
-"""fs-cleanup: remove files and directories other operating systems leave
+"""cleanup: remove files and directories other operating systems leave
 behind, and optionally normalize permissions (files 644, directories 755).
 
 The plan walks the trees itself instead of using filejobs.inputs, since

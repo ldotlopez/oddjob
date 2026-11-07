@@ -28,9 +28,9 @@ glados/
   commands/           one module per command or command family (wiring only):
                       tasks: transcribe, speak, rewrite, summarize, expand, translate, describe, audio_grep;
                       file commands: sidecars, motionphotos, conversions (jpgize, mp4ize),
-                      imghash (img-hash, img-duplicates, img-check), imgedit (autocrop,
-                      img-reduce), captions (img-caption), renames (hash-rename,
-                      fix-extensions), dates (date-sync), cleanup (fs-cleanup)
+                      imghash (img-hash, img-duplicates, img-check), imgedit (img-trim,
+                      img-reduce), captions (img-embed-description), renames (rename-by-hash,
+                      fix-extensions), dates (date-copy), cleanup (cleanup)
   lib/                domain code, no config, backends or CLI:
                       protocols.py (task Protocols), transcribe.py (steps, formatters),
                       speak.py (text source selection, SpeakStep),
@@ -42,14 +42,15 @@ glados/
                       grep.py (GrepRunner: the system grep);
                       sidecars.py, motionphotos.py, conversions.py, imghash.py, imgedit.py,
                       captions.py, renamers.py, dates.py, cleanup.py (grouping, motion-photo
-                      parsing, conversion steps, average hash and decode checks, autocrop and
+                      parsing, conversion steps, average hash and decode checks, img-trim and
                       downscaling, caption planning and step, rename planning, date reading
                       and change planning, junk and permission planning);
                       media.py (which files are images/videos and which ones each converter
                       takes), external.py (ImageMagick and exiftool adapters, user commands),
-                      shotwell.py (read-only adapter for a Shotwell library, for date-sync)
+                      shotwell.py (read-only adapter for a Shotwell library, for date-copy)
   core/               backend machinery
     session.py        Glados: config and backends without click
+    describing.py     describe's language, prompt and cached backend, shared with img-embed-description
     cli_common.py     pass_glados (injects Glados), backend/model options, the logging options
     config.py         Config model, config file loading and validation
     backends.py       backend discovery (entry-point metadata), selection, loading
@@ -116,7 +117,7 @@ counts as done. On success nothing is printed
 `-n/--dry-run` (every command that changes files) prints the plan and returns before
 any tool or backend is resolved: `input -> destination` for glados' tasks
 (`print_plan`), each planned operation for the file commands'. The one exception is
-`date-sync --from exif`, whose plan needs the dates, so `-n` runs exiftool to read
+`date-copy --from exif`, whose plan needs the dates, so `-n` runs exiftool to read
 them (it writes nothing).
 
 ## Landing results
@@ -218,31 +219,33 @@ for every command that writes a file, plain functions under `run_batch` for repo
 renames and checks, and `cli_options` for `PATH...`, `-y` and `-n`; logging comes from
 `cli_common.logging_options`, as for the tasks.
 
-- Commands that change files (`jpgize`, `mp4ize`, `motionphotos`, `autocrop`,
-  `img-reduce`, `img-caption`, `hash-rename`, `fix-extensions`, `date-sync`,
-  `fs-cleanup`) plan first (`plan_conversions`, `plan_merges`, `plan_captions`,
+- Commands that change files (`jpgize`, `mp4ize`, `motionphotos`, `img-trim`,
+  `img-reduce`, `img-embed-description`, `rename-by-hash`, `fix-extensions`, `date-copy`,
+  `cleanup`) plan first (`plan_conversions`, `plan_merges`, `plan_captions`,
   `plan_rename`, `plan_extension_fix`, `dates.plan_change`, `cleanup.plan_cleanup`, or a
   destination per input), then apply, so `-n` prints the plan without touching anything
-  or requiring the extra, and the external tools only for `date-sync --from exif`.
-- `date-sync` reads every date first (a `dates.DateSource`, under one `run_batch`), then
+  or requiring the extra, and the external tools only for `date-copy --from exif`.
+- `date-copy` reads every date first (a `dates.DateSource`, under one `run_batch`), then
   applies the planned `Rename`, `SetMtime` or `SetExifDate` changes under a second one.
   The command picks the source for `--from` (`MtimeDates`, `NameDates`, `ExifDates`,
   `ShotwellDates`), wrapped in `MtimeFallback` with `--mtime-fallback`. EXIF and
   QuickTime dates go through exiftool (`-api QuickTimeUTC`, so video dates are local
   time); Shotwell's exposure times come from its database, opened read-only. Shotwell is
   a source only. Dates are aware datetimes in the local zone.
-- `fs-cleanup` walks the trees itself (`cleanup.plan_cleanup`) instead of using
+- `cleanup` walks the trees itself (`cleanup.plan_cleanup`) instead of using
   `filejobs.inputs.expand_inputs`, since it removes and chmods directories as well as
   files; it does not descend into junk directories or follow symlinks.
 - In-memory transforms (motion-photo join/split/strip) are `BytesStep`s; `jpgize` is
   `JpegConversionStep` (ImageMagick, then exiftool copies the tags except Orientation)
   and `mp4ize` is `Mp4RemuxStep` (ffmpeg through `filejobs/runners.py`, copying the video
   stream; the audio is copied or, failing that, re-encoded to AAC).
-- `autocrop` and `img-reduce` are `BytesStep`s (Pillow, keeping EXIF and the ICC
+- `img-trim` and `img-reduce` are `BytesStep`s (Pillow, keeping EXIF and the ICC
   profile; lossy formats saved at quality 90); `img-reduce --in-place` lands the result
-  on the input's own path. `img-caption` is `CaptionStep` (exiftool writes
-  XMP-dc:Description and EXIF:ImageDescription into a copy, landed in place).
-- `img-hash`, `img-duplicates`, `img-check`, `autocrop` and `img-reduce` need the `images` extra
+  on the input's own path. `img-embed-description` is `CaptionStep` (exiftool writes
+  XMP-dc:Description and EXIF:ImageDescription into a copy, landed in place); an image
+  without a `NAME.description.txt` (or with `--redescribe`) is first described by a
+  `DescribeStep` Job landing the sidecar, through the same describer as `describe`.
+- `img-hash`, `img-duplicates`, `img-check`, `img-trim` and `img-reduce` need the `images` extra
   (Pillow, pillow-heif); `glados.lib.imghash` and `glados.lib.imgedit` are imported
   through `load_extra_module` only when one of them runs. `img-hash` caches hashes in
   the shared cache (`img-hash/` keys: content digest and hash size).

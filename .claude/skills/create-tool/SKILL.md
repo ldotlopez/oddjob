@@ -64,8 +64,8 @@ Propose these with the spec; ask only if there is a genuine alternative.
 - **Name**: lowercase, hyphenated, unique. Match the existing families:
   `img-<verb>` for image operations (`img-reduce`, `img-check`),
   `<format>ize` for conversions to a format (`jpgize`, `mp4ize`),
-  `<noun>-<verb>` for file operations (`hash-rename`, `date-sync`,
-  `fs-cleanup`), a bare verb for tasks (`summarize`, `translate`). Several
+  a verb first for other file operations (`rename-by-hash`, `date-copy`,
+  `fix-extensions`, `cleanup`), a bare verb for tasks (`summarize`, `translate`). Several
   operations on one subject become a group with subcommands
   (`motionphotos`, `sidecars`).
 - **Module**: `glados/commands/<area>.py` (an existing area module if the

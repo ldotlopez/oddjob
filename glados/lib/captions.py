@@ -1,11 +1,12 @@
-"""img-caption: write each image's NAME.description.txt sidecar (as
-`glados describe` writes them) into the image's own metadata."""
+"""img-embed-description: write each image's NAME.description.txt sidecar (as
+`glados describe` writes them, and generates it when missing) into the image's
+own metadata."""
 
 from __future__ import annotations
 
 import shlex
 import shutil
-from collections.abc import Collection, Sequence
+from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol
@@ -22,12 +23,18 @@ class DescriptionWriter(Protocol):
 
 @dataclass(frozen=True, slots=True)
 class Caption:
+    """An image to caption from `sidecar`, which `glados describe` writes
+    first when `generate` is set."""
+
     image: Path
     sidecar: Path
+    generate: bool = False
 
     def describe(self) -> str:
         image, sidecar = shlex.quote(str(self.image)), shlex.quote(str(self.sidecar))
-        return f"caption {image} from {sidecar}"
+        if self.generate:
+            return f"describe {image} into {sidecar}, then embed it"
+        return f"embed {sidecar} into {image}"
 
     def text(self) -> str:
         """The sidecar's text. ValueError if it is empty: exiftool would
@@ -42,14 +49,16 @@ def description_sidecar(image: Path) -> Path:
     return image.with_suffix(DESCRIPTION_SUFFIX)
 
 
-def plan_captions(images: Sequence[Path], explicit: Collection[Path]) -> list[Caption]:
-    """One Caption per image with a sidecar. An image named explicitly is
-    planned even without one, so its missing sidecar fails as an input
-    instead of being skipped like the images found in directories."""
+def plan_captions(images: Sequence[Path], *, redescribe: bool) -> list[Caption]:
+    """One Caption per image. Its description is generated when it has no
+    sidecar yet, or always with `redescribe`."""
     return [
-        Caption(image=image, sidecar=description_sidecar(image))
+        Caption(
+            image=image,
+            sidecar=description_sidecar(image),
+            generate=redescribe or not description_sidecar(image).is_file(),
+        )
         for image in images
-        if image in explicit or description_sidecar(image).is_file()
     ]
 
 

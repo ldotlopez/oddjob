@@ -1,4 +1,4 @@
-"""date-sync: copy a file's date from one place to another, among its
+"""date-copy: copy a file's date from one place to another, among its
 EXIF/QuickTime metadata, its modification time and its name; a Shotwell
 library can also be read as the source.
 
@@ -53,7 +53,7 @@ EXIF_VIDEO_WRITE_TAGS = (
 )
 
 DATED_NAME_FORMAT = "%Y-%m-%d %H.%M.%S"
-# Default --name-format: reads back the names date-sync writes.
+# Default --name-format: reads back the names date-copy writes.
 DEFAULT_NAME_FORMAT = DATED_NAME_FORMAT
 NAME_FIELDS = {
     "Y": r"\d{4}",

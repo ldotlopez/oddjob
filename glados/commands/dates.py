@@ -1,4 +1,4 @@
-"""`glados date-sync`: read every date first, then apply the changes."""
+"""`glados date-copy`: read every date first, then apply the changes."""
 
 from __future__ import annotations
 
@@ -71,7 +71,7 @@ def build_source(
             )
 
 
-@click.command("date-sync")
+@click.command("date-copy")
 @paths_argument
 @click.option("--from", "source", type=SOURCES, required=True, help="read the date")
 @click.option("--to", "target", type=TARGETS, required=True, help="write the date")
@@ -96,7 +96,7 @@ def build_source(
 @overwrite_option
 @dry_run_option
 @logging_options
-def date_sync_cmd(
+def date_copy_cmd(
     paths: tuple[Path, ...],
     source: str,
     target: str,

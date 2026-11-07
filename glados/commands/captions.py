@@ -1,7 +1,9 @@
-"""`glados img-caption`: one in-place Job per image with a description."""
+"""`glados img-embed-description`: one in-place Job per image, describing it
+first when it has no NAME.description.txt (or with --redescribe)."""
 
 from __future__ import annotations
 
+import contextlib
 from pathlib import Path
 
 import rich_click as click
@@ -16,24 +18,67 @@ from filejobs.cli_options import (
 from filejobs.inputs import expand_inputs
 from filejobs.pipeline import Job
 from filejobs.progress import BaseProgressReporter
-from glados.core.cli_common import logging_options
+from glados.core.cli_common import (
+    backend_option,
+    logging_options,
+    model_option,
+    pass_glados,
+)
+from glados.core.describing import describe_prompt, open_describer
+from glados.core.session import Glados
 from glados.lib import media
 from glados.lib.captions import Caption, CaptionStep, plan_captions
+from glados.lib.describe import DescribeStep
 from glados.lib.external import ExifTool
+from glados.lib.protocols import Describer
 
 
-@click.command("img-caption")
+@click.command("img-embed-description")
 @paths_argument
+@click.option(
+    "--redescribe",
+    is_flag=True,
+    default=False,
+    help="describe every image again, replacing its NAME.description.txt",
+)
+@click.option(
+    "-l",
+    "--language",
+    default=None,
+    help="language of generated descriptions (default: the system locale's)",
+)
+@click.option(
+    "--no-cache",
+    is_flag=True,
+    default=False,
+    help="neither read nor store cached descriptions",
+)
+@model_option
+@backend_option("describe")
 @overwrite_option
 @dry_run_option
 @logging_options
-def img_caption_cmd(paths: tuple[Path, ...], overwrite: bool, dry_run: bool) -> None:
-    """Write each image's NAME.description.txt (from `glados describe`) into
-    its XMP and EXIF description, in place (needs -y). Images in directories
-    without one are skipped."""
+@pass_glados
+def img_embed_description_cmd(
+    glados: Glados,
+    paths: tuple[Path, ...],
+    redescribe: bool,
+    language: str | None,
+    no_cache: bool,
+    model: str | None,
+    backend: str | None,
+    overwrite: bool,
+    dry_run: bool,
+) -> None:
+    """Write each image's NAME.description.txt into its XMP and EXIF
+    description, in place (needs -y). An image without that file is first
+    described with `glados describe` (needs a model that takes images), which
+    writes it; --redescribe does so for every image."""
     if not dry_run:
-        require_overwrite(overwrite, "img-caption rewrites images in place")
-    captions = plan_captions(expand_inputs(paths, media.is_image), set(paths))
+        require_overwrite(overwrite, "img-embed-description rewrites images in place")
+    captions = plan_captions(
+        expand_inputs(paths, media.is_image), redescribe=redescribe
+    )
     if dry_run:
         for caption in captions:
             click.echo(caption.describe())
@@ -43,12 +88,26 @@ def img_caption_cmd(paths: tuple[Path, ...], overwrite: bool, dry_run: bool) -> 
     except FileNotFoundError as exc:
         raise click.ClickException(str(exc)) from exc
 
-    def apply(caption: Caption, reporter: BaseProgressReporter) -> Path:
-        step = CaptionStep(exiftool, caption.text())
-        job = Job(
-            steps=[(step, f"Captioning {caption.image.name}")],
-            dest_fn=lambda _image: caption.image,
-        )
-        return job.run(caption.image, reporter, overwrite=overwrite)
+    with contextlib.ExitStack() as stack:
+        describer: Describer | None = None
+        prompt = ""
+        if any(caption.generate for caption in captions):
+            prompt = describe_prompt(glados, None, language)
+            describer = open_describer(
+                stack, glados, backend, model, use_cache=not no_cache
+            )
 
-    run_jobs(captions, apply, "Captioning", label=lambda caption: str(caption.image))
+        def apply(caption: Caption, reporter: BaseProgressReporter) -> Path:
+            if caption.generate and describer is not None:
+                Job(
+                    steps=[(DescribeStep(describer, prompt), "Describing")],
+                    dest_fn=lambda _image: caption.sidecar,
+                ).run(caption.image, reporter, overwrite=redescribe)
+            step = CaptionStep(exiftool, caption.text())
+            job = Job(
+                steps=[(step, f"Embedding {caption.image.name}")],
+                dest_fn=lambda _image: caption.image,
+            )
+            return job.run(caption.image, reporter, overwrite=overwrite)
+
+        run_jobs(captions, apply, "Embedding", label=lambda caption: str(caption.image))

@@ -56,7 +56,7 @@ ollama = "glados.plugins.ollama:__glados_plugin__"
 openai = "glados.plugins.openai:__glados_plugin__"
 
 [project.optional-dependencies]
-# Pillow-based image commands (img-hash, img-duplicates, img-check, autocrop,
+# Pillow-based image commands (img-hash, img-duplicates, img-check, img-trim,
 # img-reduce).
 images = [
     "pillow>=13.0.0",

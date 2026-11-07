@@ -158,16 +158,23 @@ class RenamerTests(unittest.TestCase):
 
 
 class CaptionPlanTests(unittest.TestCase):
-    def test_images_without_sidecar_are_skipped_unless_named(self) -> None:
+    def test_images_without_sidecar_are_described(self) -> None:
         tmp = make_tmp(self)
-        described, bare, named = tmp / "a.jpg", tmp / "b.png", tmp / "c.jpg"
+        described, bare = tmp / "a.jpg", tmp / "b.png"
         (tmp / "a.description.txt").write_text("a cat", encoding="utf-8")
-        planned = captions.plan_captions([described, bare, named], {named})
-        self.assertEqual([caption.image for caption in planned], [described, named])
+        planned = captions.plan_captions([described, bare], redescribe=False)
+        self.assertEqual([caption.image for caption in planned], [described, bare])
+        self.assertEqual([caption.generate for caption in planned], [False, True])
         self.assertEqual(planned[0].sidecar, tmp / "a.description.txt")
         self.assertEqual(planned[0].text(), "a cat")
         with self.assertRaises(FileNotFoundError):
             planned[1].text()
+
+    def test_redescribe_describes_every_image(self) -> None:
+        tmp = make_tmp(self)
+        (tmp / "a.description.txt").write_text("a cat", encoding="utf-8")
+        planned = captions.plan_captions([tmp / "a.jpg"], redescribe=True)
+        self.assertTrue(planned[0].generate)
 
     def test_an_empty_description_is_an_error(self) -> None:
         tmp = make_tmp(self)

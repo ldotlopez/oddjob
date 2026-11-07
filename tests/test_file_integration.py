@@ -154,7 +154,7 @@ class ImgCaptionIntegrationTest(IntegrationCase):
         image = self.tmp / "a.jpg"
         magick("-size", "16x16", "xc:red", image)
         (self.tmp / "a.description.txt").write_text("Un gato, señor", encoding="utf-8")
-        self.glados("img-caption", "-y", self.tmp)
+        self.glados("img-embed-description", "-y", self.tmp)
         self.assertEqual(exif_tag(image, "XMP-dc:Description"), "Un gato, señor")
         self.assertEqual(exif_tag(image, "EXIF:ImageDescription"), "Un gato, señor")
 
@@ -173,7 +173,7 @@ class DateSyncIntegrationTest(IntegrationCase):
         image, video = self.tmp / f"{stem}.jpg", self.tmp / f"{stem}.mp4"
         magick("-size", "64x48", "gradient:red-blue", image)
         make_video(video)
-        self.glados("date-sync", "--from", "name", "--to", "exif", "-y", self.tmp)
+        self.glados("date-copy", "--from", "name", "--to", "exif", "-y", self.tmp)
         self.assertEqual(exif_tag(image, "DateTimeOriginal"), "2019:07:14 18:03:22")
         # QuickTime stores UTC: written and read back as local time.
         local = run_tool(
@@ -182,7 +182,7 @@ class DateSyncIntegrationTest(IntegrationCase):
         )  # fmt: skip
         self.assertEqual(local.strip(), "2019:07:14 18:03:22")
 
-        self.glados("date-sync", "--from", "exif", "--to", "name", self.tmp)
+        self.glados("date-copy", "--from", "exif", "--to", "name", self.tmp)
         names = sorted(path.name for path in self.tmp.iterdir())
         self.assertEqual(len(names), 2)
         for name in names:
