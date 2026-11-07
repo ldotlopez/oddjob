@@ -3,3 +3,4 @@ __pycache__
 *.egg-info/
 .env
 tests/integration.env
+.claude/worktrees/
