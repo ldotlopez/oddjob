@@ -259,8 +259,8 @@ stay green.
 
 ## Backlog
 
-- **`--in-place` for every file transformation.** `img-reduce` gets
-  `--in-place`: the result replaces the original atomically (the `Job` lands
+- **`--in-place` for every file transformation.** Done for `img-reduce`
+  (`aed78c3`): the result replaces the original atomically (the `Job` lands
   its temp file on the input's own path), so no `NAME.<infix>.<ext>` is left
   behind. Offer the same option on the other file producers (`autocrop`,
   `jpgize`, `mp4ize`, glados' text tasks where output and input formats
@@ -294,6 +294,9 @@ stay green.
   - HEIC + MOV cannot be joined as-is: the `MotionPhoto_Data` trailer is a
     JPEG layout. Either convert with `jpgize` (a lossy re-encode) or write
     a HEIF motion photo, which is a different container and a new writer.
+  - Kept open until real iOS samples exist (see "Integration tests on
+    real files"): motion photos stay Android MP4, and `is_mp4` now rejects
+    MOV (`a5dc567`), so accepting `.mov` means relaxing it again.
   - Next step: test both variants on a real iOS export opened on an
     Android gallery. If the MOV trailer plays, let `merge` accept `.mov`;
     if not, let `merge` remux a `.mov` sidecar through `Mp4RemuxStep`
@@ -306,29 +309,36 @@ so.
 
 Bugs:
 
-- **`hash-rename` counts every file twice in its summary.** Hashing and
+- **Fixed (`c4c51fc`): `hash-rename` counts every file twice in its
+  summary.** Hashing and
   renaming are two `run_batch` runs, and `finish_batch` adds both reports.
   So two files where one rename fails print `3 done, 1 failed`.
   `date-sync` avoids it by passing only the read batch's failures
   (`BatchReport(failures=...)`); `rename_planned` should do the same.
-- **Empty plans warn on a clean tree.** `run_batch` logs `WARNING ...: no
+- **Fixed (`c4c51fc`, `rename_planned` returns early): empty plans warn
+  on a clean tree.** `run_batch` logs `WARNING ...: no
   input files` when given nothing. `fix-extensions` and `hash-rename` pass
   it an empty plan when nothing needs renaming, so a clean run is not
   silent (decision 0007). `fs-cleanup` and `date-sync` return early
   instead. Fix it in `rename_planned`, or have `run_batch` warn only when
   there were no inputs at all, not when there was nothing to do.
-- **`motionphotos.is_mp4` accepts any ISO BMFF file.** It only checks for
+- **Fixed (`a5dc567`, it checks the MP4 major brand):
+  `motionphotos.is_mp4` accepts any ISO BMFF file.** It only checks for
   an `ftyp` box, so MOV, 3GP, HEIF and AVIF all pass, and `join` then
   reports "not an MP4 file" only for non-BMFF data. Either rename it to
   match what it checks, or check the brand (see the iOS item above).
 
 Inconsistencies:
 
-- **In-place writes without `-y` fail in two ways.** `img-caption` fails
+- **Fixed (`034899c`): every in-place command (`img-caption`,
+  `date-sync --to exif`, `motionphotos strip` without `-o`, and `merge`,
+  which now takes `-y`) refuses up front through `require_overwrite`.**
+  Was: in-place writes without `-y` fail in two ways. `img-caption` fails
   each file through `check_destination` (`0 done, N failed`, exit 1), while
   `date-sync --to exif` refuses up front with a usage error (exit 2).
   Pick one for every in-place command; the up-front error is clearer.
-- **`-n` and external binaries.** The skill says `-n` returns before
+- **Fixed (the `absorb-tool` skill now says "nothing that writes"): `-n`
+  and external binaries.** The skill says `-n` returns before
   resolving any external binary. But `date-sync --from exif -n` must run
   exiftool (read-only) to compute the plan. The rule should say
   "nothing that writes", and the skill updated to match.
@@ -336,7 +346,8 @@ Inconsistencies:
   `autocrop` and `img-reduce` lists every candidate, including images that
   will fail (no transparency) or be skipped (already small enough).
   Document it, or check sizes in `-n` when the extra is installed.
-- **`describe()` paths are not quoted.** `mv a b`, `rm`, `chmod` and
+- **Fixed (`2b879ba`, `shlex.join`/`shlex.quote`): `describe()` paths are
+  not quoted.** `mv a b`, `rm`, `chmod` and
   `exiftool` plans print raw paths, but `date-sync` names contain spaces
   (`2019-07-14 18.03.22 9f3a01bc.jpg`). The plans read like shell commands
   that cannot be pasted. Use `shlex.quote` in every `describe()`, which
@@ -371,7 +382,7 @@ Tests:
   their fixtures (ImageMagick gradients, ffmpeg test patterns, a minimal
   Shotwell schema), so device quirks go untested. Add a sample set that is
   never committed (privacy, size): a directory named by
-  `MULTITOOL_TEST_SAMPLES` in `tests/integration.env`, with
+  `GLADOS_TEST_SAMPLES` in `tests/integration.env`, with
   `*IntegrationTest` classes that skip when it is unset. Candidate files,
   the user will provide all of them (2026-11-07):
   - an iPhone Live Photo export, as both HEIC + MOV and JPEG + MOV
@@ -392,6 +403,6 @@ Tests:
 
 The section 2 prerequisites come first, since each is small and
 independent. Then the tools, one per commit, each following the
-`absorb-tool` skill: glados tasks and multitool commands are independent of
+`absorb-tool` skill: glados tasks and file commands are independent of
 each other. A tool that pushes code into `filejobs` goes alone, with its own
 decision record.

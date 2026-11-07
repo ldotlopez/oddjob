@@ -98,12 +98,15 @@ Rules for every shape:
 - Destinations: `suffix_destination` only when the output extension always
   differs from the input's; otherwise `infix_destination` (suffix would
   overwrite the input).
-- `-y/--overwrite` (`overwrite_option`); in place needs `-y` unless in place
-  by definition (`merge`).
-- `-n/--dry-run` on every command that changes files: plan first, return
-  before resolving any backend or external binary. Destination-only plan →
-  `print_plan`; more than one action per item → frozen dataclasses with
-  `describe()` (`Conversion`, `Merge`, `Rename`).
+- `-y/--overwrite` (`overwrite_option`); writing in place always needs `-y`,
+  checked up front with `require_overwrite` (skipped under `-n`).
+- `-n/--dry-run` on every command that changes files: plan first, run
+  nothing that writes. Read-only tools the plan needs may run (`date-sync
+  --from exif -n` reads with exiftool); return before resolving anything
+  only the writes need. Destination-only plan → `print_plan`; more than one
+  action per item → frozen dataclasses with `describe()` (`Conversion`,
+  `Merge`, `Rename`), paths quoted with `shlex` (`shlex.join` for
+  shell-like lines).
 - Input failures are `JOB_ERRORS` (`OSError`, `RuntimeError`, `ValueError`,
   `SubprocessError`): raise one, don't catch locally. A genuinely new error
   class is added to `JOB_ERRORS` (and that is a decision record).
