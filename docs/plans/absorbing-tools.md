@@ -2,7 +2,8 @@
 
 Status: draft (2026-11-06). Prerequisites done (2.1, 2.3, 2.4; 2.2 needed
 no code); mediatools inventoried and ported: six tools, removebg left out by
-the user (section 1).
+the user (section 1). Round 2 (`ocdutils/ocdutils/`) inventoried
+2026-11-07: three tools to port.
 
 ## Context
 
@@ -56,6 +57,23 @@ rows stay proposals.
 | `emojize` | `mt/texttransform.py` | stdout only | yes | text backend | — | not absorbed: `rewrite -i` covers it | |
 | `embeddings` | `mt/embeddings.py` | an sqlite index | yes | OpenAI | `numpy`, `python-magic` | not absorbed: an index fits no command shape | |
 | `cv2histogram` | `mt/backends/cv2histogram.py` | — | second `img-duplicates` method | — | `opencv` | not absorbed: decision 0003 chose the average hash | |
+
+### Round 2: `ocdutils/ocdutils/` (`oc` below)
+
+Settled with the user (2026-11-07). Already covered, so not ported:
+`oc/motionphotos.py` (`motionphotos`), `oc/similarimages.py`
+(`img-duplicates`), `fsjanitor --ext` (`fix-extensions`).
+
+| Tool | Source | Writes files? | Replaceable implementation? | External binaries / services | New Python deps | Destination | Done |
+|---|---|---|---|---|---|---|---|
+| `deosxfy` + `perms` | `oc/fsjanitor.py` | deletes OS junk files; `--perms` chmods (files 644, dirs 755) | no | — | — | multitool `fs-cleanup` (macOS, Windows, KDE junk; opt-in `--perms`), one plan of removals and chmods | |
+| `image-reduce` | `oc/fsjanitor.py` | new file per input (`NAME.reduced.<ext>`), or the original atomically with `--in-place` | no | — | — (Pillow, `multitool` extra) | multitool `img-reduce`, file producer | |
+| `dtnamer` + `uniqnamer` | `oc/dtnamer.py`, `oc/uniqnamer.py` | renames, rewrites EXIF in place, or sets mtime | no | `exiftool` | — (no `piexif`, `dateutil`) | multitool `date-sync --from exif\|mtime\|name --to exif\|mtime\|name`; names are `YYYY-mm-dd HH.MM.SS <crc32>.<ext>`; Shotwell source dropped (machine-specific) | |
+| `sidecars` (video prune) | `oc/sidecars.py` | deletes the video sidecars of images | no | — | — | not absorbed: `motionphotos merge --rm` (after `jpgize`/`mp4ize`) does it without losing the video | |
+| `mdupes` | `oc/mdupes.py` | only reports | second `img-duplicates` method | — | `opencv`, `python-magic` | not absorbed: decision 0003 chose the average hash | |
+| `checksumrenamer` | `oc/checksumrenamer.py` | — | — | — | — | not absorbed: an unfinished stub | |
+| `metadata` | `oc/metadata/` | only reports | — | — | `piexif` | not absorbed: unfinished; `exiftool`/`stat` print it | |
+| `filesystem`, `ocdlib` | `oc/filesystem.py`, `oc/ocdlib.py` | — | — | — | — | not absorbed: library code `filejobs` and `renamers` replace | |
 
 ## 2. Prerequisites (fix before the first port)
 
@@ -238,6 +256,35 @@ stay green.
   tool goes", extending 0003's scope.
 - **Which tools to absorb, and from where.** Decided for this round:
   ocdutils `mediatools/`, section 1.
+
+## Backlog
+
+- **`--in-place` for every file transformation.** `img-reduce` gets
+  `--in-place`: the result replaces the original atomically (the `Job` lands
+  its temp file on the input's own path), so no `NAME.<infix>.<ext>` is left
+  behind. Offer the same option on the other file producers (`autocrop`,
+  `jpgize`, `mp4ize`, glados' text tasks where output and input formats
+  match). It changes a shared option set, so settle it in its own decision
+  record before rolling it out.
+- **iOS motion photos (`jpeg`/`heic` + `mov`).** `motionphotos merge` pairs
+  only `.jpg`/`.jpeg` with `.mp4`; iOS exports Live Photos as `.jpeg` +
+  `.mov` or `.heic` + `.mov`. Findings so far:
+  - JPEG + MOV can be joined as-is at the byte level: an iPhone MOV starts
+    with `ftyp qt  `, which `motionphotos.is_mp4` accepts (tried: `join` and
+    `split` round-trip a synthetic MOV). Only `plan_merges`' `.mp4` filter
+    rejects it. Unverified: whether Google Photos and Samsung Gallery play
+    a QuickTime-branded trailer. Google's Motion Photo format describes the
+    trailer as MP4.
+  - Remuxing first is lossless and cheap: `mp4ize`'s step copies the video
+    and audio and, with ffmpeg's default stream selection, drops the
+    `mebx` Apple metadata track that MP4 cannot hold.
+  - HEIC + MOV cannot be joined as-is: the `MotionPhoto_Data` trailer is a
+    JPEG layout. Either convert with `jpgize` (a lossy re-encode) or write
+    a HEIF motion photo, which is a different container and a new writer.
+  - Next step: test both variants on a real iOS export opened on an
+    Android gallery. If the MOV trailer plays, let `merge` accept `.mov`;
+    if not, let `merge` remux a `.mov` sidecar through `Mp4RemuxStep`
+    before joining. HEIC stays a `jpgize` step before `merge`.
 
 ## Order
 
