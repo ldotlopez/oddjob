@@ -373,7 +373,7 @@ Tests:
   never committed (privacy, size): a directory named by
   `MULTITOOL_TEST_SAMPLES` in `tests/integration.env`, with
   `*IntegrationTest` classes that skip when it is unset. Candidate files,
-  to confirm with the user before collecting them:
+  the user will provide all of them (2026-11-07):
   - an iPhone Live Photo export, as both HEIC + MOV and JPEG + MOV
     (`motionphotos`, `jpgize`, `mp4ize`, the iOS item above);
   - a Samsung or Google motion photo JPEG (`motionphotos check/split/strip`);
