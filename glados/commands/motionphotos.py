@@ -14,6 +14,7 @@ from filejobs.cli_options import (
     dry_run_option,
     overwrite_option,
     paths_argument,
+    require_overwrite,
     run_jobs,
     run_single_job,
 )
@@ -99,6 +100,8 @@ def split_cmd(file: Path, image: Path, video: Path, overwrite: bool) -> None:
 @logging_options
 def strip_cmd(file: Path, output: Path | None, overwrite: bool) -> None:
     """Remove the video of motion photo FILE (in place needs -y)."""
+    if output is None:
+        require_overwrite(overwrite, "strip without -o rewrites FILE in place")
     job = to_destination(BytesStep(motionphotos.strip), "Stripping", output or file)
     run_single_job(job, file, overwrite)
 
@@ -106,10 +109,16 @@ def strip_cmd(file: Path, output: Path | None, overwrite: bool) -> None:
 @motionphotos_cmd.command("merge")
 @paths_argument
 @click.option("--rm", "remove_video", is_flag=True, help="remove each merged video")
+@overwrite_option
 @dry_run_option
 @logging_options
-def merge_cmd(paths: tuple[Path, ...], remove_video: bool, dry_run: bool) -> None:
-    """Merge each NAME.jpg + NAME.mp4 pair in PATH... into NAME.jpg."""
+def merge_cmd(
+    paths: tuple[Path, ...], remove_video: bool, overwrite: bool, dry_run: bool
+) -> None:
+    """Merge each NAME.jpg + NAME.mp4 pair in PATH... into NAME.jpg, in
+    place (needs -y)."""
+    if not dry_run:
+        require_overwrite(overwrite, "merge rewrites each NAME.jpg in place")
     groups = sidecars.group_sidecars(expand_inputs(paths, accept_all))
     merges = motionphotos.plan_merges(groups, remove_video)
     if dry_run:
@@ -120,7 +129,7 @@ def merge_cmd(paths: tuple[Path, ...], remove_video: bool, dry_run: bool) -> Non
     def apply(merge: motionphotos.Merge, reporter: BaseProgressReporter) -> Path:
         description = f"Merging {merge.image.name}"
         job = to_destination(joining_step(merge.video), description, merge.image)
-        written = job.run(merge.image, reporter, overwrite=True)
+        written = job.run(merge.image, reporter, overwrite=overwrite)
         if merge.remove_video:
             merge.video.unlink()
         return written

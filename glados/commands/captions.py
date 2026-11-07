@@ -10,6 +10,7 @@ from filejobs.cli_options import (
     dry_run_option,
     overwrite_option,
     paths_argument,
+    require_overwrite,
     run_jobs,
 )
 from filejobs.inputs import expand_inputs
@@ -30,6 +31,8 @@ def img_caption_cmd(paths: tuple[Path, ...], overwrite: bool, dry_run: bool) -> 
     """Write each image's NAME.description.txt (from `glados describe`) into
     its XMP and EXIF description, in place (needs -y). Images in directories
     without one are skipped."""
+    if not dry_run:
+        require_overwrite(overwrite, "img-caption rewrites images in place")
     captions = plan_captions(expand_inputs(paths, media.is_image), set(paths))
     if dry_run:
         for caption in captions:

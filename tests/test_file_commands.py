@@ -100,7 +100,7 @@ class CommandTests(unittest.TestCase):
         (self.tmp / "a.mp4").write_bytes(MP4)
         with self.assertLogs("filejobs", "INFO") as logs:
             result = self.runner.invoke(
-                cli, ["motionphotos", "merge", "-v", str(self.tmp)]
+                cli, ["motionphotos", "merge", "-v", "-y", str(self.tmp)]
             )
         self.assertEqual(result.exit_code, 0, result.output)
         self.assertEqual(
@@ -109,6 +109,18 @@ class CommandTests(unittest.TestCase):
         self.assertTrue((self.tmp / "a.mp4").exists())
         self.assertEqual(wrote(logs.records), [self.tmp / "a.jpg"])
         self.assertEqual(result.stdout, "")
+
+    def test_motionphotos_merge_needs_overwrite(self) -> None:
+        (self.tmp / "a.jpg").write_bytes(JPEG)
+        (self.tmp / "a.mp4").write_bytes(MP4)
+        refused = self.runner.invoke(cli, ["motionphotos", "merge", str(self.tmp)])
+        self.assertEqual(refused.exit_code, 2, refused.output)
+        self.assertIn("add -y", refused.stderr)
+        self.assertEqual((self.tmp / "a.jpg").read_bytes(), JPEG)
+        planned = self.runner.invoke(
+            cli, ["motionphotos", "merge", "-n", str(self.tmp)]
+        )
+        self.assertEqual(planned.exit_code, 0, planned.output)
 
     def test_motionphotos_join_and_split(self) -> None:
         (self.tmp / "still.jpg").write_bytes(JPEG)
@@ -160,7 +172,8 @@ class CommandTests(unittest.TestCase):
             refused = self.runner.invoke(
                 cli, ["motionphotos", "strip", "-v", str(file)]
             )
-        self.assertEqual(refused.exit_code, 1)
+        self.assertEqual(refused.exit_code, 2)
+        self.assertIn("add -y", refused.stderr)
         with self.assertLogs("filejobs", "INFO") as logs:
             done = self.runner.invoke(
                 cli, ["motionphotos", "strip", "-v", "-y", str(file)]
@@ -380,8 +393,8 @@ class ImgCaptionCommandTests(unittest.TestCase):
         write_executable(self.bin, "exiftool", FAKE_WRITER)
         env = {"PATH": str(self.bin)}
         refused = self.runner.invoke(cli, ["img-caption", str(self.tmp)], env=env)
-        self.assertEqual(refused.exit_code, 1, refused.output)
-        self.assertIn("0 done, 1 failed", refused.stderr)
+        self.assertEqual(refused.exit_code, 2, refused.output)
+        self.assertIn("add -y", refused.stderr)
         self.assertEqual(self.image.read_bytes(), JPEG)
         done = self.runner.invoke(cli, ["img-caption", "-y", str(self.tmp)], env=env)
         self.assertEqual(done.exit_code, 0, done.output)

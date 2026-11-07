@@ -13,6 +13,7 @@ from filejobs.cli_options import (
     finish_batch,
     overwrite_option,
     paths_argument,
+    require_overwrite,
 )
 from filejobs.inputs import expand_inputs
 from filejobs.progress import BaseProgressReporter
@@ -114,8 +115,8 @@ def date_sync_cmd(
     source_place, target_place = dates.Place(source), dates.Place(target)
     if source_place is target_place:
         raise click.UsageError("--from and --to must differ")
-    if target_place is dates.Place.EXIF and not overwrite and not dry_run:
-        raise click.UsageError("--to exif rewrites files in place: add -y")
+    if target_place is dates.Place.EXIF and not dry_run:
+        require_overwrite(overwrite, "--to exif rewrites files in place")
 
     # -n reads dates but writes nothing: exiftool only to read from it.
     needs_exiftool = source_place is dates.Place.EXIF or (
