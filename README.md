@@ -134,6 +134,9 @@ base_url = "https://api.openai.com/v1"
 # api_key defaults to the OPENAI_API_KEY environment variable
 timeout = 600
 
+[backends.openai.tasks.describe]  # on top of [backends.openai], for describe only
+model = "gpt-4.1"                 # describe needs a vision model
+
 [backends.ollama]
 model = "llama3.2"
 base_url = "http://localhost:11434"
@@ -156,7 +159,8 @@ summarize = "Summarize the text the user sends as bullet points. {length}"
 
 Backend selection: `-b`, then `GLADOS_<TASK>_BACKEND`, then `[tasks]`, then the only
 installed backend; with several backends installed for a task (both whisper ones for
-`transcribe`, or the three text backends), that task needs one of those. Backend options: the backend's defaults, then `[backends.<name>]`, then CLI
+`transcribe`, or the three text backends), that task needs one of those. Backend options: the backend's defaults, then `[backends.<name>]`, then
+`[backends.<name>.tasks.<task>]` (only when that backend runs that task), then CLI
 flags. Default models: `turbo` for `whisper`, `$XDG_DATA_HOME/whisper/default-model.bin`
 for `whisper_cpp`.
 

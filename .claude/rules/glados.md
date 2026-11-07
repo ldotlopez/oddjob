@@ -54,7 +54,8 @@
   (`core/backends.py`, keyed by module), and only for the selected backend.
 - Backend selection per task: `-b`, then `GLADOS_<TASK>_BACKEND`, then `[tasks]` in
   the config, then the only installed implementor. Options: model defaults, then
-  `[backends.<name>]`, then CLI overrides (`-m` → `model`). Per-run values are
+  `[backends.<name>]`, then `[backends.<name>.tasks.<task>]` (decision 0010; `tasks`
+  is a reserved key), then CLI overrides (`-m` → `model`). Per-run values are
   method arguments, not options.
 - Config is optional: `$XDG_CONFIG_HOME/glados/config.toml`, `${VAR}` expanded,
   `.env` loaded. It is read on first use in `Glados` (`core/session.py`),

@@ -298,7 +298,9 @@ The OpenAI `whisper` backend has no tests yet.
 `Glados.config()` (`core/session.py`) loads the config on first use (never at import): `.env`, then
 `$XDG_CONFIG_HOME/glados/config.toml` with `${VAR}` expansion, validated into the frozen
 `Config` model (`tasks`, `backends`, `prompts`) and checked against the installed
-backends. A missing file is an empty config.
+backends. A missing file is an empty config. A backend's options for a task are
+`[backends.<name>]` with `[backends.<name>.tasks.<task>]` on top
+(`Config.backend_options`, decision 0010).
 
 ## Console and logging
 
