@@ -32,7 +32,8 @@ glados/
                       audio_grep.py (argument split, transcript cache, grep over transcripts),
                       grep.py (GrepRunner: the system grep)
   core/               glados' backend machinery
-    cli_common.py     GladosContext, backend/model options, glados' logging options
+    session.py        Glados: config and backends without click
+    cli_common.py     pass_glados (injects Glados), backend/model options, glados' logging options
     config.py         Config model, config file loading and validation
     backends.py       backend discovery (entry-point metadata), selection, loading
   plugins/            backend modules, each providing one or more backends (only backends live here)
@@ -65,7 +66,7 @@ tests/                unittest suite: one module per backend module or tool area
   ([decision 0005](decisions/0005-one-command-layout.md)). glados' task commands are
   also installed on their own through `[project.scripts]`, so a task is the same
   `click.Command` whether it runs as `glados <task>` or standalone. Commands only parse
-  options, expand inputs, wire adapters (glados: the backend, from `GladosContext`) and
+  options, expand inputs, wire adapters (glados: the backend, from `Glados`) and
   hand the work to `run_jobs` or `run_batch`. click is imported only in `cli.py`,
   `commands/`, `filejobs/cli_*.py` and `glados/core/cli_*.py`;
   `tests/test_boundaries.py` enforces it.
@@ -76,7 +77,7 @@ tests/                unittest suite: one module per backend module or tool area
   (`pipeline`, `progress`, `runners`, `inputs`, `batch`, `cli_options`) is shared by
   both tools: `Job` chains `ProgressStep[Path]` steps, each consuming the previous
   step's output path, and moves the last result to the destination; intermediates are
-  deleted. `glados/core/` (`backends`, `config`, `cli_common`) is glados' backend
+  deleted. `glados/core/` (`backends`, `config`, `session`, `cli_common`) is glados' backend
   part, used only by glados.
 - **Contracts** (`tasks/protocols.py`): one `Protocol` per task (`Transcriber`,
   `Rewriter`, `Summarizer`, `Expander`) plus `TranscriptSegment`. Backends satisfy them
@@ -131,7 +132,7 @@ place (`motionphotos merge`, `strip -y`).
 ```
 transcribe PATH...
   -> inputs = expand_inputs(PATH..., audio/video)
-  -> GladosContext.backend("transcribe", Transcriber, -b, {"model": -m})
+  -> Glados.backend("transcribe", Transcriber, -b, {"model": -m})
        config (lazy) -> backends.select -> backends.load -> e.g. WhisperCppBackend
   -> Job([AudioExtractor, TranscribeStep], dest = INPUT.<format> or -o)
        AudioExtractor: ffmpeg -> temp mono 16 kHz WAV
@@ -148,7 +149,7 @@ audio-grep ARGUMENTS...
   -> run_batch: per input, CachedTranscripts.segments
        key = sha256(content sha256, mtime_ns, --backend, --model, --language)
        UserCache ($XDG_CACHE_HOME/glados/transcripts, 180-day TTL) hit -> segments
-       miss -> GladosContext.backend("transcribe", ...) (first miss only)
+       miss -> Glados.backend("transcribe", ...) (first miss only)
             -> AudioExtractor -> Transcriber.transcribe -> segments -> cache
   -> grep_transcripts: FORMATTERS[--transcript-format] -> one temp file per input
        -> GrepRunner: grep GREP_ARGS TEMP... -> temp paths in its output replaced by media paths
@@ -161,7 +162,7 @@ audio-grep ARGUMENTS...
 rewrite PATH... -i INSTRUCTIONS
   -> inputs = expand_inputs(PATH..., text files except *.rewrite.*)
   -> prompt = config.prompts.render_rewrite(INSTRUCTIONS)     ([prompts] or default)
-  -> GladosContext.backend("rewrite", Rewriter, -b, {"model": -m}) -> TextBackend
+  -> Glados.backend("rewrite", Rewriter, -b, {"model": -m}) -> TextBackend
   -> Job([TextStep(text -> Rewriter.rewrite(text, prompt=prompt))],
          dest = INPUT.rewrite.<ext> or -o)
        TextStep: read UTF-8 -> transport.complete(prompt, text) streams the reply -> temp file
@@ -184,7 +185,7 @@ through `tasks/translate.language_infix`, names the output (`FILE.es.<ext>`).
 describe PATH... -i INSTRUCTIONS [-w | -o FILE]
   -> inputs = expand_inputs(PATH..., images)
   -> prompt = config.prompts.render_describe(INSTRUCTIONS)
-  -> GladosContext.backend("describe", Describer, -b, {"model": -m}) -> TextBackend
+  -> Glados.backend("describe", Describer, -b, {"model": -m}) -> TextBackend
   default (a report):
   -> run_batch: describe_image -> transport.complete(prompt, "", images=[INPUT])
        -> consume_stream -> text
@@ -294,7 +295,7 @@ The OpenAI `whisper` backend has no tests yet.
 
 ## Configuration
 
-`GladosContext.config()` loads the config on first use (never at import): `.env`, then
+`Glados.config()` (`core/session.py`) loads the config on first use (never at import): `.env`, then
 `$XDG_CONFIG_HOME/glados/config.toml` with `${VAR}` expansion, validated into the frozen
 `Config` model (`tasks`, `backends`, `prompts`) and checked against the installed
 backends. A missing file is an empty config.

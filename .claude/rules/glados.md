@@ -57,7 +57,8 @@
   `[backends.<name>]`, then CLI overrides (`-m` → `model`). Per-run values are
   method arguments, not options.
 - Config is optional: `$XDG_CONFIG_HOME/glados/config.toml`, `${VAR}` expanded,
-  `.env` loaded. It is read on first use in `GladosContext`, never at import.
+  `.env` loaded. It is read on first use in `Glados` (`core/session.py`),
+  injected by `pass_glados`, never at import.
 - The backend registry is a deliberate exception to `architecture.md`'s "no plugin
   registries" rule: backends are the replaceable part here. Keep it.
 - Nothing is imported until a backend is selected. A broken backend fails only
