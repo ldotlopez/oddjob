@@ -1,6 +1,6 @@
 """Image edits on encoded bytes: autocrop, reduce.
 
-Needs the `multitool` extra (Pillow, pillow-heif).
+Needs the `images` extra (Pillow, pillow-heif).
 """
 
 from __future__ import annotations

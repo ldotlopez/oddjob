@@ -12,8 +12,8 @@ from pathlib import Path
 
 from click.testing import CliRunner, Result
 
+from glados.cli import cli
 from glados.lib import motionphotos
-from multitool.cli import cli
 
 HAS_PILLOW = importlib.util.find_spec("PIL") is not None
 
@@ -113,12 +113,14 @@ class MotionPhotoIntegrationTest(IntegrationCase):
         magick("-size", "64x48", "gradient:red-blue", still)
         make_video(clip)
         joined = self.tmp / "motion.jpg"
-        self.multitool("motionphotos", "join", "-i", still, "-v", clip, "-o", joined)
+        self.multitool(
+            "motionphotos", "join", "-i", still, "--video", clip, "-o", joined
+        )
         self.multitool("motionphotos", "check", joined)
         magick(joined, self.tmp / "decoded.png")  # still a readable JPEG
 
         image, video = self.tmp / "out.jpg", self.tmp / "out.mp4"
-        self.multitool("motionphotos", "split", joined, "-i", image, "-v", video)
+        self.multitool("motionphotos", "split", joined, "-i", image, "--video", video)
         self.assertEqual(image.read_bytes(), still.read_bytes())
         self.assertEqual(video.read_bytes(), clip.read_bytes())
         self.assertEqual(stream_codecs(video), stream_codecs(clip))

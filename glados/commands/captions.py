@@ -1,4 +1,4 @@
-"""`multitool img-caption`: one in-place Job per image with a description."""
+"""`glados img-caption`: one in-place Job per image with a description."""
 
 from __future__ import annotations
 
@@ -15,6 +15,7 @@ from filejobs.cli_options import (
 from filejobs.inputs import expand_inputs
 from filejobs.pipeline import Job
 from filejobs.progress import BaseProgressReporter
+from glados.core.cli_common import logging_options
 from glados.lib import media
 from glados.lib.captions import Caption, CaptionStep, plan_captions
 from glados.lib.external import ExifTool
@@ -24,6 +25,7 @@ from glados.lib.external import ExifTool
 @paths_argument
 @overwrite_option
 @dry_run_option
+@logging_options
 def img_caption_cmd(paths: tuple[Path, ...], overwrite: bool, dry_run: bool) -> None:
     """Write each image's NAME.description.txt (from `glados describe`) into
     its XMP and EXIF description, in place (needs -y). Images in directories

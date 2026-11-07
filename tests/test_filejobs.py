@@ -363,7 +363,7 @@ class MultipleInputTaskTests(unittest.TestCase):
         for name in ("a.txt", "b.txt"):
             (tmp / name).write_text("text")
         runner = CliRunner()
-        for command in (rewrite.cli, transcribe.cli):
+        for command in (rewrite.rewrite_cmd, transcribe.transcribe_cmd):
             result = runner.invoke(command, ["-o", str(tmp / "out.txt"), str(tmp)])
             self.assertEqual(result.exit_code, 2, result.output)
             self.assertIn("exactly one input file", result.output)
@@ -377,7 +377,7 @@ class MultipleInputTaskTests(unittest.TestCase):
             "XDG_CONFIG_HOME": str(tmp / "config"),
             "GLADOS_REWRITE_BACKEND": None,
         }
-        result = runner.invoke(rewrite.cli, ["-n", str(tmp)], env=no_backend)
+        result = runner.invoke(rewrite.rewrite_cmd, ["-n", str(tmp)], env=no_backend)
         self.assertEqual(result.exit_code, 0, result.output)
         self.assertEqual(
             result.output.splitlines(),
@@ -387,7 +387,7 @@ class MultipleInputTaskTests(unittest.TestCase):
             ],
         )
         self.assertEqual(sorted(p.name for p in tmp.iterdir()), ["a.txt", "b.md"])
-        without_dry_run = runner.invoke(rewrite.cli, [str(tmp)], env=no_backend)
+        without_dry_run = runner.invoke(rewrite.rewrite_cmd, [str(tmp)], env=no_backend)
         self.assertEqual(without_dry_run.exit_code, 1, without_dry_run.output)
 
 

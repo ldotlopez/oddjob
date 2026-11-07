@@ -1,4 +1,4 @@
-"""`multitool date-sync`: read every date first, then apply the changes."""
+"""`glados date-sync`: read every date first, then apply the changes."""
 
 from __future__ import annotations
 
@@ -16,6 +16,7 @@ from filejobs.cli_options import (
 )
 from filejobs.inputs import expand_inputs
 from filejobs.progress import BaseProgressReporter
+from glados.core.cli_common import logging_options
 from glados.lib import dates
 from glados.lib.external import ExifTool
 from glados.lib.shotwell import ShotwellLibrary
@@ -93,6 +94,7 @@ def build_source(
 )
 @overwrite_option
 @dry_run_option
+@logging_options
 def date_sync_cmd(
     paths: tuple[Path, ...],
     source: str,

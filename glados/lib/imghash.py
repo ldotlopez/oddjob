@@ -1,6 +1,6 @@
 """Average hashes of images, near-duplicate groups, and decode checks.
 
-Needs the `multitool` extra (Pillow, pillow-heif).
+Needs the `images` extra (Pillow, pillow-heif).
 """
 
 from __future__ import annotations

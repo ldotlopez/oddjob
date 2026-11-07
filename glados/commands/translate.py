@@ -63,7 +63,7 @@ def infix_of(
 @dry_run_option
 @logging_options
 @pass_glados
-def cli(
+def translate_cmd(
     glados: Glados,
     paths: tuple[Path, ...],
     target: tuple[str, str],
@@ -96,4 +96,4 @@ def cli(
 
 
 if __name__ == "__main__":
-    cli()
+    translate_cmd()

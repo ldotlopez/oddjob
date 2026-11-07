@@ -10,13 +10,14 @@ from contextlib import closing
 from datetime import datetime
 from pathlib import Path
 
+import rich_click as click
 from click.testing import CliRunner, Result
 from support import recorded_argv, write_executable
 from test_multitool_conversions import FAKE_WRITER
 from test_multitool_domain import HAS_PILLOW, JPEG, MP4
 
+from glados.cli import cli
 from glados.lib import motionphotos, renamers
-from multitool.cli import cli
 
 
 def wrote(records: list[logging.LogRecord]) -> list[Path]:
@@ -33,7 +34,7 @@ class CommandTests(unittest.TestCase):
     def setUp(self) -> None:
         self.tmp = Path(self.enterContext(tempfile.TemporaryDirectory()))
         self.runner = CliRunner()
-        for name in ("filejobs", "multitool"):  # -v changes them process-wide
+        for name in ("filejobs", "glados"):  # -v changes them process-wide
             logger = logging.getLogger(name)
             self.addCleanup(logger.setLevel, logger.level)
 
@@ -87,7 +88,7 @@ class CommandTests(unittest.TestCase):
         (self.tmp / "a.mp4").write_bytes(MP4)
         with self.assertLogs("filejobs", "INFO") as logs:
             result = self.runner.invoke(
-                cli, ["-v", "motionphotos", "merge", str(self.tmp)]
+                cli, ["motionphotos", "merge", "-v", str(self.tmp)]
             )
         self.assertEqual(result.exit_code, 0, result.output)
         self.assertEqual(
@@ -105,9 +106,9 @@ class CommandTests(unittest.TestCase):
             join = self.runner.invoke(
                 cli,
                 [
-                    "-v", "motionphotos", "join",
+                    "motionphotos", "join", "-v",
                     "-i", str(self.tmp / "still.jpg"),
-                    "-v", str(self.tmp / "clip.mp4"),
+                    "--video", str(self.tmp / "clip.mp4"),
                     "-o", str(joined),
                     "--rm",
                 ],
@@ -119,9 +120,9 @@ class CommandTests(unittest.TestCase):
             split = self.runner.invoke(
                 cli,
                 [
-                    "-v", "motionphotos", "split", str(joined),
+                    "motionphotos", "split", "-v", str(joined),
                     "-i", str(self.tmp / "s.jpg"),
-                    "-v", str(self.tmp / "s.mp4"),
+                    "--video", str(self.tmp / "s.mp4"),
                 ],
             )  # fmt: skip
         self.assertEqual(split.exit_code, 0, split.output)
@@ -145,12 +146,12 @@ class CommandTests(unittest.TestCase):
         file.write_bytes(motionphotos.join(JPEG, MP4))
         with self.assertNoLogs("filejobs", "INFO"):
             refused = self.runner.invoke(
-                cli, ["-v", "motionphotos", "strip", str(file)]
+                cli, ["motionphotos", "strip", "-v", str(file)]
             )
         self.assertEqual(refused.exit_code, 1)
         with self.assertLogs("filejobs", "INFO") as logs:
             done = self.runner.invoke(
-                cli, ["-v", "motionphotos", "strip", "-y", str(file)]
+                cli, ["motionphotos", "strip", "-v", "-y", str(file)]
             )
         self.assertEqual(done.exit_code, 0, done.output)
         self.assertEqual(file.read_bytes(), JPEG)
@@ -178,7 +179,7 @@ class CommandTests(unittest.TestCase):
         (self.tmp / "a.png").write_bytes(b"png")
         with self.assertLogs("filejobs", "INFO") as logs:
             result = self.runner.invoke(
-                cli, ["-v", "jpgize", str(self.tmp / "a.png")], env={"PATH": str(tools)}
+                cli, ["jpgize", "-v", str(self.tmp / "a.png")], env={"PATH": str(tools)}
             )
         self.assertEqual(result.exit_code, 0, result.output)
         self.assertTrue((self.tmp / "a.jpg").exists())
@@ -235,7 +236,7 @@ class AutocropCommandTests(unittest.TestCase):
         logo.save(self.tmp / "logo.png")
         Image.new("RGB", (4, 4)).save(self.tmp / "photo.jpg")
         self.runner = CliRunner()
-        for name in ("filejobs", "multitool"):
+        for name in ("filejobs", "glados"):
             logger = logging.getLogger(name)
             self.addCleanup(logger.setLevel, logger.level)
 
@@ -244,7 +245,7 @@ class AutocropCommandTests(unittest.TestCase):
 
         with self.assertLogs("filejobs", "INFO") as logs:
             result = self.runner.invoke(
-                cli, ["-v", "autocrop", str(self.tmp / "logo.png")]
+                cli, ["autocrop", "-v", str(self.tmp / "logo.png")]
             )
         self.assertEqual(result.exit_code, 0, result.output)
         self.assertEqual(result.stdout, "")
@@ -292,7 +293,7 @@ class ImgReduceCommandTests(unittest.TestCase):
         Image.new("RGB", (40, 20), (200, 10, 10)).save(self.tmp / "big.jpg")
         Image.new("RGB", (8, 8)).save(self.tmp / "small.png")
         self.runner = CliRunner()
-        for name in ("filejobs", "multitool"):
+        for name in ("filejobs", "glados"):
             logger = logging.getLogger(name)
             self.addCleanup(logger.setLevel, logger.level)
 
@@ -305,7 +306,7 @@ class ImgReduceCommandTests(unittest.TestCase):
     def test_writes_reduced_images_and_skips_the_ones_that_fit(self) -> None:
         with self.assertLogs("filejobs", "INFO") as logs:
             result = self.runner.invoke(
-                cli, ["-v", "img-reduce", "--max-size", "10", str(self.tmp)]
+                cli, ["img-reduce", "-v", "--max-size", "10", str(self.tmp)]
             )
         self.assertEqual(result.exit_code, 0, result.output)
         self.assertEqual(result.stdout, "")
@@ -589,6 +590,43 @@ class FsCleanupCommandTests(unittest.TestCase):
         self.assertEqual(result.exit_code, 1, result.output)
         self.assertIn("2 done, 1 failed", result.stderr)
         self.assertFalse((self.tmp / ".DS_Store").exists())
+
+
+def leaf_commands(
+    group: click.Group, prefix: str = ""
+) -> list[tuple[str, click.Command]]:
+    """Every runnable command under `group`, with its full name."""
+    found = []
+    for name, command in group.commands.items():
+        full = f"{prefix}{name}"
+        if isinstance(command, click.Group):
+            found.extend(leaf_commands(command, f"{full} "))
+        else:
+            found.append((full, command))
+    return found
+
+
+class CommandTreeTests(unittest.TestCase):
+    def test_no_command_declares_an_option_twice(self) -> None:
+        for name, command in leaf_commands(cli):
+            with self.subTest(command=name):
+                opts = [
+                    opt
+                    for param in command.params
+                    for opt in (*param.opts, *param.secondary_opts)
+                    if opt.startswith("-")
+                ]
+                self.assertEqual(len(opts), len(set(opts)), opts)
+
+    def test_every_command_takes_the_logging_options(self) -> None:
+        # audio-grep passes -v/-q on to grep; it takes only --log-level.
+        for name, command in leaf_commands(cli):
+            with self.subTest(command=name):
+                names = {param.name for param in command.params}
+                expected = {"log_level"}
+                if name != "audio-grep":
+                    expected |= {"verbose", "quiet"}
+                self.assertLessEqual(expected, names)
 
 
 if __name__ == "__main__":

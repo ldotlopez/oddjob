@@ -1,4 +1,4 @@
-"""`multitool sidecars`: list groups of files sharing a name."""
+"""`glados sidecars`: list groups of files sharing a name."""
 
 from __future__ import annotations
 
@@ -8,6 +8,7 @@ import rich_click as click
 
 from filejobs.cli_options import paths_argument
 from filejobs.inputs import accept_all, expand_inputs
+from glados.core.cli_common import logging_options
 from glados.lib import sidecars
 
 
@@ -28,6 +29,7 @@ def sidecars_cmd() -> None:
 @click.option(
     "--cs", "case_sensitive", is_flag=True, help="match extensions case-sensitively"
 )
+@logging_options
 def scan_cmd(
     paths: tuple[Path, ...], extensions: tuple[str, ...], case_sensitive: bool
 ) -> None:
@@ -45,6 +47,7 @@ def scan_cmd(
 
 @sidecars_cmd.command("find")
 @click.argument("file", type=click.Path(exists=True, dir_okay=False, path_type=Path))
+@logging_options
 def find_cmd(file: Path) -> None:
     """List the sidecar files of FILE."""
     group = sidecars.sidecars_of(file, file.parent.iterdir())

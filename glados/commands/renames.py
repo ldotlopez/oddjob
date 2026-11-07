@@ -1,4 +1,4 @@
-"""`multitool hash-rename` and `fix-extensions`: plan every rename first, then
+"""`glados hash-rename` and `fix-extensions`: plan every rename first, then
 apply them."""
 
 from __future__ import annotations
@@ -17,6 +17,7 @@ from filejobs.cli_options import (
 )
 from filejobs.inputs import accept_all, expand_inputs
 from filejobs.progress import BaseProgressReporter
+from glados.core.cli_common import logging_options
 from glados.lib import renamers
 
 
@@ -55,6 +56,7 @@ def rename_planned(
 )
 @overwrite_option
 @dry_run_option
+@logging_options
 def hash_rename_cmd(
     paths: tuple[Path, ...], algo: str, overwrite: bool, dry_run: bool
 ) -> None:
@@ -74,6 +76,7 @@ def hash_rename_cmd(
 @paths_argument
 @overwrite_option
 @dry_run_option
+@logging_options
 def fix_extensions_cmd(paths: tuple[Path, ...], overwrite: bool, dry_run: bool) -> None:
     """Lowercase each file's extension in PATH... and normalize jpeg -> jpg,
     mpeg -> mpg, tif -> tiff."""

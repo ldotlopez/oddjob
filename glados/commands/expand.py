@@ -44,7 +44,7 @@ DEFAULT_INFIX = "expanded"
 @dry_run_option
 @logging_options
 @pass_glados
-def cli(
+def expand_cmd(
     glados: Glados,
     paths: tuple[Path, ...],
     target_length: int | None,
@@ -73,4 +73,4 @@ def cli(
 
 
 if __name__ == "__main__":
-    cli()
+    expand_cmd()

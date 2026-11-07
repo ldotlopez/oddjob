@@ -198,7 +198,7 @@ class ImageHashTests(unittest.TestCase):
     def test_unchanged_file_is_answered_from_the_cache(self) -> None:
         from glados.lib import imghash
 
-        cache = UserCache(app="multitool", base_dir=self.tmp / "cache")
+        cache = UserCache(app="glados", base_dir=self.tmp / "cache")
         self.addCleanup(cache.close)
         hasher = imghash.ImageHasher(16, cache)
         image = self.tmp / "a.png"

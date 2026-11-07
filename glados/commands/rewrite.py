@@ -52,7 +52,7 @@ DEFAULT_INFIX = "rewrite"
 @dry_run_option
 @logging_options
 @pass_glados
-def cli(
+def rewrite_cmd(
     glados: Glados,
     paths: tuple[Path, ...],
     instructions: str | None,
@@ -81,4 +81,4 @@ def cli(
 
 
 if __name__ == "__main__":
-    cli()
+    rewrite_cmd()

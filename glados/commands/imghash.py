@@ -1,5 +1,5 @@
-"""`multitool img-hash`, `img-duplicates` and `img-check` (need the
-`multitool` extra; glados.lib.imghash is imported only when one of them
+"""`glados img-hash`, `img-duplicates` and `img-check` (need the
+`images` extra; glados.lib.imghash is imported only when one of them
 runs)."""
 
 from __future__ import annotations
@@ -10,6 +10,7 @@ from collections.abc import Callable
 from pathlib import Path
 from types import ModuleType
 
+import platformdirs
 import rich_click as click
 from foundation.cache import UserCache
 
@@ -18,21 +19,21 @@ from filejobs.cli_options import finish_batch, paths_argument
 from filejobs.inputs import expand_inputs
 from filejobs.pipeline import JOB_ERRORS
 from filejobs.progress import BaseProgressReporter
+from glados.core.cli_common import logging_options
 from glados.lib import media
 from glados.lib.external import run_command_with_paths
 
-CACHE_APP = "multitool"
+CACHE_APP = "glados"
 
 
 def load_extra_module(name: str) -> ModuleType:
-    """multitool.<name>, a module that needs the optional `multitool` extra
+    """glados.lib.<name>, a module that needs the optional `images` extra
     (imghash, imgedit); a clean error if the extra is not installed."""
     try:
         return importlib.import_module(f"glados.lib.{name}")
     except ImportError as exc:
         raise click.ClickException(
-            f"{exc.name} is missing: install the multitool extra"
-            " (uv sync --extra multitool)"
+            f"{exc.name} is missing: install the images extra (uv sync --extra images)"
         ) from exc
 
 
@@ -54,13 +55,18 @@ def hash_cache(no_cache: bool, expiration: float) -> UserCache | None:
     """The hash cache, closed when the running command ends."""
     if no_cache:
         return None
-    cache = UserCache(app=CACHE_APP, expiration_time=expiration)
+    cache = UserCache(
+        app=CACHE_APP,
+        expiration_time=expiration,
+        base_dir=Path(platformdirs.user_cache_dir(CACHE_APP)) / "imghash",
+    )
     click.get_current_context().call_on_close(cache.close)
     return cache
 
 
 @click.command("img-hash")
 @hash_options
+@logging_options
 def img_hash_cmd(paths: tuple[Path, ...], hash_size: int, no_cache: bool) -> None:
     """Print the average hash of each image in PATH..."""
     imghash = load_extra_module("imghash")
@@ -82,6 +88,7 @@ def img_hash_cmd(paths: tuple[Path, ...], hash_size: int, no_cache: bool) -> Non
 
 @click.command("img-check")
 @paths_argument
+@logging_options
 def img_check_cmd(paths: tuple[Path, ...]) -> None:
     """Print each image in PATH... that cannot be fully decoded, with the
     reason; exit 1 if there was any."""
@@ -117,6 +124,7 @@ def img_check_cmd(paths: tuple[Path, ...]) -> None:
     default=None,
     help="run this command once per group, with the group's files appended",
 )
+@logging_options
 def img_duplicates_cmd(
     paths: tuple[Path, ...],
     hash_size: int,

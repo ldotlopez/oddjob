@@ -1,4 +1,4 @@
-"""`multitool autocrop` and `img-reduce` (need the `multitool` extra;
+"""`glados autocrop` and `img-reduce` (need the `images` extra;
 glados.lib.imgedit is imported only when they run, after -n)."""
 
 from __future__ import annotations
@@ -20,8 +20,9 @@ from filejobs.cli_options import (
 from filejobs.inputs import expand_inputs
 from filejobs.pipeline import BytesStep, Job, infix_destination, override_destination
 from filejobs.progress import BaseProgressReporter
+from glados.commands.imghash import load_extra_module
+from glados.core.cli_common import logging_options
 from glados.lib import media
-from multitool.commands.imghash import load_extra_module
 
 LOGGER = logging.getLogger(__name__)
 # fsjanitor's threshold (the shorter side of 4K UHD).
@@ -32,6 +33,7 @@ DEFAULT_MAX_SIZE = 2160
 @paths_argument
 @common_file_options
 @dry_run_option
+@logging_options
 def autocrop_cmd(
     paths: tuple[Path, ...], output: Path | None, overwrite: bool, dry_run: bool
 ) -> None:
@@ -69,6 +71,7 @@ def same_path(input_path: Path) -> Path:
 )
 @common_file_options
 @dry_run_option
+@logging_options
 def img_reduce_cmd(
     paths: tuple[Path, ...],
     max_size: int,

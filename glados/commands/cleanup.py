@@ -1,4 +1,4 @@
-"""`multitool fs-cleanup`: plan every removal (and chmod) first, then apply."""
+"""`glados fs-cleanup`: plan every removal (and chmod) first, then apply."""
 
 from __future__ import annotations
 
@@ -9,6 +9,7 @@ import rich_click as click
 from filejobs.batch import run_batch
 from filejobs.cli_options import dry_run_option, finish_batch, paths_argument
 from filejobs.progress import BaseProgressReporter
+from glados.core.cli_common import logging_options
 from glados.lib import cleanup
 
 
@@ -21,6 +22,7 @@ from glados.lib import cleanup
     help="also chmod files to 644 and directories to 755",
 )
 @dry_run_option
+@logging_options
 def fs_cleanup_cmd(
     paths: tuple[Path, ...], fix_permissions: bool, dry_run: bool
 ) -> None:

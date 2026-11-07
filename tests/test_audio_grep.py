@@ -14,7 +14,7 @@ from support import NullReporter
 
 from filejobs.inputs import media_type_filter
 from filejobs.progress import ProgressEvent, ProgressStream
-from glados.commands.audio_grep import cli
+from glados.commands.audio_grep import audio_grep_cmd
 from glados.lib.audio_grep import (
     TRANSCRIPT_TTL,
     CachedTranscripts,
@@ -222,7 +222,9 @@ class AudioGrepCommandTests(unittest.TestCase):
         self.runner = CliRunner()
 
     def test_greps_cached_transcripts_and_writes_no_sidecar(self) -> None:
-        result = self.runner.invoke(cli, ["-i", "-n", "BUDGET", str(self.media_dir)])
+        result = self.runner.invoke(
+            audio_grep_cmd, ["-i", "-n", "BUDGET", str(self.media_dir)]
+        )
         self.assertEqual(result.exit_code, 0, result.output)
         self.assertEqual(
             result.stdout,
@@ -236,17 +238,17 @@ class AudioGrepCommandTests(unittest.TestCase):
 
     def test_single_file_and_transcript_format(self) -> None:
         result = self.runner.invoke(
-            cli,
+            audio_grep_cmd,
             ["--transcript-format", "txt", "else", str(self.media_dir / "notes.m4a")],
         )
         self.assertEqual((result.exit_code, result.stdout), (0, "something else\n"))
 
     def test_no_match_exits_1(self) -> None:
-        result = self.runner.invoke(cli, ["absent", str(self.media_dir)])
+        result = self.runner.invoke(audio_grep_cmd, ["absent", str(self.media_dir)])
         self.assertEqual((result.exit_code, result.stdout), (1, ""))
 
     def test_needs_a_media_argument(self) -> None:
-        result = self.runner.invoke(cli, ["budget", "nothing-here.mp4"])
+        result = self.runner.invoke(audio_grep_cmd, ["budget", "nothing-here.mp4"])
         self.assertEqual(result.exit_code, 2)
         self.assertIn("no audio/video file or directory", result.output)
 

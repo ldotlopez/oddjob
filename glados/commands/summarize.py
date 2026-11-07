@@ -44,7 +44,7 @@ DEFAULT_INFIX = "summary"
 @dry_run_option
 @logging_options
 @pass_glados
-def cli(
+def summarize_cmd(
     glados: Glados,
     paths: tuple[Path, ...],
     max_length: int | None,
@@ -76,4 +76,4 @@ def cli(
 
 
 if __name__ == "__main__":
-    cli()
+    summarize_cmd()

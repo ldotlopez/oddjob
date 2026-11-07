@@ -80,7 +80,7 @@ def resolve_output_format(requested: str | None, output: Path | None) -> str:
 @dry_run_option
 @logging_options
 @pass_glados
-def cli(
+def transcribe_cmd(
     glados: Glados,
     paths: tuple[Path, ...],
     model: str | None,
@@ -116,4 +116,4 @@ def cli(
 
 
 if __name__ == "__main__":
-    cli()
+    transcribe_cmd()

@@ -60,7 +60,9 @@ class TranslateCommandTests(unittest.TestCase):
 
     def test_dry_run_needs_no_backend_and_skips_earlier_outputs(self) -> None:
         result = self.runner.invoke(
-            translate.cli, ["-n", "-l", "ES", str(self.tmp)], env=self.no_backend
+            translate.translate_cmd,
+            ["-n", "-l", "ES", str(self.tmp)],
+            env=self.no_backend,
         )
         self.assertEqual(result.exit_code, 0, result.output)
         self.assertEqual(
@@ -69,8 +71,10 @@ class TranslateCommandTests(unittest.TestCase):
         )
 
     def test_language_is_required_and_must_name_a_file(self) -> None:
-        missing = self.runner.invoke(translate.cli, [str(self.tmp)])
-        unusable = self.runner.invoke(translate.cli, ["-l", "//", str(self.tmp)])
+        missing = self.runner.invoke(translate.translate_cmd, [str(self.tmp)])
+        unusable = self.runner.invoke(
+            translate.translate_cmd, ["-l", "//", str(self.tmp)]
+        )
         self.assertEqual((missing.exit_code, unusable.exit_code), (2, 2))
 
     def with_fake_llm(self) -> dict[str, str | None]:
@@ -87,7 +91,9 @@ class TranslateCommandTests(unittest.TestCase):
     def test_an_existing_destination_fails_and_the_rest_runs(self) -> None:
         (self.tmp / "other.txt").write_text("adiós", encoding="utf-8")
         result = self.runner.invoke(
-            translate.cli, ["-l", "es", str(self.tmp)], env=self.with_fake_llm()
+            translate.translate_cmd,
+            ["-l", "es", str(self.tmp)],
+            env=self.with_fake_llm(),
         )
         self.assertEqual(result.exit_code, 1, result.output)
         self.assertIn("1 done, 1 failed", result.stderr)
@@ -100,7 +106,7 @@ class TranslateCommandTests(unittest.TestCase):
         env = self.with_fake_llm()
         args = ["-v", "-l", "Brazilian Portuguese", str(self.tmp / "notes.txt")]
         with self.assertLogs("filejobs", "INFO") as logs:
-            result = self.runner.invoke(translate.cli, args, env=env)
+            result = self.runner.invoke(translate.translate_cmd, args, env=env)
         self.assertEqual(result.exit_code, 0, result.output)
         self.assertEqual(result.stdout, "")
         destination = self.tmp / "notes.brazilian-portuguese.txt"

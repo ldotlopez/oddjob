@@ -1,6 +1,6 @@
 """Click options and job runners with no backend knowledge.
 
-Shared by glados' task commands and by multitool; nothing here imports the
+Shared by glados' task and file commands; nothing here imports the
 backend registry or the glados config (those live in glados/core/cli_common.py).
 """
 

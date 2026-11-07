@@ -77,7 +77,7 @@ is_media = media_type_filter("audio/", "video/")
     help="e.g. debug or glados.core:debug,*:info (also GLADOS_LOG_LEVEL)",
 )
 @pass_glados
-def cli(
+def audio_grep_cmd(
     glados: Glados,
     arguments: tuple[str, ...],
     backend: str | None,
@@ -134,4 +134,4 @@ def cli(
 
 
 if __name__ == "__main__":
-    cli()
+    audio_grep_cmd()

@@ -1,7 +1,7 @@
 """Generic subprocess runners: no knowledge of this project's tasks.
 
 Drives ffmpeg with arbitrary arguments and turns its progress output into
-a ProgressStream, for glados' transcribe and multitool's conversions alike.
+a ProgressStream, for transcribe and the jpgize/mp4ize conversions alike.
 """
 
 from __future__ import annotations

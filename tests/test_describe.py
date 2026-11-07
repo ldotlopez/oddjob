@@ -73,7 +73,7 @@ class DescribeCommandTests(unittest.TestCase):
             "GLADOS_DESCRIBE_BACKEND": None,
         }
         result = self.runner.invoke(
-            describe.cli, ["-n", "-w", str(self.tmp)], env=no_backend
+            describe.describe_cmd, ["-n", "-w", str(self.tmp)], env=no_backend
         )
         self.assertEqual(result.exit_code, 0, result.output)
         self.assertEqual(
@@ -95,14 +95,16 @@ class DescribeCommandTests(unittest.TestCase):
     def test_overwrite_and_dry_run_need_write(self) -> None:
         for flag in ("-y", "-n"):
             with self.subTest(flag=flag):
-                result = self.runner.invoke(describe.cli, [flag, str(self.tmp)])
+                result = self.runner.invoke(
+                    describe.describe_cmd, [flag, str(self.tmp)]
+                )
                 self.assertEqual(result.exit_code, 2, result.output)
                 self.assertIn("need -w or -o", result.output)
 
     def test_prints_descriptions_and_writes_nothing_by_default(self) -> None:
         llm, env = self.with_fake_llm()
         image = self.tmp / "cat.jpg"
-        result = self.runner.invoke(describe.cli, [str(image)], env=env)
+        result = self.runner.invoke(describe.describe_cmd, [str(image)], env=env)
         self.assertEqual(result.exit_code, 0, result.output)
         # The fake echoes "<system prompt>|<user text>"; describe sends no text.
         self.assertRegex(result.stdout, rf"^{image}: Describe the image .*\|\n$")
@@ -113,7 +115,9 @@ class DescribeCommandTests(unittest.TestCase):
         _, env = self.with_fake_llm()
         output = self.tmp / "out.txt"
         image = str(self.tmp / "cat.jpg")
-        result = self.runner.invoke(describe.cli, ["-o", str(output), image], env=env)
+        result = self.runner.invoke(
+            describe.describe_cmd, ["-o", str(output), image], env=env
+        )
         self.assertEqual(result.exit_code, 0, result.output)
         self.assertEqual(result.stdout, "")
         self.assertTrue(output.read_text(encoding="utf-8").startswith("Describe"))
@@ -123,7 +127,9 @@ class DescribeCommandTests(unittest.TestCase):
         image = self.tmp / "cat.jpg"
         with self.assertLogs("filejobs", "INFO") as logs:
             result = self.runner.invoke(
-                describe.cli, ["-v", "-w", "-i", "in Spanish", str(image)], env=env
+                describe.describe_cmd,
+                ["-v", "-w", "-i", "in Spanish", str(image)],
+                env=env,
             )
         self.assertEqual(result.exit_code, 0, result.output)
         self.assertEqual(result.stdout, "")

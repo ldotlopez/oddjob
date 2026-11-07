@@ -1,4 +1,4 @@
-"""`multitool jpgize` and `multitool mp4ize`: one Job per input file."""
+"""`glados jpgize` and `glados mp4ize`: one Job per input file."""
 
 from __future__ import annotations
 
@@ -17,6 +17,7 @@ from filejobs.inputs import expand_inputs
 from filejobs.pipeline import ProgressStep
 from filejobs.progress import BaseProgressReporter
 from filejobs.runners import FFMpegRunner
+from glados.core.cli_common import logging_options
 from glados.lib import media
 from glados.lib.conversions import (
     Conversion,
@@ -67,6 +68,7 @@ def convert_all(
 
 @click.command("jpgize")
 @conversion_options
+@logging_options
 def jpgize_cmd(
     paths: tuple[Path, ...], overwrite: bool, remove_source: bool, dry_run: bool
 ) -> None:
@@ -84,6 +86,7 @@ def jpgize_cmd(
 
 @click.command("mp4ize")
 @conversion_options
+@logging_options
 def mp4ize_cmd(
     paths: tuple[Path, ...], overwrite: bool, remove_source: bool, dry_run: bool
 ) -> None:

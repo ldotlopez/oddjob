@@ -1,33 +1,21 @@
 [project]
 name = "glados"
 version = "0.1.0"
-description = "CLI toolkit applying model backends (whisper, whisper.cpp, OpenAI-compatible APIs, Ollama, llm) to file-based tasks: transcribe, rewrite, summarize, expand, translate, describe; plus multitool, file utilities for sidecars, motion photos, conversions, image hashes, checks, crops, downscaling and captions, renames, extension fixes, date sync, OS-leftover cleanup and subtitle search."
+description = "CLI toolkit for files: model-backed tasks (transcribe, rewrite, summarize, expand, translate, describe, audio-grep) through replaceable backends (whisper, whisper.cpp, OpenAI-compatible APIs, Ollama, llm), and file utilities for sidecars, motion photos, conversions, image hashes, checks, crops, downscaling and captions, renames, extension fixes, date sync and OS-leftover cleanup."
 requires-python = ">=3.13"
 dependencies = [
     "platformdirs>=4.0",
     "rich>=13.0",
-    "rich-click>=1.7",
+    "rich-click>=1.9",
     "foundation",
     "pydantic>=2.14.3",
     "python-dotenv>=1.2.4",
     "requests>=2.34.2",
 ]
 
-# `glados <task> ...` is the multi-command entry point; each task is also
-# installed as its own independent tool (e.g. `transcribe file.mp4`),
-# matching how transcribe_sidecar.py worked standalone before this
-# migration — both point at the exact same click.Command object.
+# One entry point: every command is a `glados` subcommand.
 [project.scripts]
 glados = "glados.cli:cli"
-transcribe = "glados.commands.transcribe:cli"
-rewrite = "glados.commands.rewrite:cli"
-summarize = "glados.commands.summarize:cli"
-expand = "glados.commands.expand:cli"
-translate = "glados.commands.translate:cli"
-describe = "glados.commands.describe:cli"
-audio-grep = "glados.commands.audio_grep:cli"
-# File utilities without the backend registry (docs/decisions/0003).
-multitool = "multitool.cli:cli"
 
 # Which backend implements which task, readable without importing any
 # backend (see docs/decisions/0002). One group per task; the entry point's
@@ -64,7 +52,9 @@ ollama = "glados.plugins.ollama:__glados_plugin__"
 openai = "glados.plugins.openai:__glados_plugin__"
 
 [project.optional-dependencies]
-multitool = [
+# Pillow-based image commands (img-hash, img-duplicates, img-check, autocrop,
+# img-reduce).
+images = [
     "pillow>=13.0.0",
     "pillow-heif>=1.8.1",
 ]
@@ -79,10 +69,10 @@ multitool = [
 [tool.uv]
 package = true
 
-# Three top-level packages in one distribution: the two tools and their
-# shared filejobs (docs/decisions/0003, 0006).
+# Two top-level packages: the tool and its backend-free core, filejobs
+# (docs/decisions/0006).
 [tool.setuptools.packages.find]
-include = ["glados*", "multitool*", "filejobs*"]
+include = ["glados*", "filejobs*"]
 
 [tool.uv.sources]
 foundation = { git = "https://github.com/ldotlopez/foundation.git", branch = "main" }

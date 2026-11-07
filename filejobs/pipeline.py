@@ -2,8 +2,8 @@
 progress, and land the final result at a computed destination path.
 
 Each command supplies its own step list: transcribe has two (extract the
-audio, then transcribe it), the text tasks one TextStep, and multitool's
-byte transforms one BytesStep. Every step writes a temp file; only the last
+audio, then transcribe it), the text tasks one TextStep, and the file
+commands' byte transforms one BytesStep. Every step writes a temp file; only the last
 one is moved to the destination.
 """
 
