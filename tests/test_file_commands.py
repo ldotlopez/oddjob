@@ -55,6 +55,18 @@ class CommandTests(unittest.TestCase):
         names = {p.name for p in self.tmp.iterdir()}
         self.assertIn(renamers.file_digest(self.tmp / "b.txt", "crc32") + ".txt", names)
         self.assertNotIn("c.dat", names)
+        self.assertIn("2 done, 1 failed", result.output)
+
+    def test_clean_tree_is_silent(self) -> None:
+        (self.tmp / "a.jpg").write_bytes(b"a")
+        for command in ("fix-extensions", "hash-rename"):
+            with self.subTest(command=command):
+                if command == "hash-rename":
+                    name = renamers.file_digest(self.tmp / "a.jpg", "crc32") + ".jpg"
+                    (self.tmp / "a.jpg").rename(self.tmp / name)
+                result = self.runner.invoke(cli, [command, str(self.tmp)])
+                self.assertEqual(result.exit_code, 0, result.output)
+                self.assertEqual(result.output, "")
 
     def test_fix_extensions_dry_run_changes_nothing(self) -> None:
         (self.tmp / "a.JPEG").write_bytes(b"a")

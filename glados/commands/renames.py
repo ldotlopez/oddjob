@@ -27,11 +27,14 @@ def rename_planned(
     dry_run: bool,
     *earlier: BatchReport,
 ) -> None:
-    """Print the plan (-n), or apply it; then the summary of every batch."""
-    if dry_run:
+    """Print the plan (-n), or apply it; then the summary. The `earlier`
+    (planning) batches count only for their failures: their inputs are the
+    same files the renames count."""
+    planning = BatchReport(failures=[f for report in earlier for f in report.failures])
+    if dry_run or not planned:
         for rename in planned:
             click.echo(rename.describe())
-        finish_batch(*earlier)
+        finish_batch(planning)
         return
 
     def apply(rename: renamers.Rename, _reporter: BaseProgressReporter) -> None:
@@ -43,7 +46,7 @@ def rename_planned(
         description="Renaming",
         label=lambda rename: str(rename.source),
     )
-    finish_batch(*earlier, renaming)
+    finish_batch(planning, renaming)
 
 
 @click.command("hash-rename")
