@@ -41,9 +41,9 @@ Backends:
 - `describe`: a backend model that takes images (e.g. `gpt-4.1-mini`, or an Ollama
   vision model such as `llama3.2-vision` via `-m`).
 - For multitool: ImageMagick (`magick` or `convert`) and `exiftool` for `jpgize`,
-  `exiftool` for `img-caption`, `ffmpeg`/`ffprobe` for `mp4ize`, and the `multitool`
-  extra (Pillow, pillow-heif) for `img-hash`, `img-duplicates`, `img-check` and
-  `autocrop`.
+  `exiftool` for `img-caption` and for `date-sync` with `exif`, `ffmpeg`/`ffprobe` for
+  `mp4ize`, and the `multitool` extra (Pillow, pillow-heif) for `img-hash`,
+  `img-duplicates`, `img-check`, `autocrop` and `img-reduce`.
 
 ## Install
 
@@ -167,9 +167,12 @@ File utilities without backends or config, run as `multitool <command>`:
 | `img-duplicates PATH...`    | groups of near-duplicate images (`--max-distance`, `-x CMD` per group) |
 | `img-check PATH...`         | list the images that cannot be fully decoded, with the reason (exit 1 if any) |
 | `autocrop PATH...`          | crop images to their non-transparent pixels → `NAME.cropped.<ext>`     |
+| `img-reduce PATH...`        | downscale images whose longest side exceeds `--max-size` (2160) → `NAME.reduced.<ext>` (`--in-place`: replace the original) |
 | `img-caption PATH...`       | write each `NAME.description.txt` (from `glados describe -w`) into the image's XMP and EXIF description |
 | `hash-rename PATH...`       | rename each file to `<digest of its content>.<ext>` (`--algo`)        |
 | `fix-extensions PATH...`    | lowercase extensions; `jpeg` → `jpg`, `mpeg` → `mpg`, `tif` → `tiff`  |
+| `date-sync PATH...`         | copy each image's or video's date `--from` exif/mtime/name `--to` another; `--to name` renames to `YYYY-mm-dd HH.MM.SS <crc32>.<ext>` (`--name-format`, `--mtime-fallback`) |
+| `fs-cleanup PATH...`        | remove macOS, Windows and KDE leftovers (`.DS_Store`, `._NAME`, `Thumbs.db`, `.Trash-<uid>`...); `--perms`: chmod files 644, directories 755 |
 | `srt-grep PATTERN PATH...`  | cues containing PATTERN in `.srt` files (a media file means its `NAME.srt`; exit 1 if none) |
 
 ```sh
@@ -179,9 +182,10 @@ uv run multitool img-duplicates ~/Pictures -x "echo"
 ```
 
 Commands that change files (`jpgize`, `mp4ize`, `motionphotos merge`, `autocrop`,
-`img-caption`, `hash-rename`, `fix-extensions`) take `-n/--dry-run`; commands that would
-replace an existing file need `-y/--overwrite`, and `img-caption` always does (it
-writes in place). `img-hash`, `img-duplicates`, `img-check` and `autocrop` need the
+`img-reduce`, `img-caption`, `hash-rename`, `fix-extensions`, `date-sync`, `fs-cleanup`)
+take `-n/--dry-run`; commands that would replace an existing file need `-y/--overwrite`,
+and `img-caption` and `date-sync --to exif` always do (they write in place).
+`img-hash`, `img-duplicates`, `img-check`, `autocrop` and `img-reduce` need the
 `multitool` extra (`uv sync --extra multitool`). `img-caption` pairs with
 `glados describe -w`, and `srt-grep` with `glados transcribe -f srt`. Commands taking `PATH...`
 keep going when one input fails (exit 1 at the end); on success, commands that write

@@ -4,8 +4,8 @@
   tasks `rewrite`, `summarize`, `expand`, `translate`, `describe` (backends
   `openai`, `ollama`, `llm`; `describe` takes images and needs a vision model).
 - multitool commands: `sidecars`, `motionphotos`, `jpgize`, `mp4ize`, `img-hash`,
-  `img-duplicates`, `img-check`, `autocrop`, `img-caption`, `hash-rename`,
-  `fix-extensions`, `srt-grep`.
+  `img-duplicates`, `img-check`, `autocrop`, `img-reduce`, `img-caption`,
+  `hash-rename`, `fix-extensions`, `date-sync`, `fs-cleanup`, `srt-grep`.
 - Run tasks via `uv run glados <task> PATH...`; each task is also a standalone
   script (`uv run transcribe PATH...`) using the same click.Command.
 - Layout, shared by both tools (`docs/decisions/0005`): `<tool>/cli.py` is the
@@ -24,7 +24,7 @@
   filejobs imports neither. `tests/test_boundaries.py` checks all three.
 - multitool's runtime binaries: ImageMagick (`magick`/`convert`), `exiftool`,
   `ffmpeg`/`ffprobe`. Its Pillow code (`imghash`, `imgedit`: `img-hash`,
-  `img-duplicates`, `img-check`, `autocrop`) and their tests need the extra:
+  `img-duplicates`, `img-check`, `autocrop`, `img-reduce`) and their tests need the extra:
   `uv sync --extra multitool`; commands load it through `load_extra_module`.
 - Runtime needs `ffmpeg` and `ffprobe` on PATH, plus the selected transcribe
   backend's CLI: `whisper-cli` (`whisper_cpp`) or `whisper` from `openai-whisper`

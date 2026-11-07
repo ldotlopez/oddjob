@@ -1,7 +1,7 @@
 [project]
 name = "glados"
 version = "0.1.0"
-description = "CLI toolkit applying model backends (whisper, whisper.cpp, OpenAI-compatible APIs, Ollama, llm) to file-based tasks: transcribe, rewrite, summarize, expand, translate, describe; plus multitool, file utilities for sidecars, motion photos, conversions, image hashes, checks, crops and captions, renames, extension fixes and subtitle search."
+description = "CLI toolkit applying model backends (whisper, whisper.cpp, OpenAI-compatible APIs, Ollama, llm) to file-based tasks: transcribe, rewrite, summarize, expand, translate, describe; plus multitool, file utilities for sidecars, motion photos, conversions, image hashes, checks, crops, downscaling and captions, renames, extension fixes, date sync, OS-leftover cleanup and subtitle search."
 requires-python = ">=3.13"
 dependencies = [
     "platformdirs>=4.0",

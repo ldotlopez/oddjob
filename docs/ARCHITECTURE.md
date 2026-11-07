@@ -6,8 +6,8 @@ The repository holds two command-line tools in one distribution
 - **glados**: file-based tasks backed by models. Each task is a click command that
   builds a `Job` from pipeline steps, gets a backend for its task Protocol, and runs the
   job over every input with progress reporting.
-- **multitool**: file utilities (sidecars, motion photos, conversions, image hashes,
-  renames) with no backends (see [multitool](#multitool)).
+- **multitool**: file utilities (sidecars, motion photos, conversions, image hashes and
+  edits, renames, dates, cleanup) with no backends (see [multitool](#multitool)).
 
 Both build on **filejobs**, the backend-free core they share
 ([decision 0006](decisions/0006-filejobs-package.md)).
@@ -40,14 +40,16 @@ glados/
 multitool/
   cli.py              entry point: `multitool` group
   commands/           one module per tool: sidecars, motionphotos, conversions (jpgize, mp4ize),
-                      imghash (img-hash, img-duplicates, img-check), imgedit (autocrop),
-                      captions (img-caption), renames (hash-rename, fix-extensions),
+                      imghash (img-hash, img-duplicates, img-check), imgedit (autocrop,
+                      img-reduce), captions (img-caption), renames (hash-rename,
+                      fix-extensions), dates (date-sync), cleanup (fs-cleanup),
                       subtitles (srt-grep)
   sidecars.py, motionphotos.py, conversions.py, imghash.py, imgedit.py, captions.py,
-  renamers.py, subtitles.py
+  renamers.py, dates.py, cleanup.py, subtitles.py
                       domain code: grouping, motion-photo parsing, conversion steps, average hash
-                      and decode checks, autocrop, caption planning and step, rename planning,
-                      SRT parsing and search
+                      and decode checks, autocrop and downscaling, caption planning and step,
+                      rename planning, date reading and change planning, junk and permission
+                      planning, SRT parsing and search
   media.py            which files are images/videos and which ones each converter takes
   external.py         ImageMagick and exiftool adapters, user commands
 tests/                unittest suite: one module per backend module or tool area; support.py: shared fakes
@@ -101,12 +103,16 @@ an input that fails with one of `pipeline.JOB_ERRORS` (`OSError`, `RuntimeError`
 `ValueError`, `SubprocessError`) is logged and recorded, and the remaining inputs still
 run. Anything else is a bug and propagates. `finish_batch` prints `N done, M failed`
 and exits 1 if any input failed. `run_jobs` wraps both for commands that write files
-and logs `wrote <dest>` at INFO for each result; on success nothing is printed
+and logs `wrote <dest>` at INFO for each result; an action returning `None` wrote
+nothing for that input (`img-reduce` skipping an image that already fits) and still
+counts as done. On success nothing is printed
 ([decision 0007](decisions/0007-silent-on-success.md)).
 
 `-n/--dry-run` (every command that changes files) prints the plan and returns before
 any tool or backend is resolved: `input -> destination` for glados' tasks
-(`print_plan`), each planned operation for multitool's.
+(`print_plan`), each planned operation for multitool's. The one exception is
+`date-sync --from exif`, whose plan needs the dates, so `-n` runs exiftool to read
+them (it writes nothing).
 
 ## Landing results
 
@@ -186,17 +192,27 @@ functions under `run_batch` for reports, renames and checks, and `cli_options` f
 `PATH...`, `-y`, `-n` and logging (`logging_options_for("multitool")`).
 
 - Commands that change files (`jpgize`, `mp4ize`, `motionphotos`, `autocrop`,
-  `img-caption`, `hash-rename`, `fix-extensions`) plan first (`plan_conversions`,
-  `plan_merges`, `plan_captions`, `plan_rename`, `plan_extension_fix`, or a destination
-  per input), then apply, so `-n` prints the plan without touching anything or requiring
-  the external tools or the extra.
+  `img-reduce`, `img-caption`, `hash-rename`, `fix-extensions`, `date-sync`,
+  `fs-cleanup`) plan first (`plan_conversions`, `plan_merges`, `plan_captions`,
+  `plan_rename`, `plan_extension_fix`, `dates.plan_change`, `cleanup.plan_cleanup`, or a
+  destination per input), then apply, so `-n` prints the plan without touching anything
+  or requiring the extra, and the external tools only for `date-sync --from exif`.
+- `date-sync` reads every date first (`dates.DateReader`, under one `run_batch`), then
+  applies the planned `Rename`, `SetMtime` or `SetExifDate` changes under a second one.
+  EXIF and QuickTime dates go through exiftool (`-api QuickTimeUTC`, so video dates are
+  local time); dates are aware datetimes in the local zone.
+- `fs-cleanup` walks the trees itself (`cleanup.plan_cleanup`) instead of using
+  `filejobs.inputs.expand_inputs`, since it removes and chmods directories as well as
+  files; it does not descend into junk directories or follow symlinks.
 - In-memory transforms (motion-photo join/split/strip) are `BytesStep`s; `jpgize` is
   `JpegConversionStep` (ImageMagick, then exiftool copies the tags except Orientation)
   and `mp4ize` is `Mp4RemuxStep` (ffmpeg through `filejobs/runners.py`, copying the video
   stream; the audio is copied or, failing that, re-encoded to AAC).
-- `autocrop` is a `BytesStep` (Pillow); `img-caption` is `CaptionStep` (exiftool
-  writes XMP-dc:Description and EXIF:ImageDescription into a copy, landed in place).
-- `img-hash`, `img-duplicates`, `img-check` and `autocrop` need the `multitool` extra
+- `autocrop` and `img-reduce` are `BytesStep`s (Pillow, keeping EXIF and the ICC
+  profile; lossy formats saved at quality 90); `img-reduce --in-place` lands the result
+  on the input's own path. `img-caption` is `CaptionStep` (exiftool writes
+  XMP-dc:Description and EXIF:ImageDescription into a copy, landed in place).
+- `img-hash`, `img-duplicates`, `img-check`, `autocrop` and `img-reduce` need the `multitool` extra
   (Pillow, pillow-heif); `multitool.imghash` and `multitool.imgedit` are imported
   through `load_extra_module` only when one of them runs.
 - `img-check` and `srt-grep` are reports: the problems or matches on stdout, exit 1 if
