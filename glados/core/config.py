@@ -98,8 +98,9 @@ class Prompts(pydantic.BaseModel):
     def render_translate(self, language: str) -> str:
         return self.translate.format(language=language)
 
-    def render_describe(self, instructions: str | None) -> str:
-        return self.describe.format(instructions=instructions or "")
+    def render_describe(self, instructions: str | None, language: str | None) -> str:
+        prompt = self.describe.format(instructions=instructions or "")
+        return f"{prompt} Reply in {language}." if language else prompt
 
 
 DEFAULT_INSTRUCTIONS = "Improve clarity and correctness without changing the meaning."

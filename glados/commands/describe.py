@@ -2,8 +2,11 @@
 land it at NAME.description.txt, via a Describer backend.
 
 The system prompt comes from `[prompts] describe` in the config, with
--i/--instructions filling its `{instructions}`. Any text backend whose model
-takes images implements it (tasks/text_backend.py). Printing is a report
+-i/--instructions filling its `{instructions}`; "Reply in <language>." is
+appended, the language being -l/--language or else the system locale's. Any text backend whose model
+takes images implements it (lib/text_backend.py). Descriptions are cached
+(glados/lib/cache.py) by image content, prompt, backend and its options;
+--no-cache skips it. Printing is a report
 under run_batch; writing is a file producer (Job + run_jobs), so -o, -y and
 -n apply only then. The same click.Command is the `glados describe`
 subcommand and the standalone `describe` tool.
@@ -11,6 +14,8 @@ subcommand and the standalone `describe` tool.
 
 from __future__ import annotations
 
+import contextlib
+import locale
 from pathlib import Path
 
 import rich_click as click
@@ -29,6 +34,7 @@ from filejobs.cli_options import (
 from filejobs.inputs import expand_inputs
 from filejobs.pipeline import Job, override_destination, suffix_destination
 from filejobs.progress import BaseProgressReporter
+from glados.core.cache import open_user_cache
 from glados.core.cli_common import (
     backend_option,
     logging_options,
@@ -38,11 +44,24 @@ from glados.core.cli_common import (
 from glados.core.session import Glados
 from glados.lib.describe import (
     DESCRIPTION_EXTENSION,
+    CachedDescriber,
     DescribeStep,
+    DescriptionSettings,
     describe_image,
     is_image,
 )
+from glados.lib.language import language_name, locale_language
 from glados.lib.protocols import Describer
+
+
+def system_language() -> str | None:
+    """The language name of the user's message locale (LC_ALL, LC_MESSAGES,
+    LANG), or None when it is unset, unavailable or names no language."""
+    try:
+        locale.setlocale(locale.LC_MESSAGES, "")
+    except locale.Error:
+        return None
+    return locale_language(locale.getlocale(locale.LC_MESSAGES)[0])
 
 
 @click.command("describe")
@@ -52,6 +71,19 @@ from glados.lib.protocols import Describer
     "--instructions",
     default=None,
     help="extra instructions, e.g. 'in Spanish' or 'one sentence'",
+)
+@click.option(
+    "-l",
+    "--language",
+    default=None,
+    help="language of the description, e.g. 'es' or 'Brazilian Portuguese'"
+    " (default: the system locale's)",
+)
+@click.option(
+    "--no-cache",
+    is_flag=True,
+    default=False,
+    help="neither read nor store cached descriptions",
 )
 @click.option(
     "-w",
@@ -70,6 +102,8 @@ def describe_cmd(
     glados: Glados,
     paths: tuple[Path, ...],
     instructions: str | None,
+    language: str | None,
+    no_cache: bool,
     write: bool,
     model: str | None,
     backend: str | None,
@@ -89,21 +123,42 @@ def describe_cmd(
     if dry_run:
         print_plan(inputs, dest_fn)
         return
-    prompt = glados.config().prompts.render_describe(instructions)
-    describer = glados.backend("describe", Describer, backend, {"model": model})
-    if write:
-        job = Job(
-            steps=[(DescribeStep(describer, prompt), "Describing")], dest_fn=dest_fn
+    reply_language = language_name(language) if language else system_language()
+    prompt = glados.config().prompts.render_describe(instructions, reply_language)
+
+    overrides = {"model": model}
+
+    def make_describer() -> Describer:
+        return glados.backend("describe", Describer, backend, overrides)
+
+    with contextlib.ExitStack() as stack:
+        describer: Describer = (
+            make_describer()
+            if no_cache
+            else CachedDescriber(
+                stack.enter_context(open_user_cache()),
+                make_describer,
+                DescriptionSettings(
+                    *glados.backend_options("describe", backend, overrides)
+                ),
+            )
         )
-        run_jobs(inputs, job_action(job, overwrite), "Describing")
-        return
+        if write:
+            job = Job(
+                steps=[(DescribeStep(describer, prompt), "Describing")],
+                dest_fn=dest_fn,
+            )
+            run_jobs(inputs, job_action(job, overwrite), "Describing")
+            return
 
-    descriptions: list[tuple[Path, str]] = []
+        descriptions: list[tuple[Path, str]] = []
 
-    def collect(image: Path, reporter: BaseProgressReporter) -> None:
-        descriptions.append((image, describe_image(describer, prompt, image, reporter)))
+        def collect(image: Path, reporter: BaseProgressReporter) -> None:
+            descriptions.append(
+                (image, describe_image(describer, prompt, image, reporter))
+            )
 
-    report = run_batch(inputs, collect, description="Describing")
+        report = run_batch(inputs, collect, description="Describing")
     for image, description in descriptions:
         click.echo(f"{image}: {description}")
     finish_batch(report)

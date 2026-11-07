@@ -33,7 +33,6 @@ glados/
                       fix-extensions), dates (date-sync), cleanup (fs-cleanup)
   lib/                domain code, no config, backends or CLI:
                       protocols.py (task Protocols), transcribe.py (steps, formatters),
-                      translate.py (language -> file name infix), describe.py (describe_image, DescribeStep),
                       text_backend.py (ChatTransport Protocol; TextBackend: every text task over it),
                       audio_grep.py (argument split, transcript cache, grep over transcripts),
                       grep.py (GrepRunner: the system grep);
@@ -144,8 +143,8 @@ audio-grep ARGUMENTS...
   -> split_command_line: existing dirs and audio/video files are inputs, the rest grep args
   -> inputs = expand_inputs(inputs, audio/video)
   -> run_batch: per input, CachedTranscripts.segments
-       key = sha256(content sha256, mtime_ns, --backend, --model, --language)
-       UserCache ($XDG_CACHE_HOME/glados/transcripts, 180-day TTL) hit -> segments
+       key = audio-grep/ + sha256(content sha256, mtime_ns, --backend, --model, --language)
+       shared user cache (core/cache.py) hit -> segments
        miss -> Glados.backend("transcribe", ...) (first miss only)
             -> AudioExtractor -> Transcriber.transcribe -> segments -> cache
   -> grep_transcripts: FORMATTERS[--transcript-format] -> one temp file per input
@@ -179,10 +178,15 @@ through `lib/translate.language_infix`, names the output (`FILE.es.<ext>`).
 `describe` takes images instead of text, and by default prints instead of writing:
 
 ```
-describe PATH... -i INSTRUCTIONS [-w | -o FILE]
+describe PATH... -i INSTRUCTIONS [-l LANGUAGE] [-w | -o FILE]
   -> inputs = expand_inputs(PATH..., images)
-  -> prompt = config.prompts.render_describe(INSTRUCTIONS)
-  -> Glados.backend("describe", Describer, -b, {"model": -m}) -> TextBackend
+  -> language = language_name(-l) or the system locale's (commands/describe.py reads it)
+  -> prompt = config.prompts.render_describe(INSTRUCTIONS, language)  (appends "Reply in <language>.")
+  -> Glados.backend_options("describe", -b, {"model": -m}) -> (backend, options), nothing loaded
+  -> describer = CachedDescriber(shared cache, lazy Glados.backend("describe", ...))
+       key = describe/ + sha256(image content sha256, prompt, backend, options minus api_key)
+       hit -> text; miss -> TextBackend (built on the first miss) -> text -> cache
+       (--no-cache: the TextBackend directly)
   default (a report):
   -> run_batch: describe_image -> transport.complete(prompt, "", images=[INPUT])
        -> consume_stream -> text
@@ -236,7 +240,7 @@ renames and checks, and `cli_options` for `PATH...`, `-y` and `-n`; logging come
 - `img-hash`, `img-duplicates`, `img-check`, `autocrop` and `img-reduce` need the `images` extra
   (Pillow, pillow-heif); `glados.lib.imghash` and `glados.lib.imgedit` are imported
   through `load_extra_module` only when one of them runs. `img-hash` caches hashes in
-  `$XDG_CACHE_HOME/glados/imghash`.
+  the shared cache (`img-hash/` keys: content digest and hash size).
 - `img-check` is a report: the problems on stdout, exit 1 if there were any.
 
 Boundaries ([decision 0011](decisions/0011-one-tool.md)): filejobs imports nothing

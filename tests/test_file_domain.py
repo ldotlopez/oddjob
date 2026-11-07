@@ -2,7 +2,6 @@
 photos, renames and image hashes."""
 
 import importlib.util
-import os
 import tempfile
 import unittest
 from datetime import datetime
@@ -208,7 +207,7 @@ class ImageHashTests(unittest.TestCase):
         )
         self.assertEqual(imghash.duplicate_groups(hashes, max_distance=1), [])
 
-    def test_unchanged_file_is_answered_from_the_cache(self) -> None:
+    def test_hashes_are_cached_by_content_not_path(self) -> None:
         from glados.lib import imghash
 
         cache = UserCache(app="glados", base_dir=self.tmp / "cache")
@@ -216,13 +215,13 @@ class ImageHashTests(unittest.TestCase):
         hasher = imghash.ImageHasher(16, cache)
         image = self.tmp / "a.png"
         first = hasher.hash(image)
-        # Same size and mtime but unreadable content: only the cache can answer.
-        stat = image.stat()
-        image.write_bytes(b"\0" * stat.st_size)
-        os.utime(image, ns=(stat.st_atime_ns, stat.st_mtime_ns))
-        self.assertEqual(hasher.hash(image), first)
-        with self.assertRaises(OSError):
-            imghash.ImageHasher(16, cache=None).hash(image)
+        (self.tmp / "copy.png").write_bytes(image.read_bytes())
+        self.assertEqual(hasher.hash(self.tmp / "copy.png"), first)
+        (key,) = cache.iter()
+        self.assertRegex(key, r"^img-hash/[0-9a-f]{64}$")
+        hasher.hash(self.tmp / "b.png")
+        imghash.ImageHasher(8, cache).hash(image)
+        self.assertEqual(len(list(cache.iter())), 3)
 
     def test_decode_problem(self) -> None:
         from glados.lib import imghash

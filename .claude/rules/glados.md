@@ -2,7 +2,9 @@
 
 - Implemented tasks: `transcribe` (backends `whisper`, `whisper_cpp`) and the text
   tasks `rewrite`, `summarize`, `expand`, `translate`, `describe` (backends
-  `openai`, `ollama`, `llm`; `describe` takes images and needs a vision model), and
+  `openai`, `ollama`, `llm`; `describe` takes images and needs a vision model, and
+  replies in `-l` or else the system locale's language: `Prompts.render_describe`
+  appends "Reply in <language>.", not a template placeholder), and
   `audio-grep` (system grep over cached transcripts, through the `transcribe`
   backends; decision 0009).
 - File commands (no backends or config): `sidecars`, `motionphotos`, `jpgize`, `mp4ize`, `img-hash`,
@@ -66,6 +68,13 @@
   injected by `pass_glados`, never at import.
 - The backend registry is a deliberate exception to `architecture.md`'s "no plugin
   registries" rule: backends are the replaceable part here. Keep it.
+- One user cache for every command (`docs/decisions/0012`): open it with
+  `glados.core.cache.open_user_cache()` (180-day expiry, 1 GiB, least recently used
+  dropped first) and key entries with `glados.lib.cache.cache_key("<tool>", version,
+  ...)`, i.e. `<tool>/<digest>`, with no paths in the key; lib code receives the store
+  as a `ByteStore`. Include everything that changes the cached value (content, prompt,
+  backend, effective options via `Glados.backend_options`) and bump the layout version
+  when the value's format changes.
 - Nothing is imported until a backend is selected. A broken backend fails only
   when selected, with a clear error. Options of unused backends are not
   validated.

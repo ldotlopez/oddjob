@@ -6,15 +6,13 @@ never has to be known here. Each input is transcribed (or its transcript
 read from the cache), written to a temporary file, and grep runs once over
 all of them; the temporary paths in its output become the media paths.
 
-Transcripts are cached by a digest of the file's content, its mtime and
-the transcription settings. The key holds no path, so the cache cannot be
-used to find out which files were transcribed. The command is
-glados/commands/audio_grep.py.
+Transcripts are cached (glados/lib/cache.py) under `audio-grep/` by a digest
+of the file's content, its mtime and the transcription settings. The command
+is glados/commands/audio_grep.py.
 """
 
 from __future__ import annotations
 
-import hashlib
 import json
 import logging
 import os
@@ -22,21 +20,21 @@ import tempfile
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Protocol
 
 from foundation.cache import CacheMissError
 
 from filejobs.inputs import FileFilter
 from filejobs.pipeline import ProgressStep, consume_stream
 from filejobs.progress import BaseProgressReporter
+from glados.lib.cache import ByteStore, cache_key, file_sha256
 from glados.lib.grep import GrepResult, GrepRunner
 from glados.lib.protocols import Transcriber, TranscriptSegment
 from glados.lib.transcribe import FORMATTERS, AudioExtractor
 
 DEFAULT_TRANSCRIPT_FORMAT = "lrc"
-TRANSCRIPT_TTL = 180 * 24 * 60 * 60  # seconds
+CACHE_TOOL = "audio-grep"
 # Bumped when the cached value's layout changes, so old entries are misses.
-CACHE_KEY_VERSION = "audio-grep/1"
+CACHE_LAYOUT_VERSION = "1"
 
 LOGGER = logging.getLogger(__name__)
 
@@ -84,20 +82,16 @@ class TranscriptionSettings:
 
 
 def transcript_key(media: Path, settings: TranscriptionSettings) -> str:
-    """SHA-256 over the content's SHA-256, the mtime and the settings."""
-    with media.open("rb") as stream:
-        content_digest = hashlib.file_digest(stream, "sha256").hexdigest()
-    material = "\0".join(
-        [
-            CACHE_KEY_VERSION,
-            content_digest,
-            str(media.stat().st_mtime_ns),
-            settings.backend or "",
-            settings.model or "",
-            settings.language or "",
-        ]
+    """Keyed by the content's SHA-256, the mtime and the settings."""
+    return cache_key(
+        CACHE_TOOL,
+        CACHE_LAYOUT_VERSION,
+        file_sha256(media),
+        str(media.stat().st_mtime_ns),
+        settings.backend or "",
+        settings.model or "",
+        settings.language or "",
     )
-    return hashlib.sha256(material.encode("utf-8")).hexdigest()
 
 
 def encode_segments(segments: Sequence[TranscriptSegment]) -> bytes:
@@ -122,21 +116,13 @@ def decode_segments(value: bytes) -> list[TranscriptSegment]:
     return segments
 
 
-class TranscriptStore(Protocol):
-    """A foundation.cache.Cache: get raises CacheMissError on a miss."""
-
-    def get(self, key: str) -> bytes: ...
-
-    def set(self, key: str, value: bytes) -> None: ...
-
-
 class CachedTranscripts:
     """Transcript segments of a media file, from the store when cached, else
     from the transcriber, which is only built on the first miss."""
 
     def __init__(
         self,
-        store: TranscriptStore,
+        store: ByteStore,
         transcriber: Callable[[], Transcriber],
         settings: TranscriptionSettings,
         extractor: Callable[[], ProgressStep[Path]] = AudioExtractor,

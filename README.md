@@ -91,7 +91,10 @@ Common options:
 (e.g. `es`, `Brazilian Portuguese`), which also names its output. `describe` prints
 `PATH: description` per image; `-w, --write` (implied by `-o`) writes
 `<name>.description.txt` instead, and `-y`/`-n` apply only then. It also takes
-`-i, --instructions` (e.g. `in Spanish`).
+`-i, --instructions` and `-l, --language` (e.g. `es`, `Brazilian Portuguese`); without
+`-l` the description is requested in the language of the system locale (`LC_ALL`,
+`LC_MESSAGES`, `LANG`), and in no particular language under `C`/`POSIX` or an unset locale.
+Descriptions are cached; `--no-cache` skips it.
 
 `audio-grep` runs the system `grep` over the transcriptions of audio/video files:
 
@@ -105,9 +108,19 @@ own options are long-only, since grep owns the short ones: `--backend`, `--model
 `--language`, `--transcript-format` (what grep searches, default `lrc`: one
 timestamped line per segment) and `--log-level`. A pattern starting with `-` needs
 `-e`. Exit status is grep's, or 2 if a file could not be transcribed. No sidecar is
-written: transcripts are cached for 180 days in `$XDG_CACHE_HOME/glados/transcripts`,
-keyed by a digest of the file's content, its mtime and `--backend`/`--model`/
-`--language`, so the cache holds no paths.
+written: transcripts go to the shared cache (see below), keyed by a digest of the
+file's content, its mtime and `--backend`/`--model`/`--language`, so the cache holds
+no paths.
+
+### Cache
+
+`audio-grep`, `describe`, `img-hash` and `img-duplicates` share one cache in
+`$XDG_CACHE_HOME/glados`, owner-only, with keys `<command>/<digest>`. Entries expire
+after 180 days, and the least recently used are dropped when the cache passes 1 GiB
+(checked once a day). `describe` keys on the image's content, the prompt, the backend
+and its configured options (not `api_key`); `img-hash` on the content and `--hash-size`.
+`describe` and the hash commands take `--no-cache`. The cache can be deleted at any
+time.
 
 ## Configuration
 
@@ -184,7 +197,7 @@ File utilities without backends or config, run as `glados <command>`:
 | `motionphotos merge PATH...`| merge each `NAME.jpg` + `NAME.mp4` pair into `NAME.jpg` (`--rm`: remove the video) |
 | `jpgize PATH...`            | HEIC/HEIF/WebP/PNG → JPEG, upright, keeping metadata and timestamps (`--rm`: remove sources) |
 | `mp4ize PATH...`            | remux videos into MP4 without re-encoding the video (`--rm`: remove sources) |
-| `img-hash PATH...`          | print each image's average hash (cached; `--no-cache`)                |
+| `img-hash PATH...`          | print each image's average hash (cached by content; `--no-cache`)    |
 | `img-duplicates PATH...`    | groups of near-duplicate images (`--max-distance`, `-x CMD` per group) |
 | `img-check PATH...`         | list the images that cannot be fully decoded, with the reason (exit 1 if any) |
 | `autocrop PATH...`          | crop images to their non-transparent pixels → `NAME.cropped.<ext>`     |

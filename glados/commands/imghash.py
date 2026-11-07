@@ -10,7 +10,6 @@ from collections.abc import Callable
 from pathlib import Path
 from types import ModuleType
 
-import platformdirs
 import rich_click as click
 from foundation.cache import UserCache
 
@@ -19,11 +18,10 @@ from filejobs.cli_options import finish_batch, paths_argument
 from filejobs.inputs import expand_inputs
 from filejobs.pipeline import JOB_ERRORS
 from filejobs.progress import BaseProgressReporter
+from glados.core.cache import open_user_cache
 from glados.core.cli_common import logging_options
 from glados.lib import media
 from glados.lib.external import run_command_with_paths
-
-CACHE_APP = "glados"
 
 
 def load_extra_module(name: str) -> ModuleType:
@@ -51,15 +49,11 @@ def hash_options[F: Callable[..., object]](func: F) -> F:
     return paths_argument(func)
 
 
-def hash_cache(no_cache: bool, expiration: float) -> UserCache | None:
-    """The hash cache, closed when the running command ends."""
+def hash_cache(no_cache: bool) -> UserCache | None:
+    """The shared user cache, closed when the running command ends."""
     if no_cache:
         return None
-    cache = UserCache(
-        app=CACHE_APP,
-        expiration_time=expiration,
-        base_dir=Path(platformdirs.user_cache_dir(CACHE_APP)) / "imghash",
-    )
+    cache = open_user_cache()
     click.get_current_context().call_on_close(cache.close)
     return cache
 
@@ -70,9 +64,7 @@ def hash_cache(no_cache: bool, expiration: float) -> UserCache | None:
 def img_hash_cmd(paths: tuple[Path, ...], hash_size: int, no_cache: bool) -> None:
     """Print the average hash of each image in PATH..."""
     imghash = load_extra_module("imghash")
-    hasher = imghash.ImageHasher(
-        hash_size, hash_cache(no_cache, imghash.CACHE_EXPIRATION)
-    )
+    hasher = imghash.ImageHasher(hash_size, hash_cache(no_cache))
     results: list[tuple[Path, str]] = []
 
     def collect(path: Path, _reporter: BaseProgressReporter) -> None:
@@ -134,9 +126,7 @@ def img_duplicates_cmd(
 ) -> None:
     """Find groups of near-duplicate images in PATH..."""
     imghash = load_extra_module("imghash")
-    hasher = imghash.ImageHasher(
-        hash_size, hash_cache(no_cache, imghash.CACHE_EXPIRATION)
-    )
+    hasher = imghash.ImageHasher(hash_size, hash_cache(no_cache))
     hashes: list[tuple[Path, str]] = []
 
     def collect(path: Path, _reporter: BaseProgressReporter) -> None:

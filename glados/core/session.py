@@ -11,10 +11,11 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Callable, Mapping
+from typing import Any
 
 from dotenv import load_dotenv
 
-from glados.core.backends import check_config, resolve
+from glados.core.backends import check_config, effective_options, resolve
 from glados.core.config import Config, config_path, load_config
 
 LOGGER = logging.getLogger(__name__)
@@ -58,3 +59,14 @@ class Glados:
         core.backends.resolve. Raises BackendError (or ConfigError on the
         first call, from loading the config)."""
         return resolve(task, protocol, choice, self.config(), overrides or {})
+
+    def backend_options(
+        self,
+        task: str,
+        choice: str | None = None,
+        overrides: Mapping[str, object] | None = None,
+    ) -> tuple[str, dict[str, Any]]:
+        """The name of the backend `backend` would select for `task` and the
+        options it would be loaded with, without loading it: see
+        core.backends.effective_options."""
+        return effective_options(task, choice, self.config(), overrides or {})

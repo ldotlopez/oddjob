@@ -4,26 +4,24 @@ transcriptions of audio/video files (logic in glados/tasks/audio_grep.py).
 Every argument that is not one of the options below, an existing directory
 or an audio/video file goes to grep unchanged, so the options are long-only:
 grep owns nearly every short flag (-b, -m, -l, -v, -q, ...). Transcripts are
-cached in the user cache directory, never written as sidecars.
+cached in the shared user cache, never written as sidecars.
 """
 
 from __future__ import annotations
 
 from pathlib import Path
 
-import platformdirs
 import rich_click as click
-from foundation.cache import UserCache
 
 from filejobs.batch import run_batch
 from filejobs.cli_options import setup_logging
 from filejobs.inputs import expand_inputs, media_type_filter
 from filejobs.progress import BaseProgressReporter
+from glados.core.cache import open_user_cache
 from glados.core.cli_common import APP_LOGGER, pass_glados
 from glados.core.session import Glados
 from glados.lib.audio_grep import (
     DEFAULT_TRANSCRIPT_FORMAT,
-    TRANSCRIPT_TTL,
     CachedTranscripts,
     Transcript,
     TranscriptionSettings,
@@ -34,7 +32,6 @@ from glados.lib.grep import GrepRunner
 from glados.lib.protocols import Transcriber
 from glados.lib.transcribe import FORMATTERS
 
-CACHE_APP = "glados"
 # grep's exit status for an error; a failed transcription counts as one.
 GREP_ERROR = 2
 
@@ -103,10 +100,7 @@ def audio_grep_cmd(
         return glados.backend("transcribe", Transcriber, backend, {"model": model})
 
     transcripts: list[Transcript] = []
-    cache_dir = Path(platformdirs.user_cache_dir(CACHE_APP)) / "transcripts"
-    with UserCache(
-        app=CACHE_APP, expiration_time=TRANSCRIPT_TTL, base_dir=cache_dir
-    ) as cache:
+    with open_user_cache() as cache:
         source = CachedTranscripts(
             cache, make_transcriber, TranscriptionSettings(backend, model, language)
         )

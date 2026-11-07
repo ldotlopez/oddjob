@@ -1,6 +1,6 @@
 # 0009. audio-grep: one glados command with a transcript cache, replacing srt-grep
 
-Status: accepted (2026-11-07). Partly supersedes 0008 (its `agrep` split).
+Status: accepted (2026-11-07), partly superseded by 0012 (the cache location and key). Partly supersedes 0008 (its `agrep` split).
 
 ## Context
 

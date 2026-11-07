@@ -9,14 +9,17 @@ from collections.abc import Sequence
 from pathlib import Path
 
 import pillow_heif
-from foundation.cache import Cache, CacheMissError
+from foundation.cache import CacheMissError
 from PIL import Image, UnidentifiedImageError
+
+from glados.lib.cache import ByteStore, cache_key, file_sha256
 
 DEFAULT_HASH_SIZE = 16  # 16x16 = 256-bit hash
 DEFAULT_MAX_DISTANCE = 8  # bits that may differ between duplicates
 
-# How long a cached hash stays valid; keys change with the file anyway.
-CACHE_EXPIRATION = 30 * 24 * 60 * 60
+CACHE_TOOL = "img-hash"
+# Bumped when the cached value's layout changes, so old entries are misses.
+CACHE_LAYOUT_VERSION = "1"
 
 # What Pillow raises for undecodable data (UnidentifiedImageError and
 # "image file is truncated" are OSErrors; some plugins raise the others).
@@ -90,16 +93,17 @@ def duplicate_groups(
 
 
 class ImageHasher:
-    """Average hashes of image files, cached by path, size and mtime."""
+    """Average hashes of image files, cached by hash size and content."""
 
-    def __init__(self, size: int, cache: Cache | None) -> None:
+    def __init__(self, size: int, cache: ByteStore | None) -> None:
         pillow_heif.register_heif_opener()
         self.size = size
         self.cache = cache
 
     def _key(self, path: Path) -> str:
-        stat = path.stat()
-        return f"ahash{self.size}:{path.resolve()}:{stat.st_size}:{stat.st_mtime_ns}"
+        return cache_key(
+            CACHE_TOOL, CACHE_LAYOUT_VERSION, str(self.size), file_sha256(path)
+        )
 
     def hash(self, path: Path) -> str:
         if self.cache is None:

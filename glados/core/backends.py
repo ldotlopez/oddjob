@@ -161,6 +161,24 @@ def load[T](name: str, task: str, protocol: type[T], options: Mapping[str, Any])
         raise BackendError(f"backend {name}: {exc}") from exc
 
 
+def effective_options(
+    task: str,
+    choice: str | None,
+    cfg: Config,
+    overrides: Mapping[str, Any],
+) -> tuple[str, dict[str, Any]]:
+    """The backend selected for `task` and the options it is loaded with:
+    `[backends.<name>]`, then `[backends.<name>.tasks.<task>]`, then
+    `overrides` (CLI flags; None means not given). The backend's own defaults
+    are not included: they are only known once it is loaded."""
+    name = select(task, choice, cfg)
+    options = {
+        **cfg.backend_options(name, task),
+        **{key: value for key, value in overrides.items() if value is not None},
+    }
+    return name, options
+
+
 def resolve[T](
     task: str,
     protocol: type[T],
@@ -168,15 +186,9 @@ def resolve[T](
     cfg: Config,
     overrides: Mapping[str, Any],
 ) -> T:
-    """Select the backend for `task` and load it with its options: the
-    backend's defaults, then `[backends.<name>]`, then
-    `[backends.<name>.tasks.<task>]`, then `overrides` (CLI flags; None
-    means not given)."""
-    name = select(task, choice, cfg)
-    options = {
-        **cfg.backend_options(name, task),
-        **{key: value for key, value in overrides.items() if value is not None},
-    }
+    """Select the backend for `task` and load it with its options (see
+    effective_options; the backend's defaults come first)."""
+    name, options = effective_options(task, choice, cfg, overrides)
     return load(name, task, protocol, options)
 
 

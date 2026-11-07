@@ -9,14 +9,14 @@ from pathlib import Path
 from unittest import mock
 
 from click.testing import CliRunner
-from foundation.cache import MissingKeyError, UserCache
+from foundation.cache import MissingKeyError
 from support import NullReporter
 
 from filejobs.inputs import media_type_filter
 from filejobs.progress import ProgressEvent, ProgressStream
 from glados.commands.audio_grep import audio_grep_cmd
+from glados.core.cache import open_user_cache
 from glados.lib.audio_grep import (
-    TRANSCRIPT_TTL,
     CachedTranscripts,
     Transcript,
     TranscriptionSettings,
@@ -109,7 +109,7 @@ class TranscriptKeyTests(unittest.TestCase):
             os.utime(path, ns=(1_000, 2_000))
         key = transcript_key(first, DEFAULTS)
         self.assertEqual(key, transcript_key(second, DEFAULTS))
-        self.assertEqual(len(key), 64)
+        self.assertRegex(key, r"^audio-grep/[0-9a-f]{64}$")
         self.assertNotIn("a.mp3", key)
         self.assertNotEqual(
             key,
@@ -213,11 +213,7 @@ class AudioGrepCommandTests(unittest.TestCase):
         for name in ("meeting.mp4", "notes.m4a"):
             media = self.media_dir / name
             media.write_bytes(name.encode())
-            with UserCache(
-                app="glados",
-                expiration_time=TRANSCRIPT_TTL,
-                base_dir=self.cache_home / "glados" / "transcripts",
-            ) as cache:
+            with open_user_cache() as cache:
                 cache.set(transcript_key(media, DEFAULTS), encode_segments(SEGMENTS))
         self.runner = CliRunner()
 
