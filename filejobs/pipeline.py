@@ -222,6 +222,11 @@ class Job:
     step, and again right before the move, in case it appeared meanwhile;
     either check passes when `overwrite` is set. Intermediate temp files
     are removed whether or not the run succeeds.
+
+    A step may pass its input through unchanged. Only files the steps
+    created are removed or moved, never the input: when no step produced
+    a new file, the input is copied to the destination (or left alone when
+    the destination is the input itself).
     """
 
     def __init__(
@@ -242,20 +247,32 @@ class Job:
         check_destination(dest, overwrite)
 
         current = input_path
-        intermediates: list[Path] = []
-        moved = False
+        created: list[Path] = []
+        landed = False
         try:
             for step, description in self.steps:
                 current = consume_stream(step.run(current), reporter, description)
                 LOGGER.debug("%s: produced %s", description, current)
-                intermediates.append(current)
+                if current != input_path and current not in created:
+                    created.append(current)
 
-            move_to_destination(current, dest, overwrite)
-            moved = True
+            land_result(input_path, current, dest, overwrite)
+            landed = True
             return dest
         finally:
-            # every step's output is a temp file except the one that got
-            # moved to dest (if we got that far) — clean up the rest
-            cleanup = intermediates[:-1] if moved else intermediates
-            for produced in cleanup:
-                produced.unlink(missing_ok=True)
+            # remove every file the steps created, except the one that
+            # became dest (if we got that far)
+            for produced in created:
+                if not (landed and produced == current):
+                    produced.unlink(missing_ok=True)
+
+
+def land_result(input_path: Path, result: Path, dest: Path, overwrite: bool) -> None:
+    """Put a job's `result` at `dest`. A temp file is moved; the input
+    itself (every step passed it through) is copied, so it stays where it
+    is, or left alone when `dest` is the input."""
+    if result != input_path:
+        move_to_destination(result, dest, overwrite)
+    elif dest != input_path:
+        check_destination(dest, overwrite)
+        copy_into_place(input_path, dest)

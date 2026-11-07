@@ -29,7 +29,12 @@ from filejobs.pipeline import (
     move_to_destination,
     suffix_destination,
 )
-from filejobs.progress import BaseProgressReporter, PlainProgressReporter
+from filejobs.progress import (
+    BaseProgressReporter,
+    PlainProgressReporter,
+    ProgressEvent,
+    ProgressStream,
+)
 from glados.commands import rewrite, transcribe
 
 
@@ -171,6 +176,87 @@ class BytesStepAndRunJobsTests(unittest.TestCase):
         move_to_destination(produced, dest, overwrite=True)
         self.assertEqual(dest.read_text(), "new")
         self.assertFalse(produced.exists())
+
+
+class PassThroughStep:
+    """Returns its input unchanged, like a "skip, already done" step."""
+
+    def run(self, input_path: Path) -> ProgressStream[Path]:
+        yield ProgressEvent(completed=1, total=1, done=True, result=input_path)
+
+
+class FailingStep:
+    def run(self, input_path: Path) -> ProgressStream[Path]:
+        raise ValueError(f"cannot process {input_path.name}")
+        yield  # a generator, like every step
+
+
+class JobPassThroughTests(unittest.TestCase):
+    """Job.run removes or moves only files its steps created."""
+
+    def setUp(self) -> None:
+        self.tmp = make_tmp(self)
+        self.input = self.tmp / "a.dat"
+        self.input.write_bytes(b"abc")
+
+    def test_pass_through_then_producer_keeps_the_input(self) -> None:
+        job = Job(
+            steps=[
+                (PassThroughStep(), "Skipping"),
+                (BytesStep(bytes.upper, ".out"), "Uppercasing"),
+            ],
+            dest_fn=suffix_destination("out"),
+        )
+        dest = job.run(self.input, NullReporter())
+        self.assertEqual(dest.read_bytes(), b"ABC")
+        self.assertEqual(self.input.read_bytes(), b"abc")
+
+    def test_pass_through_then_failure_keeps_the_input(self) -> None:
+        job = Job(
+            steps=[(PassThroughStep(), "Skipping"), (FailingStep(), "Failing")],
+            dest_fn=suffix_destination("out"),
+        )
+        with self.assertRaises(ValueError):
+            job.run(self.input, NullReporter())
+        self.assertEqual(self.input.read_bytes(), b"abc")
+        self.assertFalse((self.tmp / "a.out").exists())
+
+    def test_only_pass_through_copies_to_another_destination(self) -> None:
+        job = Job(
+            steps=[(PassThroughStep(), "Skipping")],
+            dest_fn=suffix_destination("out"),
+        )
+        dest = job.run(self.input, NullReporter())
+        self.assertEqual(dest.read_bytes(), b"abc")
+        self.assertEqual(self.input.read_bytes(), b"abc")
+
+    def test_only_pass_through_in_place_leaves_the_input(self) -> None:
+        job = Job(steps=[(PassThroughStep(), "Skipping")], dest_fn=lambda path: path)
+        dest = job.run(self.input, NullReporter(), overwrite=True)
+        self.assertEqual(dest, self.input)
+        self.assertEqual(self.input.read_bytes(), b"abc")
+
+    def test_producer_then_pass_through_moves_the_temp_file(self) -> None:
+        produced: list[Path] = []
+
+        class RecordingStep(BytesStep):
+            def run(self, input_path: Path) -> ProgressStream[Path]:
+                for event in super().run(input_path):
+                    if event.done and event.result is not None:
+                        produced.append(event.result)
+                    yield event
+
+        job = Job(
+            steps=[
+                (RecordingStep(bytes.upper, ".out"), "Uppercasing"),
+                (PassThroughStep(), "Skipping"),
+            ],
+            dest_fn=suffix_destination("out"),
+        )
+        dest = job.run(self.input, NullReporter())
+        self.assertEqual(dest.read_bytes(), b"ABC")
+        self.assertFalse(produced[0].exists())
+        self.assertEqual(self.input.read_bytes(), b"abc")
 
 
 SHARED_MEMORY = Path("/dev/shm")

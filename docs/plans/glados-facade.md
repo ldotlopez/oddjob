@@ -1,6 +1,6 @@
 # Plan: a click-free `Glados` facade for config and backends
 
-Status: draft (2026-11-07).
+Status: done (2026-11-07), except step 6 (docs), which waits for approval.
 
 ## Context
 
