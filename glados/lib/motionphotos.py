@@ -3,7 +3,7 @@ MP4 video, in one .jpg file.
 
 The marker string can occur more than once (Samsung's trailer index names
 it again after the video), so the video marker is the first one followed
-by an MP4 `ftyp` box.
+by an MP4 `ftyp` box (`is_mp4`).
 """
 
 from __future__ import annotations
@@ -19,9 +19,20 @@ from glados.lib.sidecars import SidecarGroup
 MARKER = b"MotionPhoto_Data"
 
 
+# Major brands of the MP4 family, whatever the codec inside. Other ISO BMFF
+# files (QuickTime `qt  `, 3GP, HEIF, AVIF) also start with `ftyp` but are
+# not MP4: Android motion photos carry an MP4 video.
+MP4_BRANDS = frozenset(
+    {b"isom", b"mp41", b"mp42", b"avc1", b"dash"}
+    | {f"iso{version}".encode() for version in range(2, 10)}
+)
+
+
 def is_mp4(content: bytes, offset: int = 0) -> bool:
-    """Whether an MP4 (ISO BMFF) file starts at `offset`."""
-    return content[offset + 4 : offset + 8] == b"ftyp"
+    """Whether an MP4 file (an `ftyp` box with an MP4 major brand) starts
+    at `offset`."""
+    box = content[offset + 4 : offset + 12]
+    return box[:4] == b"ftyp" and box[4:] in MP4_BRANDS
 
 
 def _video_marker_index(content: bytes) -> int | None:

@@ -79,6 +79,19 @@ class MotionPhotoTests(unittest.TestCase):
         self.assertEqual(motionphotos.split(joined), (JPEG, MP4))
         self.assertEqual(motionphotos.strip(joined), JPEG)
 
+    def test_is_mp4_checks_the_major_brand(self) -> None:
+        for brand in (b"isom", b"mp41", b"mp42", b"iso6", b"avc1"):
+            with self.subTest(brand=brand):
+                self.assertTrue(motionphotos.is_mp4(b"\x00\x00\x00\x18ftyp" + brand))
+        for brand in (b"qt  ", b"heic", b"mif1", b"avif", b"3gp4"):
+            with self.subTest(brand=brand):
+                self.assertFalse(motionphotos.is_mp4(b"\x00\x00\x00\x18ftyp" + brand))
+
+    def test_join_rejects_a_quicktime_video(self) -> None:
+        mov = b"\x00\x00\x00\x14ftypqt  fake-video"
+        with self.assertRaisesRegex(ValueError, "not an MP4"):
+            motionphotos.join(JPEG, mov)
+
     def test_marker_not_followed_by_mp4_is_ignored(self) -> None:
         image = JPEG + motionphotos.MARKER + b"not a video"
         photo = motionphotos.MotionPhoto.parse(
