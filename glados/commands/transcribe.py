@@ -27,12 +27,12 @@ from filejobs.cli_options import (
 from filejobs.inputs import expand_inputs, media_type_filter
 from filejobs.pipeline import Job, override_destination, suffix_destination
 from glados.core.cli_common import (
-    GladosContext,
     backend_option,
     logging_options,
     model_option,
-    pass_glados_context,
+    pass_glados,
 )
+from glados.core.session import Glados
 from glados.tasks.protocols import Transcriber
 from glados.tasks.transcribe import (
     DEFAULT_OUTPUT_FORMAT,
@@ -79,9 +79,9 @@ def resolve_output_format(requested: str | None, output: Path | None) -> str:
 @common_file_options
 @dry_run_option
 @logging_options
-@pass_glados_context
+@pass_glados
 def cli(
-    ctx: GladosContext,
+    glados: Glados,
     paths: tuple[Path, ...],
     model: str | None,
     language: str | None,
@@ -99,7 +99,7 @@ def cli(
     if dry_run:
         print_plan(inputs, dest_fn)
         return
-    transcriber = ctx.backend("transcribe", Transcriber, backend, {"model": model})
+    transcriber = glados.backend("transcribe", Transcriber, backend, {"model": model})
     job = Job(
         steps=[
             (AudioExtractor(), "Extracting audio"),

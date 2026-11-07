@@ -19,12 +19,12 @@ from filejobs.cli_options import (
 from filejobs.inputs import expand_inputs, text_inputs_except_outputs
 from filejobs.pipeline import Job, TextStep, infix_destination, override_destination
 from glados.core.cli_common import (
-    GladosContext,
     backend_option,
     logging_options,
     model_option,
-    pass_glados_context,
+    pass_glados,
 )
+from glados.core.session import Glados
 from glados.tasks.protocols import Summarizer
 
 DEFAULT_INFIX = "summary"
@@ -43,9 +43,9 @@ DEFAULT_INFIX = "summary"
 @common_file_options
 @dry_run_option
 @logging_options
-@pass_glados_context
+@pass_glados
 def cli(
-    ctx: GladosContext,
+    glados: Glados,
     paths: tuple[Path, ...],
     max_length: int | None,
     model: str | None,
@@ -61,8 +61,8 @@ def cli(
     if dry_run:
         print_plan(inputs, dest_fn)
         return
-    prompt = ctx.config().prompts.render_summarize(max_length)
-    summarizer = ctx.backend("summarize", Summarizer, backend, {"model": model})
+    prompt = glados.config().prompts.render_summarize(max_length)
+    summarizer = glados.backend("summarize", Summarizer, backend, {"model": model})
     job = Job(
         steps=[
             (

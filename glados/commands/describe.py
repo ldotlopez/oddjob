@@ -30,12 +30,12 @@ from filejobs.inputs import expand_inputs
 from filejobs.pipeline import Job, override_destination, suffix_destination
 from filejobs.progress import BaseProgressReporter
 from glados.core.cli_common import (
-    GladosContext,
     backend_option,
     logging_options,
     model_option,
-    pass_glados_context,
+    pass_glados,
 )
+from glados.core.session import Glados
 from glados.tasks.describe import (
     DESCRIPTION_EXTENSION,
     DescribeStep,
@@ -65,9 +65,9 @@ from glados.tasks.protocols import Describer
 @common_file_options
 @dry_run_option
 @logging_options
-@pass_glados_context
+@pass_glados
 def cli(
-    ctx: GladosContext,
+    glados: Glados,
     paths: tuple[Path, ...],
     instructions: str | None,
     write: bool,
@@ -89,8 +89,8 @@ def cli(
     if dry_run:
         print_plan(inputs, dest_fn)
         return
-    prompt = ctx.config().prompts.render_describe(instructions)
-    describer = ctx.backend("describe", Describer, backend, {"model": model})
+    prompt = glados.config().prompts.render_describe(instructions)
+    describer = glados.backend("describe", Describer, backend, {"model": model})
     if write:
         job = Job(
             steps=[(DescribeStep(describer, prompt), "Describing")], dest_fn=dest_fn

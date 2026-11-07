@@ -19,7 +19,8 @@ from filejobs.batch import run_batch
 from filejobs.cli_options import setup_logging
 from filejobs.inputs import expand_inputs, media_type_filter
 from filejobs.progress import BaseProgressReporter
-from glados.core.cli_common import APP_LOGGER, GladosContext, pass_glados_context
+from glados.core.cli_common import APP_LOGGER, pass_glados
+from glados.core.session import Glados
 from glados.tasks.audio_grep import (
     DEFAULT_TRANSCRIPT_FORMAT,
     TRANSCRIPT_TTL,
@@ -75,9 +76,9 @@ is_media = media_type_filter("audio/", "video/")
     default=None,
     help="e.g. debug or glados.core:debug,*:info (also GLADOS_LOG_LEVEL)",
 )
-@pass_glados_context
+@pass_glados
 def cli(
-    ctx: GladosContext,
+    glados: Glados,
     arguments: tuple[str, ...],
     backend: str | None,
     model: str | None,
@@ -99,7 +100,7 @@ def cli(
         raise click.ClickException(str(exc)) from exc
 
     def make_transcriber() -> Transcriber:
-        return ctx.backend("transcribe", Transcriber, backend, {"model": model})
+        return glados.backend("transcribe", Transcriber, backend, {"model": model})
 
     transcripts: list[Transcript] = []
     cache_dir = Path(platformdirs.user_cache_dir(CACHE_APP)) / "transcripts"

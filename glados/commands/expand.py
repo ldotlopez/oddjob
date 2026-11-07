@@ -19,12 +19,12 @@ from filejobs.cli_options import (
 from filejobs.inputs import expand_inputs, text_inputs_except_outputs
 from filejobs.pipeline import Job, TextStep, infix_destination, override_destination
 from glados.core.cli_common import (
-    GladosContext,
     backend_option,
     logging_options,
     model_option,
-    pass_glados_context,
+    pass_glados,
 )
+from glados.core.session import Glados
 from glados.tasks.protocols import Expander
 
 DEFAULT_INFIX = "expanded"
@@ -43,9 +43,9 @@ DEFAULT_INFIX = "expanded"
 @common_file_options
 @dry_run_option
 @logging_options
-@pass_glados_context
+@pass_glados
 def cli(
-    ctx: GladosContext,
+    glados: Glados,
     paths: tuple[Path, ...],
     target_length: int | None,
     model: str | None,
@@ -61,8 +61,8 @@ def cli(
     if dry_run:
         print_plan(inputs, dest_fn)
         return
-    prompt = ctx.config().prompts.render_expand(target_length)
-    expander = ctx.backend("expand", Expander, backend, {"model": model})
+    prompt = glados.config().prompts.render_expand(target_length)
+    expander = glados.backend("expand", Expander, backend, {"model": model})
     job = Job(
         steps=[
             (TextStep(lambda text: expander.expand(text, prompt=prompt)), "Expanding")

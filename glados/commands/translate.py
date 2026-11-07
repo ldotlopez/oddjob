@@ -26,12 +26,12 @@ from filejobs.cli_options import (
 from filejobs.inputs import expand_inputs, text_inputs_except_outputs
 from filejobs.pipeline import Job, TextStep, infix_destination, override_destination
 from glados.core.cli_common import (
-    GladosContext,
     backend_option,
     logging_options,
     model_option,
-    pass_glados_context,
+    pass_glados,
 )
+from glados.core.session import Glados
 from glados.tasks.protocols import Translator
 from glados.tasks.translate import language_infix
 
@@ -62,9 +62,9 @@ def infix_of(
 @common_file_options
 @dry_run_option
 @logging_options
-@pass_glados_context
+@pass_glados
 def cli(
-    ctx: GladosContext,
+    glados: Glados,
     paths: tuple[Path, ...],
     target: tuple[str, str],
     model: str | None,
@@ -81,8 +81,8 @@ def cli(
     if dry_run:
         print_plan(inputs, dest_fn)
         return
-    prompt = ctx.config().prompts.render_translate(language)
-    translator = ctx.backend("translate", Translator, backend, {"model": model})
+    prompt = glados.config().prompts.render_translate(language)
+    translator = glados.backend("translate", Translator, backend, {"model": model})
     job = Job(
         steps=[
             (

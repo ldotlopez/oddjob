@@ -1,71 +1,46 @@
-"""Shared Click plumbing: common options and the per-invocation context
-object every task command reads from.
+"""Shared Click plumbing: common options, and pass_glados, which hands
+every task command the run's Glados (core/session.py).
 
-GladosContext is the same object whether a command runs under the
-`glados` group (`glados transcribe ...`) or as its own standalone tool
-(`transcribe ...`, no group at all) — click.make_pass_decorator's
-ensure=True calls ctx.ensure_object() for us, which creates a default
-instance when no parent group already put one on the context, so leaf
+The Glados lives on click's context object (ctx.obj), so it is the same
+one whether a command runs under the `glados` group (`glados transcribe
+...`) or as its own standalone tool (`transcribe ...`, no group at all):
+ensure_object() creates it when no parent group already did, and leaf
 commands never have to special-case which way they were invoked.
 """
 
 from __future__ import annotations
 
+import functools
 import logging
-from collections.abc import Callable, Mapping
-from dataclasses import dataclass
+from collections.abc import Callable
+from typing import Concatenate
 
 import rich_click as click
-from dotenv import load_dotenv
 
 from filejobs.cli_options import logging_options_for
-from glados.core.backends import BackendError, check_config, resolve
-from glados.core.config import Config, ConfigError, config_path, load_config
+from glados.core.backends import BackendError
+from glados.core.config import ConfigError
+from glados.core.session import Glados
 
 APP_LOGGER = "glados"
 
 LOGGER = logging.getLogger(__name__)
 
 
-@dataclass(slots=True)
-class GladosContext:
-    """What every task command needs from glados: the configuration (loaded
-    once, on first use, never at import) and the backend for its task.
-    Config and backend errors become a clean message + exit code. Running
-    the task's Job over its inputs is cli_options.run_jobs."""
+def pass_glados[**P, R](func: Callable[Concatenate[Glados, P], R]) -> Callable[P, R]:
+    """Passes the run's Glados as the first argument and turns its config
+    and backend errors into a clean message and exit code. Put it nearest
+    the function, below every click option."""
 
-    _config: Config | None = None
-
-    def config(self) -> Config:
-        if self._config is None:
-            load_dotenv()
-            path = config_path()
-            LOGGER.debug(
-                "config: %s (%s)", path, "found" if path.is_file() else "not found"
-            )
-            try:
-                cfg = load_config(path)
-                check_config(cfg)
-            except (ConfigError, BackendError) as exc:
-                raise click.ClickException(str(exc)) from exc
-            self._config = cfg
-        return self._config
-
-    def backend[T](
-        self,
-        task: str,
-        protocol: type[T],
-        choice: str | None,
-        overrides: Mapping[str, object],
-    ) -> T:
-        """The backend object for `task`: see core.backends.resolve."""
+    @functools.wraps(func)
+    def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
+        glados = click.get_current_context().ensure_object(Glados)
         try:
-            return resolve(task, protocol, choice, self.config(), overrides)
-        except BackendError as exc:
+            return func(glados, *args, **kwargs)
+        except (ConfigError, BackendError) as exc:
             raise click.ClickException(str(exc)) from exc
 
-
-pass_glados_context = click.make_pass_decorator(GladosContext, ensure=True)
+    return wrapper
 
 
 # --log-level/-v/-q for every glados task command, on the `glados` logger

@@ -26,12 +26,12 @@ from filejobs.cli_options import (
 from filejobs.inputs import expand_inputs, text_inputs_except_outputs
 from filejobs.pipeline import Job, TextStep, infix_destination, override_destination
 from glados.core.cli_common import (
-    GladosContext,
     backend_option,
     logging_options,
     model_option,
-    pass_glados_context,
+    pass_glados,
 )
+from glados.core.session import Glados
 from glados.tasks.protocols import Rewriter
 
 DEFAULT_INFIX = "rewrite"
@@ -51,9 +51,9 @@ DEFAULT_INFIX = "rewrite"
 @common_file_options
 @dry_run_option
 @logging_options
-@pass_glados_context
+@pass_glados
 def cli(
-    ctx: GladosContext,
+    glados: Glados,
     paths: tuple[Path, ...],
     instructions: str | None,
     model: str | None,
@@ -69,8 +69,8 @@ def cli(
     if dry_run:
         print_plan(inputs, dest_fn)
         return
-    prompt = ctx.config().prompts.render_rewrite(instructions)
-    rewriter = ctx.backend("rewrite", Rewriter, backend, {"model": model})
+    prompt = glados.config().prompts.render_rewrite(instructions)
+    rewriter = glados.backend("rewrite", Rewriter, backend, {"model": model})
     job = Job(
         steps=[
             (TextStep(lambda text: rewriter.rewrite(text, prompt=prompt)), "Rewriting")
