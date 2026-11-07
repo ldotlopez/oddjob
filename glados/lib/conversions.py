@@ -4,6 +4,7 @@ its timestamps (and, for images, its metadata)."""
 from __future__ import annotations
 
 import logging
+import shlex
 import shutil
 from collections.abc import Iterable
 from dataclasses import dataclass
@@ -91,8 +92,12 @@ class Conversion:
     remove_source: bool
 
     def describe(self) -> str:
-        action = f"convert {self.source} -> {self.destination}"
-        return f"{action}, then remove {self.source}" if self.remove_source else action
+        source, destination = (
+            shlex.quote(str(self.source)),
+            shlex.quote(str(self.destination)),
+        )
+        action = f"convert {source} -> {destination}"
+        return f"{action}, then remove {source}" if self.remove_source else action
 
 
 def plan_conversions(

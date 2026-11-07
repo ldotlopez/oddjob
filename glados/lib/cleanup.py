@@ -8,6 +8,7 @@ into, and nothing is followed through a symlink.
 
 from __future__ import annotations
 
+import shlex
 import shutil
 import stat
 from collections.abc import Iterable, Iterator
@@ -66,7 +67,8 @@ class Removal:
     directory: bool
 
     def describe(self) -> str:
-        return f"rm -r {self.path}" if self.directory else f"rm {self.path}"
+        command = ["rm", "-r"] if self.directory else ["rm"]
+        return shlex.join([*command, str(self.path)])
 
     def apply(self) -> None:
         if self.directory:
@@ -81,7 +83,7 @@ class Chmod:
     mode: int
 
     def describe(self) -> str:
-        return f"chmod {self.mode:o} {self.path}"
+        return shlex.join(["chmod", f"{self.mode:o}", str(self.path)])
 
     def apply(self) -> None:
         self.path.chmod(self.mode)

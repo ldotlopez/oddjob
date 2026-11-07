@@ -13,6 +13,7 @@ from __future__ import annotations
 import enum
 import os
 import re
+import shlex
 from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -139,7 +140,8 @@ class SetMtime:
     when: datetime
 
     def describe(self) -> str:
-        return f"touch -m -d '{self.when:%Y-%m-%d %H:%M:%S}' {self.path}"
+        when = f"{self.when:%Y-%m-%d %H:%M:%S}"
+        return shlex.join(["touch", "-m", "-d", when, str(self.path)])
 
 
 @dataclass(frozen=True, slots=True)
@@ -148,7 +150,8 @@ class SetExifDate:
     when: datetime
 
     def describe(self) -> str:
-        return f"exiftool -AllDates='{self.when:{EXIF_DATE_FORMAT}}' {self.path}"
+        when = f"{self.when:{EXIF_DATE_FORMAT}}"
+        return shlex.join(["exiftool", f"-AllDates={when}", str(self.path)])
 
 
 type DateChange = renamers.Rename | SetMtime | SetExifDate

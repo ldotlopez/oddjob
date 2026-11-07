@@ -8,6 +8,7 @@ by an MP4 `ftyp` box (`is_mp4`).
 
 from __future__ import annotations
 
+import shlex
 from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
@@ -91,8 +92,9 @@ class Merge:
     remove_video: bool
 
     def describe(self) -> str:
-        action = f"merge {self.video} into {self.image}"
-        return f"{action}, then remove {self.video}" if self.remove_video else action
+        video, image = shlex.quote(str(self.video)), shlex.quote(str(self.image))
+        action = f"merge {video} into {image}"
+        return f"{action}, then remove {video}" if self.remove_video else action
 
 
 def plan_merges(groups: Iterable[SidecarGroup], remove_video: bool) -> list[Merge]:

@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import shlex
 import shutil
 from collections.abc import Collection, Sequence
 from dataclasses import dataclass
@@ -25,7 +26,8 @@ class Caption:
     sidecar: Path
 
     def describe(self) -> str:
-        return f"caption {self.image} from {self.sidecar}"
+        image, sidecar = shlex.quote(str(self.image)), shlex.quote(str(self.sidecar))
+        return f"caption {image} from {sidecar}"
 
     def text(self) -> str:
         """The sidecar's text. ValueError if it is empty: exiftool would

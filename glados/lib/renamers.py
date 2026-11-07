@@ -4,6 +4,7 @@ fix-extensions normalizes extensions."""
 from __future__ import annotations
 
 import hashlib
+import shlex
 import zlib
 from dataclasses import dataclass
 from pathlib import Path
@@ -45,7 +46,7 @@ class Rename:
     destination: Path
 
     def describe(self) -> str:
-        return f"mv {self.source} {self.destination}"
+        return shlex.join(["mv", str(self.source), str(self.destination)])
 
 
 def plan_rename(source: Path, digest: str) -> Rename | None:

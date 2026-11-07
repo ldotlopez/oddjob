@@ -475,7 +475,8 @@ class DateSyncCommandTests(unittest.TestCase):
         os.utime(photo, (0, self.when.timestamp()))
         result = self.invoke("--from", "mtime", "--to", "name", "-n")
         self.assertEqual(result.exit_code, 0, result.output)
-        self.assertEqual(result.stdout, f"mv {photo} {self.dated(photo)}\n")
+        # The dated name has spaces: quoted, so the line can be pasted.
+        self.assertEqual(result.stdout, f"mv {photo} '{self.dated(photo)}'\n")
         self.assertTrue(photo.exists())
 
     def test_from_exif_to_name_renames_and_fails_files_without_a_date(self) -> None:
@@ -503,7 +504,7 @@ class DateSyncCommandTests(unittest.TestCase):
         self.assertIn("add -y", refused.output)
         planned = self.invoke("--from", "name", "--to", "exif", "-n")
         self.assertIn(
-            f"exiftool -AllDates='2019:07:14 18:03:22' {video}", planned.stdout
+            f"exiftool '-AllDates=2019:07:14 18:03:22' '{video}'", planned.stdout
         )
         done = self.invoke("--from", "name", "--to", "exif", "-y")
         self.assertEqual(done.exit_code, 0, done.output)
