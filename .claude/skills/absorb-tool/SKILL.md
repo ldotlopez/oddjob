@@ -1,6 +1,6 @@
 ---
 name: absorb-tool
-description: Bring an outside tool (a script, an ocdutils leftover, a one-off utility) into this repository as a glados command, either a task (model/service-backed, with replaceable backends) or a plain file command, following decisions 0004-0011. Use whenever the user wants to port, absorb, migrate, add or "bring in" a tool, script or command to glados, asks where a new tool should go, or asks to add a new glados task, file command or backend-backed command, even if they do not name this skill.
+description: Bring an outside tool (a script, an ocdutils leftover, a one-off utility) into this repository as a glados command, either a task (model/service-backed, with replaceable backends) or a plain file command, following decisions 0004-0011. Use whenever the user wants to port, absorb, migrate or "bring in" an existing tool, script or command to glados, or asks where such a tool should go, even if they do not name this skill. Its classification, command shapes, test and docs rules are also the conventions the create-tool skill follows; for a new tool designed from scratch (no source to port), use create-tool instead.
 ---
 
 # Absorb a tool into glados
