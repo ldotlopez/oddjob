@@ -3,7 +3,7 @@
 Nothing here knows about ffmpeg, whisper, or any particular task: it's the
 vocabulary that runners, backends, and the pipeline all speak. Rich bars are
 transient and plain progress is INFO logging, so a successful run leaves
-nothing behind unless -v is given (decision 0007).
+nothing behind unless -v is given (decision 0004).
 """
 
 from __future__ import annotations
@@ -115,7 +115,7 @@ class RichProgressReporter:
 
 class PlainProgressReporter:
     """No colors, no cursor control: occasional percentage lines, logged at
-    INFO, so they show only with -v (decision 0007)."""
+    INFO, so they show only with -v (decision 0004)."""
 
     STEP = 10  # log at most every STEP percentage points
 

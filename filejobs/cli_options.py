@@ -169,7 +169,7 @@ def run_jobs[T](
     label: Callable[[T], str] = str,
 ) -> None:
     """Run `action` on every item, logging each path it wrote at INFO, then
-    the batch summary (only on failure, decision 0007). An action returning
+    the batch summary (only on failure, decision 0004). An action returning
     None had nothing to write for that item, which still counts as done."""
 
     def run(item: T, reporter: BaseProgressReporter) -> None:

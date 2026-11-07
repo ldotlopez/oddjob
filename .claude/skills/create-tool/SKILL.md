@@ -111,8 +111,7 @@ a task also gets its entry-point group in `pyproject.toml` and `uv sync`.
 
 ## 7. Verify and report
 
-- absorb-tool's step 6 checklist, without the inventory row (a new tool has
-  none in `docs/plans/absorbing-tools.md`).
+- absorb-tool's step 6 checklist.
 - ruff and the full test suite green.
 - Run it once for real on a scratch directory: `uv run oddjob <name>
   --help`, then `-n`, then the real run, and check stdout is only what the

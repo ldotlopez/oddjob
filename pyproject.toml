@@ -19,7 +19,7 @@ dependencies = [
 oddjob = "oddjob.cli:cli"
 
 # Which backend implements which task, readable without importing any
-# backend (see docs/decisions/0002). One group per task; the entry point's
+# backend (see docs/decisions/0001). One group per task; the entry point's
 # name is the backend name and its value must be
 # `oddjob.plugins.<module>:__oddjob_plugin__`. One module may provide several
 # backends. Run `uv sync` after editing.
@@ -74,7 +74,7 @@ images = [
 package = true
 
 # Two top-level packages: the tool and its backend-free core, filejobs
-# (docs/decisions/0006).
+# (docs/decisions/0003).
 [tool.setuptools.packages.find]
 include = ["oddjob*", "filejobs*"]
 

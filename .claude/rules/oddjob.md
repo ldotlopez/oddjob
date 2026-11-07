@@ -8,14 +8,14 @@
   replies in `-l` or else the system locale's language: `Prompts.render_describe`
   appends "Reply in <language>.", not a template placeholder), and
   `audio-grep` (system grep over cached transcripts, through the `transcribe`
-  backends; decision 0009).
+  backends; decision 0006).
 - File commands (no backends or config): `sidecars`, `motionphotos`, `jpgize`, `mp4ize`, `img-hash`,
   `img-duplicates`, `img-check`, `img-trim`, `img-reduce`, `img-embed-description`,
   `rename-by-hash`, `fix-extensions`, `date-copy`, `cleanup`.
-- One tool (`docs/decisions/0011`): run every command as `uv run oddjob <command>
+- One tool (`docs/decisions/0003`): run every command as `uv run oddjob <command>
   PATH...`; `oddjob` is the only installed script. A command may resolve a backend
   and do file work in one run.
-- Layout (`docs/decisions/0005`, 0011): `oddjob/cli.py` is the click group (help
+- Layout (`docs/decisions/0003`): `oddjob/cli.py` is the click group (help
   panels by subject), `oddjob/commands/<command>.py` one click command or family
   each (wiring only, objects named `<name>_cmd`), and `oddjob/lib/` holds the
   domain modules, flat, with no config, backends or CLI (only where a command has
@@ -25,7 +25,7 @@
 - Every command that writes a file runs a `Job` through `run_jobs`; reports,
   renames and checks are plain functions under `run_batch` (`docs/decisions/0004`).
 - The backend-free core is `filejobs/` (`pipeline`, `progress`, `runners`, `inputs`,
-  `batch`, `cli_options`; `docs/decisions/0006`); `oddjob/core/` holds the backend
+  `batch`, `cli_options`; `docs/decisions/0003`); `oddjob/core/` holds the backend
   part. Boundaries: filejobs imports nothing from oddjob; `oddjob.lib` imports none
   of `oddjob.core`, `oddjob.plugins`, `oddjob.commands`; `oddjob.plugins` imports
   only `oddjob.lib`. `tests/test_boundaries.py` checks them. Only commands taking
@@ -54,7 +54,7 @@
   else lists tasks. The name is the backend,
   and the value must be `oddjob.plugins.<module>:__oddjob_plugin__`; a backend must
   name the same module in every group. Run `uv sync` after editing it. See
-  `docs/decisions/0002`.
+  `docs/decisions/0001`.
 - `__oddjob_plugin__(backend, options)` builds only the named backend, validating
   its global options with that backend's own pydantic model (`extra="forbid"`,
   defaults for everything), and returns `(task name, task Protocol, object)`
@@ -62,13 +62,13 @@
   (`core/backends.py`, keyed by module), and only for the selected backend.
 - Backend selection per task: `-b`, then `ODDJOB_<TASK>_BACKEND`, then `[tasks]` in
   the config, then the only installed implementor. Options: model defaults, then
-  `[backends.<name>]`, then `[backends.<name>.tasks.<task>]` (decision 0010; `tasks`
+  `[backends.<name>]`, then `[backends.<name>.tasks.<task>]` (decision 0002; `tasks`
   is a reserved key), then CLI overrides (`-m` → `model`). Per-run values are
   method arguments, not options.
 - Config is optional: `$XDG_CONFIG_HOME/oddjob/config.toml`, `${VAR}` expanded,
   `.env` loaded. It is read on first use in `Session` (`core/session.py`),
   injected by `pass_session`, never at import.
-- One user cache for every command (`docs/decisions/0012`): open it with
+- One user cache for every command (`docs/decisions/0007`): open it with
   `oddjob.core.cache.open_user_cache()` (180-day expiry, 1 GiB, least recently used
   dropped first) and key entries with `oddjob.lib.cache.cache_key("<tool>", version,
   ...)`, i.e. `<tool>/<digest>`, with no paths in the key; lib code receives the store
@@ -87,7 +87,7 @@
   takes `--log-level`/`-v`/`-q` after its name via `cli_common.logging_options`
   (`audio-grep`: `--log-level` only; the group takes none), which sets up the
   `oddjob` logger with `foundation.loglib` (`ODDJOB_LOG_LEVEL` when no flag is given)
-  and gives the `filejobs` logger the same level. Silent on success (decision 0007):
+  and gives the `filejobs` logger the same level. Silent on success (decision 0004):
   `wrote <dest>` and plain progress are INFO, shown with `-v`.
   Modules log through `logging.getLogger(__name__)`.
 - Tests: `uv run python -m unittest discover -s tests` (stdlib unittest; see

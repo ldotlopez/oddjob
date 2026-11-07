@@ -1,7 +1,7 @@
 # Architecture
 
 The repository holds one command-line tool, `oddjob`, whose commands are of two
-kinds ([decision 0011](decisions/0011-one-tool.md)):
+kinds ([decision 0003](decisions/0003-one-tool-layout-and-boundaries.md)):
 
 - **Tasks**: file-based work backed by models. Each task is a click command that
   builds a `Job` from pipeline steps, gets a backend for its task Protocol through
@@ -11,7 +11,7 @@ kinds ([decision 0011](decisions/0011-one-tool.md)):
   [File commands](#file-commands)).
 
 A command may be both: resolve a backend and do file work. Every command builds on
-**filejobs**, the backend-free core ([decision 0006](decisions/0006-filejobs-package.md)).
+**filejobs**, the backend-free core ([decision 0003](decisions/0003-one-tool-layout-and-boundaries.md)).
 
 Every command takes several files and directories (see [Inputs](#inputs)).
 
@@ -67,7 +67,7 @@ tests/                unittest suite: one module per backend module or command a
 
 - **Entry points**: `oddjob/cli.py` (the click group; the only installed script) and
   `oddjob/commands/` (one click command or command family each)
-  ([decision 0005](decisions/0005-one-command-layout.md), 0011). Commands only parse
+  ([decision 0003](decisions/0003-one-tool-layout-and-boundaries.md)). Commands only parse
   options, expand inputs, wire adapters (tasks: the backend, from `Session`) and
   hand the work to `run_jobs` or `run_batch`. click is imported only in `cli.py`,
   `commands/`, `filejobs/cli_*.py` and `oddjob/core/cli_*.py`;
@@ -104,7 +104,7 @@ expanded by `filejobs/inputs.expand_inputs`:
 - `-o/--output` names one destination, so it only applies when the arguments
   expand to exactly one file (`check_single_output`, a usage error otherwise).
 
-Failure policy (`filejobs/batch.run_batch`, [decision 0004](decisions/0004-jobs-and-batches.md)):
+Failure policy (`filejobs/batch.run_batch`, [decision 0004](decisions/0004-jobs-batches-and-output.md)):
 an input that fails with one of `pipeline.JOB_ERRORS` (`OSError`, `RuntimeError`,
 `ValueError`, `SubprocessError`) is logged and recorded, and the remaining inputs still
 run. Anything else is a bug and propagates. `finish_batch` prints `N done, M failed`
@@ -112,7 +112,7 @@ and exits 1 if any input failed. `run_jobs` wraps both for commands that write f
 and logs `wrote <dest>` at INFO for each result; an action returning `None` wrote
 nothing for that input (`img-reduce` skipping an image that already fits) and still
 counts as done. On success nothing is printed
-([decision 0007](decisions/0007-silent-on-success.md)).
+([decision 0004](decisions/0004-jobs-batches-and-output.md)).
 
 `-n/--dry-run` (every command that changes files) prints the plan and returns before
 any tool or backend is resolved: `input -> destination` for oddjob's tasks
@@ -251,7 +251,7 @@ renames and checks, and `cli_options` for `PATH...`, `-y` and `-n`; logging come
   the shared cache (`img-hash/` keys: content digest and hash size).
 - `img-check` is a report: the problems on stdout, exit 1 if there were any.
 
-Boundaries ([decision 0011](decisions/0011-one-tool.md)): filejobs imports nothing
+Boundaries ([decision 0003](decisions/0003-one-tool-layout-and-boundaries.md)): filejobs imports nothing
 from oddjob; `oddjob.lib` imports none of `oddjob.core`, `oddjob.plugins` and
 `oddjob.commands`; `oddjob.plugins` imports only `oddjob.lib`.
 `tests/test_boundaries.py` checks them, and `tests/test_session.py` runs a file command
@@ -261,8 +261,7 @@ with a config loader that always fails.
 
 Which backend implements which task is declared in `pyproject.toml`, one entry-point
 group per task, so it is known without importing any backend
-([decision 0002](decisions/0002-one-module-many-backends.md), superseding
-[0001](decisions/0001-backend-capabilities-in-entry-point-metadata.md)). The entry
+([decision 0001](decisions/0001-backends-in-entry-point-metadata.md)). The entry
 point's name is the backend; its value names the module, and one module may provide
 several backends:
 
@@ -315,7 +314,7 @@ The OpenAI `whisper` backend has no tests yet.
 `Config` model (`tasks`, `backends`, `prompts`) and checked against the installed
 backends. A missing file is an empty config. A backend's options for a task are
 `[backends.<name>]` with `[backends.<name>.tasks.<task>]` on top
-(`Config.backend_options`, decision 0010).
+(`Config.backend_options`, decision 0002).
 
 ## Console and logging
 

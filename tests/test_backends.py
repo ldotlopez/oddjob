@@ -1,6 +1,6 @@
 """core/backends.py and the backend part of core/config.py: the task list
 from entry-point metadata, and per-task backend options
-(`[backends.<name>.tasks.<task>]`, decision 0010)."""
+(`[backends.<name>.tasks.<task>]`, decision 0002)."""
 
 import re
 import unittest

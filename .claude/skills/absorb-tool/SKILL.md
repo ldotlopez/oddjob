@@ -1,11 +1,11 @@
 ---
 name: absorb-tool
-description: Bring an outside tool (a script, an ocdutils leftover, a one-off utility) into this repository as an oddjob command, either a task (model/service-backed, with replaceable backends) or a plain file command, following decisions 0004-0011. Use whenever the user wants to port, absorb, migrate or "bring in" an existing tool, script or command to oddjob, or asks where such a tool should go, even if they do not name this skill. Its classification, command shapes, test and docs rules are also the conventions the create-tool skill follows; for a new tool designed from scratch (no source to port), use create-tool instead.
+description: Bring an outside tool (a script, an ocdutils leftover, a one-off utility) into this repository as an oddjob command, either a task (model/service-backed, with replaceable backends) or a plain file command, following decisions 0003-0005. Use whenever the user wants to port, absorb, migrate or "bring in" an existing tool, script or command to oddjob, or asks where such a tool should go, even if they do not name this skill. Its classification, command shapes, test and docs rules are also the conventions the create-tool skill follows; for a new tool designed from scratch (no source to port), use create-tool instead.
 ---
 
 # Absorb a tool into oddjob
 
-The repository is one tool, `oddjob` (decision 0011), in two packages, with
+The repository is one tool, `oddjob` (decision 0003), in two packages, with
 one way of doing things. Every new tool must fit it without changing it:
 
 - `filejobs/`: backend-free core (`Job`, steps, destination policies,
@@ -22,15 +22,14 @@ one way of doing things. Every new tool must fit it without changing it:
 One batch policy (0004). `tests/test_boundaries.py` enforces imports and
 where click may be imported.
 
-A tool is **absorbed** when it runs as a `oddjob` command, follows 0004's
+A tool is **absorbed** when it runs as an `oddjob` command, follows 0004's
 policies, has tests, and the docs describing it have been proposed (and
 edited only after approval).
 
 Before starting, read `README.md`, `docs/ARCHITECTURE.md` and
-`docs/decisions/` (project rule), and check
-`docs/plans/absorbing-tools.md` for open prerequisites and the inventory.
-The skill describes the state after those prerequisites (notably decision
-0007, silent on success); do not port a tool before they are done.
+`docs/decisions/` (project rule). Decision 0005 lists the tools already
+left out and why; `docs/BACKLOG.md` lists open work that may touch the
+tool being ported.
 
 ## Workflow
 
@@ -39,8 +38,7 @@ writing code (one question at a time), never guess a classification.
 
 ### 1. Intake
 
-Read the tool's source and fill its row in the inventory of
-`docs/plans/absorbing-tools.md` (section 1):
+Read the tool's source and settle these points with the user:
 
 | Column | Meaning |
 |---|---|
@@ -63,7 +61,7 @@ Read the tool's source and fill its row in the inventory of
    specific and a second consumer needs it. Never imports `oddjob`; click
    only in `filejobs/cli_*.py`.
 
-**Mixed tools** (model part + file part, decision 0011): one command may do
+**Mixed tools** (model part + file part, decision 0003): one command may do
 both. It takes `pass_session` and resolves the backend for its model part,
 and reuses the domain code in `oddjob/lib/` for the file part (e.g. a
 describe step followed by `CaptionStep`). The model part still gets a task
@@ -82,7 +80,7 @@ misdescribes (precedent: `renamers` → `rename-by-hash`).
 | Single file | fixed explicit names (`join -i --video -o`) | `Job` + `run_single_job` | nothing on success (`wrote <dest>` at INFO); clean `ClickException` on failure |
 | Report / rename / check | no file produced | plain function per item + `run_batch` + `finish_batch` | the report on stdout (what the command is for); summary on failure |
 
-Silent on success (decision 0007): stdout carries only what the command was
+Silent on success (decision 0004): stdout carries only what the command was
 asked for (reports, `-n` plans), never confirmations. Use `LOGGER.info` for
 anything else; never `click.echo` a success message. Progress needs nothing
 from the command: rich bars are transient, and off a terminal progress is
@@ -173,5 +171,5 @@ List the affected files with a one- or two-line summary each, then wait:
 - `pyproject.toml` description: the tool list.
 - `docs/decisions/`: a new record only if the port changes an approach
   (new command shape, new `JOB_ERRORS` member, code moved to `filejobs`, a
-  tool that does not fit the classification). Decisions are append-only.
-- `docs/plans/absorbing-tools.md`: mark the tool's inventory row done.
+  tool that does not fit the classification, a tool left out for a reason
+  decision 0005 does not already give). Decisions are append-only.

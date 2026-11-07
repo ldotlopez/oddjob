@@ -6,7 +6,7 @@ know it. Several backends may live in one module: each entry point's value
 names the module (`oddjob.plugins.<module>:__oddjob_plugin__`). Only the
 selected backend's module is imported, through foundation.plugin.Register:
 its entry point receives the backend name and its options and returns
-`(task name, task Protocol, object)` triples. See docs/decisions/0002 for
+`(task name, task Protocol, object)` triples. See docs/decisions/0001 for
 why, and how to change it.
 """
 

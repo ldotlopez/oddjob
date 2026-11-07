@@ -38,7 +38,7 @@ A new task needs everything, in this order.
    - `__oddjob_plugin__(backend, options)`: builds only the named backend
      (name → factory mapping), validates only its options, returns
      `(task, Protocol, object)` triples, one per task. One module may hold
-     several variants (decision 0002).
+     several variants (decision 0001).
    Model defaults go through `platformdirs`; no env lookups or hardcoded
    paths elsewhere.
 
