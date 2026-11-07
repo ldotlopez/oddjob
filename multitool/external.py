@@ -3,6 +3,7 @@ and arbitrary user commands. ffmpeg goes through filejobs.runners."""
 
 from __future__ import annotations
 
+import json
 import logging
 import shlex
 import shutil
@@ -11,14 +12,18 @@ from collections.abc import Sequence
 from pathlib import Path
 
 LOGGER = logging.getLogger(__name__)
+# How exiftool reads and writes dates (EXIF's own layout).
+EXIF_DATE_FORMAT = "%Y:%m:%d %H:%M:%S"
 
 
-def _run_tool(cmd: Sequence[str]) -> None:
+def _run_tool(cmd: Sequence[str]) -> str:
+    """Run `cmd` and return its stdout; a non-zero exit is a RuntimeError."""
     LOGGER.debug("running: %s", shlex.join(cmd))
     proc = subprocess.run(cmd, capture_output=True, text=True, check=False)
     if proc.returncode != 0:
         detail = proc.stderr.strip() or f"exit status {proc.returncode}"
         raise RuntimeError(f"{Path(cmd[0]).name} failed: {detail}")
+    return proc.stdout
 
 
 def _require_binary(*candidates: str) -> str:
@@ -77,6 +82,44 @@ class ExifTool:
                 "exif=utf8",
                 f"-XMP-dc:Description={text}",
                 f"-EXIF:ImageDescription={text}",
+                str(path),
+            ]
+        )
+
+    def read_dates(self, path: Path, tags: Sequence[str]) -> dict[str, str]:
+        """The `tags` of `path` that are set, as exiftool prints them with
+        EXIF_DATE_FORMAT; QuickTime dates are converted from UTC to local
+        time (`-api QuickTimeUTC`)."""
+        output = _run_tool(
+            [
+                self.binary,
+                "-json",
+                "-api",
+                "QuickTimeUTC",
+                "-d",
+                EXIF_DATE_FORMAT,
+                *(f"-{tag}" for tag in tags),
+                str(path),
+            ]
+        )
+        try:
+            (entry,) = json.loads(output)
+        except ValueError as exc:
+            raise RuntimeError(f"exiftool printed no JSON object: {exc}") from exc
+        return {tag: str(entry[tag]) for tag in tags if tag in entry}
+
+    def write_dates(self, path: Path, tags: Sequence[str], value: str) -> None:
+        """Set every one of `tags` of `path` to `value` (EXIF_DATE_FORMAT,
+        local time) in place, keeping the file's modification time."""
+        _run_tool(
+            [
+                self.binary,
+                "-quiet",
+                "-overwrite_original",
+                "-preserve",
+                "-api",
+                "QuickTimeUTC",
+                *(f"-{tag}={value}" for tag in tags),
                 str(path),
             ]
         )

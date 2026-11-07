@@ -5,6 +5,7 @@ import importlib.util
 import os
 import tempfile
 import unittest
+from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -13,6 +14,7 @@ from foundation.cache import UserCache
 from multitool import (
     captions,
     cleanup,
+    dates,
     media,
     motionphotos,
     renamers,
@@ -341,6 +343,46 @@ class ImageEditTests(unittest.TestCase):
             imgedit.reduce(animated, 10)
         with self.assertRaisesRegex(ValueError, "already fits"):
             imgedit.reduce(self.encoded(frames[0], "PNG"), 40)
+
+
+class DateTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.when = datetime(2019, 7, 14, 18, 3, 22).astimezone()
+
+    def test_name_pattern_reads_dates_from_names(self) -> None:
+        default = dates.name_pattern(dates.DEFAULT_NAME_FORMAT)
+        android = dates.name_pattern("IMG_%Y%m%d_%H%M%S")
+        short = dates.name_pattern("%d.%m.%y")
+        for name, pattern, expected in (
+            ("2019-07-14 18.03.22 9f3a01bc.jpg", default, self.when),
+            ("IMG_20190714_180322.jpg", android, self.when),
+            ("trip 14.07.19.jpg", short, self.when.replace(hour=0, minute=0, second=0)),
+        ):
+            self.assertEqual(dates.date_from_name(name, pattern), expected, name)
+        with self.assertRaises(dates.DateNotFoundError):
+            dates.date_from_name("IMG_1234.jpg", default)
+
+    def test_name_pattern_rejects_bad_formats(self) -> None:
+        for name_format in ("%Y-%q", "%Y %Y-%m-%d", "%H.%M"):
+            with self.assertRaises(ValueError, msg=name_format):
+                dates.name_pattern(name_format)
+
+    def test_date_from_tags_prefers_the_original_and_skips_zeroes(self) -> None:
+        tags = {
+            "DateTimeOriginal": "0000:00:00 00:00:00",
+            "CreateDate": "2019:07:14 18:03:22",
+            "MediaCreateDate": "2001:01:01 00:00:00",
+        }
+        self.assertEqual(dates.date_from_tags(tags), self.when)
+        tags["DateTimeOriginal"] = "2018:01:02 03:04:05"
+        self.assertEqual(dates.date_from_tags(tags).year, 2018)
+        self.assertIsNone(dates.date_from_tags({}))
+
+    def test_dated_name_normalizes_the_extension(self) -> None:
+        self.assertEqual(
+            dates.dated_name(Path("d/IMG_1.JPEG"), self.when, "9f3a01bc"),
+            Path("d/2019-07-14 18.03.22 9f3a01bc.jpg"),
+        )
 
 
 class CleanupTests(unittest.TestCase):

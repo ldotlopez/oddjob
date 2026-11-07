@@ -1,12 +1,15 @@
 """multitool commands through click's CliRunner."""
 
+import json
 import logging
+import os
 import tempfile
 import unittest
+from datetime import datetime
 from pathlib import Path
 
-from click.testing import CliRunner
-from support import write_executable
+from click.testing import CliRunner, Result
+from support import recorded_argv, write_executable
 from test_multitool_conversions import FAKE_WRITER
 from test_multitool_domain import HAS_PILLOW, JPEG, MP4, SRT
 
@@ -403,6 +406,117 @@ class ImgCaptionCommandTests(unittest.TestCase):
         self.assertEqual(done.stdout, "")
         self.assertEqual(self.image.read_bytes(), b"converted")
         self.assertEqual((self.tmp / "b.jpg").read_bytes(), JPEG)
+
+
+# exiftool keeping each file's tags in `<file>.tags` (JSON): -json prints
+# them, -TAG=VALUE arguments store them; a stored FAIL tag makes it fail.
+FAKE_EXIFTOOL = """\
+import json, sys
+from pathlib import Path
+args = sys.argv[1:]
+Path(__file__).with_suffix(".argv").write_text(json.dumps(args))
+target = Path(args[-1])
+store = target.with_name(target.name + ".tags")
+tags = json.loads(store.read_text()) if store.exists() else {}
+if "FAIL" in tags:
+    sys.exit("boom")
+if "-json" in args:
+    print(json.dumps([{"SourceFile": str(target), **tags}]))
+else:
+    tags.update(arg[1:].split("=", 1) for arg in args if "=" in arg)
+    store.write_text(json.dumps(tags))
+"""
+
+
+class DateSyncCommandTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.tmp = Path(self.enterContext(tempfile.TemporaryDirectory()))
+        self.bin = self.tmp / "bin"
+        self.bin.mkdir()
+        self.photos = self.tmp / "photos"
+        self.photos.mkdir()
+        self.runner = CliRunner()
+        self.when = datetime(2019, 7, 14, 18, 3, 22).astimezone()
+
+    def photo(self, name: str, tags: dict[str, str] | None = None) -> Path:
+        path = self.photos / name
+        path.write_bytes(name.encode())
+        os.utime(path, (0, 0))
+        if tags is not None:
+            path.with_name(f"{name}.tags").write_text(json.dumps(tags))
+        return path
+
+    def exiftool(self) -> Path:
+        return write_executable(self.bin, "exiftool", FAKE_EXIFTOOL)
+
+    def invoke(self, *args: str) -> Result:
+        return self.runner.invoke(
+            cli, ["date-sync", *args, str(self.photos)], env={"PATH": str(self.bin)}
+        )
+
+    def dated(self, path: Path) -> Path:
+        digest = renamers.file_digest(path, "crc32")
+        return path.with_name(f"2019-07-14 18.03.22 {digest}.jpg")
+
+    def test_dry_run_from_mtime_needs_no_exiftool(self) -> None:
+        photo = self.photo("IMG_1.JPEG")
+        os.utime(photo, (0, self.when.timestamp()))
+        result = self.invoke("--from", "mtime", "--to", "name", "-n")
+        self.assertEqual(result.exit_code, 0, result.output)
+        self.assertEqual(result.stdout, f"mv {photo} {self.dated(photo)}\n")
+        self.assertTrue(photo.exists())
+
+    def test_from_exif_to_name_renames_and_fails_files_without_a_date(self) -> None:
+        self.exiftool()
+        dated = self.photo("a.jpg", {"DateTimeOriginal": "2019:07:14 18:03:22"})
+        expected = self.dated(dated)
+        undated = self.photo("b.jpg", {})
+        result = self.invoke("--from", "exif", "--to", "name")
+        self.assertEqual(result.exit_code, 1, result.output)
+        self.assertEqual(result.stdout, "")
+        self.assertIn("1 done, 1 failed", result.stderr)
+        self.assertTrue(expected.exists())
+        self.assertTrue(undated.exists())
+        fallback = self.invoke("--from", "exif", "--to", "name", "--mtime-fallback")
+        self.assertEqual(fallback.exit_code, 0, fallback.output)
+        self.assertFalse(undated.exists())
+
+    def test_to_exif_needs_y_and_writes_video_track_dates(self) -> None:
+        exiftool = self.exiftool()
+        name = "2019-07-14 18.03.22 0000abcd"
+        self.photo(f"{name}.jpg")
+        video = self.photo(f"{name}.mp4")
+        refused = self.invoke("--from", "name", "--to", "exif")
+        self.assertEqual(refused.exit_code, 2, refused.output)
+        self.assertIn("add -y", refused.output)
+        planned = self.invoke("--from", "name", "--to", "exif", "-n")
+        self.assertIn(
+            f"exiftool -AllDates='2019:07:14 18:03:22' {video}", planned.stdout
+        )
+        done = self.invoke("--from", "name", "--to", "exif", "-y")
+        self.assertEqual(done.exit_code, 0, done.output)
+        self.assertEqual(done.stdout, "")
+        video_tags = json.loads(video.with_name(f"{name}.mp4.tags").read_text())
+        self.assertEqual(video_tags["TrackCreateDate"], "2019:07:14 18:03:22")
+        image_tags = json.loads((self.photos / f"{name}.jpg.tags").read_text())
+        self.assertEqual(image_tags, {"AllDates": "2019:07:14 18:03:22"})
+        self.assertIn("-preserve", recorded_argv(exiftool))
+
+    def test_from_name_to_mtime_with_a_name_format(self) -> None:
+        photo = self.photo("IMG_20190714_180322.jpg")
+        args = ("--from", "name", "--to", "mtime", "--name-format", "IMG_%Y%m%d_%H%M%S")
+        result = self.invoke(*args)
+        self.assertEqual(result.exit_code, 0, result.output)
+        self.assertEqual(photo.stat().st_mtime, self.when.timestamp())
+        again = self.invoke(*args, "-n")
+        self.assertEqual((again.exit_code, again.stdout), (0, ""))
+
+    def test_usage_errors(self) -> None:
+        same = self.invoke("--from", "name", "--to", "name")
+        self.assertEqual(same.exit_code, 2, same.output)
+        bad = self.invoke("--from", "name", "--to", "mtime", "--name-format", "%Y-%q")
+        self.assertEqual(bad.exit_code, 2, bad.output)
+        self.assertIn("%q", bad.output)
 
 
 class FsCleanupCommandTests(unittest.TestCase):

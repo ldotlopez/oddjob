@@ -161,3 +161,30 @@ class ImgCaptionIntegrationTest(IntegrationCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+@unittest.skipIf(
+    missing("magick", "convert") or missing("exiftool") or missing("ffmpeg"),
+    "needs ImageMagick, exiftool and ffmpeg",
+)
+class DateSyncIntegrationTest(IntegrationCase):
+    def test_name_to_exif_and_back_for_an_image_and_a_video(self) -> None:
+        stem = "2019-07-14 18.03.22 00000000"
+        image, video = self.tmp / f"{stem}.jpg", self.tmp / f"{stem}.mp4"
+        magick("-size", "64x48", "gradient:red-blue", image)
+        make_video(video)
+        self.multitool("date-sync", "--from", "name", "--to", "exif", "-y", self.tmp)
+        self.assertEqual(exif_tag(image, "DateTimeOriginal"), "2019:07:14 18:03:22")
+        # QuickTime stores UTC: written and read back as local time.
+        local = run_tool(
+            "exiftool", "-s3", "-api", "QuickTimeUTC", "-d", "%Y:%m:%d %H:%M:%S",
+            "-MediaCreateDate", video,
+        )  # fmt: skip
+        self.assertEqual(local.strip(), "2019:07:14 18:03:22")
+
+        self.multitool("date-sync", "--from", "exif", "--to", "name", self.tmp)
+        names = sorted(path.name for path in self.tmp.iterdir())
+        self.assertEqual(len(names), 2)
+        for name in names:
+            self.assertTrue(name.startswith("2019-07-14 18.03.22 "), name)
+            self.assertNotIn("00000000", name)
