@@ -43,7 +43,9 @@
   backends (e.g. `whisper.py`: `whisper` and `whisper_cpp`). Never put non-plugin
   modules there.
 - Which backend implements which task is declared in `pyproject.toml`, one
-  entry-point group per task (`glados.backends.<task>`). The name is the backend,
+  entry-point group per task (`glados.backends.<task>`). The set of these groups is
+  the task list (`core.backends.tasks()`): a new task needs its group, nothing
+  else lists tasks. The name is the backend,
   and the value must be `glados.plugins.<module>:__glados_plugin__`; a backend must
   name the same module in every group. Run `uv sync` after editing it. See
   `docs/decisions/0002`.
