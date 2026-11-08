@@ -18,6 +18,7 @@ from oddjob.lib import (
     dates,
     media,
     motionphotos,
+    photolint,
     renamers,
     sidecars,
 )
@@ -410,6 +411,80 @@ class DateTests(unittest.TestCase):
             dates.dated_name(Path("d/IMG_1.JPEG"), self.when, "9f3a01bc"),
             Path("d/2019-07-14 18.03.22 9f3a01bc.jpg"),
         )
+
+
+class PhotoLintTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.madrid = photolint.find_zone("Europe/Madrid")
+
+    def wall(self, text: str) -> datetime:
+        wall = photolint.wall_clock(text)
+        self.assertIsNotNone(wall, text)
+        assert wall is not None
+        return wall
+
+    def test_find_zone_ignores_case_and_rejects_unknown_names(self) -> None:
+        self.assertEqual(photolint.find_zone("europe/MADRID").key, "Europe/Madrid")
+        with self.assertRaises(photolint.UnknownZoneError):
+            photolint.find_zone("Europe/Atlantis")
+
+    def test_zone_offset_follows_daylight_saving(self) -> None:
+        for wall, expected in (
+            ("2019:07:14 18:03:22", "+02:00"),
+            ("2019:01:14 18:03:22", "+01:00"),
+            # The repeated hour at the end of DST: the first occurrence.
+            ("2019:10:27 02:30:00", "+02:00"),
+        ):
+            offset = photolint.zone_offset(self.wall(wall), self.madrid)
+            self.assertEqual(offset, expected, wall)
+
+    def test_zone_offset_rejects_the_skipped_hour(self) -> None:
+        with self.assertRaisesRegex(ValueError, "does not exist in Europe/Madrid"):
+            photolint.zone_offset(self.wall("2024:03:31 02:30:00"), self.madrid)
+
+    def test_find_problems_flags_dates_without_an_offset(self) -> None:
+        summer = "2019:07:14 18:03:22+02:00"  # read_dates appends %z
+        for tags, expected in (
+            ({"DateTimeOriginal": summer}, [photolint.NO_ZONE]),
+            ({"CreateDate": summer, "OffsetTimeDigitized": "garbage"}, ["no-zone"]),
+            ({"DateTimeOriginal": summer, "OffsetTimeOriginal": "+02:00"}, []),
+            ({"DateTimeOriginal": "0000:00:00 00:00:00"}, []),
+            ({}, []),
+        ):
+            self.assertEqual(photolint.find_problems(tags), expected, tags)
+
+    def test_plan_set_zone_fills_missing_offsets_per_date(self) -> None:
+        photo = Path("d/a.jpg")
+        tags = {
+            "DateTimeOriginal": "2019:07:14 18:03:22+0200",
+            "CreateDate": "2019:07:14 18:03:22+0200",
+            "OffsetTimeDigitized": "+05:00",
+            "ModifyDate": "2019:12:01 10:00:00+0100",
+        }
+        change = photolint.plan_set_zone(photo, tags, self.madrid, replace=False)
+        self.assertIsNotNone(change)
+        assert change is not None
+        self.assertEqual(
+            change.tags(), {"OffsetTimeOriginal": "+02:00", "OffsetTime": "+01:00"}
+        )
+        self.assertEqual(
+            change.describe(),
+            "exiftool -OffsetTimeOriginal=+02:00 -OffsetTime=+01:00 d/a.jpg",
+        )
+        replaced = photolint.plan_set_zone(photo, tags, self.madrid, replace=True)
+        assert replaced is not None
+        self.assertEqual(replaced.tags()["OffsetTimeDigitized"], "+02:00")
+
+    def test_plan_set_zone_skips_zoned_and_fails_undated_photos(self) -> None:
+        zoned = {
+            "DateTimeOriginal": "2019:07:14 18:03:22",
+            "OffsetTimeOriginal": "+02:00",
+        }
+        self.assertIsNone(
+            photolint.plan_set_zone(Path("a.jpg"), zoned, self.madrid, replace=False)
+        )
+        with self.assertRaises(dates.DateNotFoundError):
+            photolint.plan_set_zone(Path("b.jpg"), {}, self.madrid, replace=False)
 
 
 class CleanupTests(unittest.TestCase):

@@ -30,7 +30,7 @@ oddjob/
                       file commands: sidecars, motionphotos, conversions (jpgize, mp4ize),
                       imghash (img-hash, img-duplicates, img-check), imgedit (img-trim,
                       img-reduce), captions (img-embed-description), renames (rename-by-hash,
-                      fix-extensions), dates (date-copy), cleanup (cleanup)
+                      fix-extensions), dates (date-copy), photolint (photo-lint), cleanup (cleanup)
   lib/                domain code, no config, backends or CLI:
                       protocols.py (task Protocols), transcribe.py (steps, formatters),
                       speak.py (text source selection, SpeakStep),
@@ -41,10 +41,11 @@ oddjob/
                       audio_grep.py (argument split, transcript cache, grep over transcripts),
                       grep.py (GrepRunner: the system grep);
                       sidecars.py, motionphotos.py, conversions.py, imghash.py, imgedit.py,
-                      captions.py, renamers.py, dates.py, cleanup.py (grouping, motion-photo
-                      parsing, conversion steps, average hash and decode checks, img-trim and
-                      downscaling, caption planning and step, rename planning, date reading
-                      and change planning, junk and permission planning);
+                      captions.py, renamers.py, dates.py, photolint.py, cleanup.py (grouping,
+                      motion-photo parsing, conversion steps, average hash and decode checks,
+                      img-trim and downscaling, caption planning and step, rename planning,
+                      date reading and change planning, metadata checks and zone offsets,
+                      junk and permission planning);
                       media.py (which files are images/videos and which ones each converter
                       takes), external.py (ImageMagick and exiftool adapters, user commands),
                       shotwell.py (read-only adapter for a Shotwell library, for date-copy)
@@ -232,6 +233,10 @@ renames and checks, and `cli_options` for `PATH...`, `-y` and `-n`; logging come
   QuickTime dates go through exiftool (`-api QuickTimeUTC`, so video dates are local
   time); Shotwell's exposure times come from its database, opened read-only. Shotwell is
   a source only. Dates are aware datetimes in the local zone.
+- `photo-lint check` runs every check in `photolint.CHECKS` (a code and a function of
+  the tags read with exiftool) on each image. `photo-lint set-zone` works like
+  `date-copy`: it reads every image's dates and plans a `photolint.SetOffsets` under one
+  `run_batch`, then writes the offsets under a second one (decision 0011).
 - `cleanup` walks the trees itself (`cleanup.plan_cleanup`) instead of using
   `filejobs.inputs.expand_inputs`, since it removes and chmods directories as well as
   files; it does not descend into junk directories or follow symlinks.

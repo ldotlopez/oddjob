@@ -253,3 +253,27 @@ class DateSyncRepeatedHourIntegrationTest(IntegrationCase):
             "-MediaCreateDate", video,
         )  # fmt: skip
         self.assertEqual(local.strip(), "2019:10:27 02:30:00+0100")
+
+
+@unittest.skipIf(
+    missing("magick", "convert") or missing("exiftool"),
+    "needs ImageMagick and exiftool",
+)
+class PhotoLintIntegrationTest(IntegrationCase):
+    def test_set_zone_fixes_what_check_finds(self) -> None:
+        image = self.tmp / "a.jpg"
+        magick("-size", "16x16", "xc:red", image)
+        run_tool(
+            "exiftool", "-q", "-overwrite_original",
+            "-DateTimeOriginal=2019:07:14 18:03:22",
+            "-ModifyDate=2019:12:01 10:00:00", image,
+        )  # fmt: skip
+        found = self.runner.invoke(cli, ["photo-lint", "check", str(self.tmp)])
+        self.assertEqual((found.exit_code, found.stdout), (1, f"{image}: no-zone\n"))
+
+        self.oddjob("photo-lint", "set-zone", "--zone", "Europe/Madrid", "-y", self.tmp)
+
+        self.assertEqual(exif_tag(image, "OffsetTimeOriginal"), "+02:00")
+        self.assertEqual(exif_tag(image, "OffsetTime"), "+01:00")
+        self.assertEqual(exif_tag(image, "DateTimeOriginal"), "2019:07:14 18:03:22")
+        self.assertEqual(self.oddjob("photo-lint", "check", self.tmp).stdout, "")

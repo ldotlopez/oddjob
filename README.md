@@ -46,7 +46,7 @@ Backends:
 - `describe`: a backend model that takes images (e.g. `gpt-4.1-mini`, or an Ollama
   vision model such as `llama3.2-vision` via `-m`).
 - For the file commands: ImageMagick (`magick` or `convert`) and `exiftool` for `jpgize`,
-  `exiftool` for `img-embed-description` and for `date-copy` with `exif`, `ffmpeg`/`ffprobe` for
+  `exiftool` for `img-embed-description`, `photo-lint` and `date-copy` with `exif`, `ffmpeg`/`ffprobe` for
   `mp4ize`, and the `images` extra (Pillow, pillow-heif) for `img-hash`,
   `img-duplicates`, `img-check`, `img-trim` and `img-reduce`.
 
@@ -223,6 +223,8 @@ File utilities without backends or config, run as `oddjob <command>`:
 | `img-trim PATH...`          | crop images to their non-transparent pixels → `NAME.cropped.<ext>`     |
 | `img-reduce PATH...`        | downscale images whose longest side exceeds `--max-size` (2160) → `NAME.reduced.<ext>` (`--in-place`: replace the original) |
 | `img-embed-description PATH...` | write each `NAME.description.txt` into the image's XMP and EXIF description; images without one are described first (`--redescribe`: all of them) |
+| `photo-lint check PATH...`  | list the images failing a metadata check, as `PATH: CODE` (`no-zone`: an EXIF capture date without a UTC offset; exit 1 if any) |
+| `photo-lint set-zone PATH...` | record the UTC offset `--zone` (an IANA name, e.g. `Europe/Madrid`) had at each EXIF date's wall-clock time in `OffsetTime*`; offsets already there are kept (`--replace`: rewrite them); a time the zone skips fails |
 | `rename-by-hash PATH...`       | rename each file to `<digest of its content>.<ext>` (`--algo`)        |
 | `fix-extensions PATH...`    | lowercase extensions; `jpeg` → `jpg`, `mpeg` → `mpg`, `tif` → `tiff`  |
 | `date-copy PATH...`         | copy each image's or video's date `--from` exif/mtime/name/shotwell `--to` exif/mtime/name; `--to name` renames to `YYYY-mm-dd HH.MM.SS <crc32>.<ext>` (`--name-format`, `--shotwell-db`, `--mtime-fallback`) |
@@ -235,9 +237,9 @@ uv run oddjob img-duplicates ~/Pictures -x "echo"
 ```
 
 Commands that change files (`jpgize`, `mp4ize`, `motionphotos merge`, `img-trim`,
-`img-reduce`, `img-embed-description`, `rename-by-hash`, `fix-extensions`, `date-copy`, `cleanup`)
+`img-reduce`, `img-embed-description`, `photo-lint set-zone`, `rename-by-hash`, `fix-extensions`, `date-copy`, `cleanup`)
 take `-n/--dry-run`; commands that would replace an existing file need `-y/--overwrite`,
-and `img-embed-description`, `date-copy --to exif`, `motionphotos merge` and `motionphotos strip`
+and `img-embed-description`, `photo-lint set-zone`, `date-copy --to exif`, `motionphotos merge` and `motionphotos strip`
 without `-o` always do (they write in place, and refuse up front without it).
 `img-hash`, `img-duplicates`, `img-check`, `img-trim` and `img-reduce` need the
 `images` extra (`uv sync --extra images`). `img-embed-description` calls the `describe` backend for images without a

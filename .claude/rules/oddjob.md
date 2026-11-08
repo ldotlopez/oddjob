@@ -11,7 +11,7 @@
   backends; decision 0006).
 - File commands (no backends or config): `sidecars`, `motionphotos`, `jpgize`, `mp4ize`, `img-hash`,
   `img-duplicates`, `img-check`, `img-trim`, `img-reduce`, `img-embed-description`,
-  `rename-by-hash`, `fix-extensions`, `date-copy`, `cleanup`.
+  `photo-lint` (`check`, `set-zone`), `rename-by-hash`, `fix-extensions`, `date-copy`, `cleanup`.
 - One tool (`docs/decisions/0003`): run every command as `uv run oddjob <command>
   PATH...`; `oddjob` is the only installed script. A command may resolve a backend
   and do file work in one run.

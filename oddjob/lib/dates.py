@@ -18,7 +18,7 @@ import os
 import re
 import shlex
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, datetime, tzinfo
 from pathlib import Path
 from typing import Protocol
 
@@ -151,11 +151,16 @@ def recorded_time(text: str, offset: str) -> datetime:
     """An EXIF_DATE_FORMAT wall-clock time with a recorded UTC offset
     (`+01:00` or `+0100`); local time when `offset` is empty or invalid."""
     wall = datetime.strptime(text, EXIF_DATE_FORMAT)  # noqa: DTZ007
-    try:
-        zone = datetime.fromisoformat(f"2000-01-01T00:00:00{offset}").tzinfo
-    except ValueError:
-        zone = None
+    zone = utc_offset(offset)
     return wall.astimezone() if zone is None else wall.replace(tzinfo=zone)
+
+
+def utc_offset(offset: str) -> tzinfo | None:
+    """A recorded UTC offset (`+01:00` or `+0100`); None when empty or invalid."""
+    try:
+        return datetime.fromisoformat(f"2000-01-01T00:00:00{offset}").tzinfo
+    except ValueError:
+        return None
 
 
 def date_from_mtime(path: Path) -> datetime:

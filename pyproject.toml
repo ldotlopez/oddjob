@@ -1,7 +1,7 @@
 [project]
 name = "oddjob"
 version = "0.1.0"
-description = "CLI toolkit for files: model-backed tasks (transcribe, speak, rewrite, summarize, expand, translate, describe, audio-grep) through replaceable backends (whisper, whisper.cpp, piper, OpenAI-compatible APIs, Ollama, llm), and file utilities for sidecars, motion photos, conversions, image hashes, checks, crops, downscaling and captions, renames, extension fixes, date sync and OS-leftover cleanup."
+description = "CLI toolkit for files: model-backed tasks (transcribe, speak, rewrite, summarize, expand, translate, describe, audio-grep) through replaceable backends (whisper, whisper.cpp, piper, OpenAI-compatible APIs, Ollama, llm), and file utilities for sidecars, motion photos, conversions, image hashes, checks, crops, downscaling and captions, photo metadata lint and zone fixes, renames, extension fixes, date sync and OS-leftover cleanup."
 requires-python = ">=3.13"
 dependencies = [
     "platformdirs>=4.0",

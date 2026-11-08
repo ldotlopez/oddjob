@@ -23,6 +23,7 @@ from oddjob.commands.expand import expand_cmd
 from oddjob.commands.imgedit import img_reduce_cmd, img_trim_cmd
 from oddjob.commands.imghash import img_check_cmd, img_duplicates_cmd, img_hash_cmd
 from oddjob.commands.motionphotos import motionphotos_cmd
+from oddjob.commands.photolint import photo_lint_cmd
 from oddjob.commands.renames import fix_extensions_cmd, rename_by_hash_cmd
 from oddjob.commands.rewrite import rewrite_cmd
 from oddjob.commands.sidecars import sidecars_cmd
@@ -53,6 +54,7 @@ FILE_COMMANDS: list[click.Command] = [
     img_trim_cmd,
     img_reduce_cmd,
     img_embed_description_cmd,
+    photo_lint_cmd,
     rename_by_hash_cmd,
     fix_extensions_cmd,
     date_copy_cmd,
@@ -70,6 +72,7 @@ PANELS: dict[str, list[str]] = {
         "img-trim",
         "img-reduce",
         "img-embed-description",
+        "photo-lint",
         "describe",
     ],
     "Formats": ["jpgize", "mp4ize"],
