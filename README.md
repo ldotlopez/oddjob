@@ -40,9 +40,11 @@ Backends:
 - For `transcribe`: `ffmpeg` and `ffprobe` on `PATH`, plus the backend's CLI:
   - `whisper`: `whisper` from [openai-whisper](https://github.com/openai/whisper)
     (`uv tool install openai-whisper`); models are downloaded by name on first use.
-  - `whisper_cpp`: `whisper-cli` from whisper.cpp and a ggml whisper model.
+  - `whisper_cpp`: `whisper-cli` from whisper.cpp and a ggml whisper model
+    ([docs/whisper-models.md](docs/whisper-models.md)).
 - For `speak`: `piper` from piper-tts on `PATH` and a voice `.onnx` file (its `.json`
-  beside it), set with `-m` or `[backends.piper] model`.
+  beside it), set with `-m` or `[backends.piper] model`
+  ([docs/piper-voices.md](docs/piper-voices.md)).
 - For the text tasks, the backend's service or CLI:
   - `openai`: an API key (`OPENAI_API_KEY`, or `api_key`) for OpenAI, or the
     `base_url` of an OpenAI-compatible server.
