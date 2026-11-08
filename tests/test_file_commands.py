@@ -405,25 +405,43 @@ class ImgEmbedDescriptionCommandTests(unittest.TestCase):
         self.assertEqual(result.exit_code, 0, result.output)
         self.assertEqual(
             result.stdout,
-            f"embed {self.sidecar} into {self.image}\n"
+            f"embed {self.sidecar} into {self.image} -> {self.tmp / 'a.described.jpg'}\n"
             f"describe {self.bare} into {self.tmp / 'b.description.txt'},"
-            " then embed it\n",
+            f" then embed it -> {self.tmp / 'b.described.jpg'}\n",
         )
+        in_place = self.runner.invoke(
+            cli, ["img-embed-description", "-n", "--in-place", str(self.tmp)],
+            env=self.env,
+        )  # fmt: skip
+        self.assertIn(f"embed {self.sidecar} into {self.image}\n", in_place.stdout)
 
-    def test_in_place_needs_overwrite(self) -> None:
+    def test_writes_a_described_copy_and_needs_y_to_replace_it(self) -> None:
         write_executable(self.bin, "exiftool", FAKE_WRITER)
-        refused = self.runner.invoke(
+        self.bare.unlink()
+        described = self.tmp / "a.described.jpg"
+        done = self.runner.invoke(
             cli, ["img-embed-description", str(self.tmp)], env=self.env
         )
-        self.assertEqual(refused.exit_code, 2, refused.output)
-        self.assertIn("add -y", refused.stderr)
+        self.assertEqual((done.exit_code, done.stdout), (0, ""), done.output)
         self.assertEqual(self.image.read_bytes(), JPEG)
+        self.assertEqual(described.read_bytes(), b"converted")
+        # The described copy is not an input again; replacing it needs -y.
+        again = self.runner.invoke(
+            cli, ["img-embed-description", str(self.tmp)], env=self.env
+        )
+        self.assertEqual(again.exit_code, 1, again.output)
+        self.assertIn("0 done, 1 failed", again.stderr)
+        forced = self.runner.invoke(
+            cli, ["img-embed-description", "-y", str(self.tmp)], env=self.env
+        )
+        self.assertEqual(forced.exit_code, 0, forced.output)
+        self.assertFalse((self.tmp / "a.described.described.jpg").exists())
 
     def test_embeds_existing_sidecars_and_describes_the_rest(self) -> None:
         write_executable(self.bin, "exiftool", FAKE_WRITER)
         self.with_fake_llm()
         done = self.runner.invoke(
-            cli, ["img-embed-description", "-y", str(self.tmp)], env=self.env
+            cli, ["img-embed-description", "--in-place", str(self.tmp)], env=self.env
         )
         self.assertEqual(done.exit_code, 0, done.output)
         self.assertEqual(done.stdout, "")
@@ -437,7 +455,7 @@ class ImgEmbedDescriptionCommandTests(unittest.TestCase):
         write_executable(self.bin, "exiftool", FAKE_WRITER)
         self.bare.unlink()
         done = self.runner.invoke(
-            cli, ["img-embed-description", "-y", str(self.tmp)], env=self.env
+            cli, ["img-embed-description", "--in-place", str(self.tmp)], env=self.env
         )
         self.assertEqual(done.exit_code, 0, done.output)
         self.assertEqual(self.image.read_bytes(), b"converted")
@@ -448,7 +466,7 @@ class ImgEmbedDescriptionCommandTests(unittest.TestCase):
         self.bare.unlink()
         done = self.runner.invoke(
             cli,
-            ["img-embed-description", "-y", "--redescribe", str(self.tmp)],
+            ["img-embed-description", "--redescribe", str(self.tmp)],
             env=self.env,
         )
         self.assertEqual(done.exit_code, 0, done.output)

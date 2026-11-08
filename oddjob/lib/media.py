@@ -50,6 +50,15 @@ def is_autocrop_input(path: Path) -> bool:
     return is_image(path) and not is_output_of(path, CROPPED_INFIX)
 
 
+# `img-embed-description` writes NAME.<DESCRIBED_INFIX>.<ext>.
+DESCRIBED_INFIX = "described"
+
+
+def is_embed_description_input(path: Path) -> bool:
+    """Images, except earlier img-embed-description outputs."""
+    return is_image(path) and not is_output_of(path, DESCRIBED_INFIX)
+
+
 # `date-copy --to exif` writes NAME.<DATED_INFIX>.<ext>.
 DATED_INFIX = "dated"
 

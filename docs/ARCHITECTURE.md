@@ -252,11 +252,12 @@ renames and checks, and `cli_options` for `PATH...`, `-y` and `-n`; logging come
   stream; the audio is copied or, failing that, re-encoded to AAC).
 - `img-trim` and `img-reduce` are `BytesStep`s (Pillow, keeping EXIF and the ICC
   profile; lossy formats saved at quality 90). `img-embed-description` is `CaptionStep` (exiftool writes
-  XMP-dc:Description and EXIF:ImageDescription into a copy, landed in place); an image
+  XMP-dc:Description and EXIF:ImageDescription into a copy, landing as
+  `NAME.described.<ext>` or, with `--in-place`, over the image); an image
   without a `NAME.description.txt` (or with `--redescribe`) is first described by a
   `DescribeStep` Job landing the sidecar, through the same describer as `describe`.
 - Same-format commands (`img-trim`, `img-reduce`, `rewrite`, `summarize`, `expand`,
-  `translate`, `photo-lint set-zone`, `date-copy --to exif`) take `--in-place`, which lands the result on the input's own path
+  `translate`, `img-embed-description`, `photo-lint set-zone`, `date-copy --to exif`) take `--in-place`, which lands the result on the input's own path
   (decision 0010). `Job` gives the result the input's permissions before it lands and,
   with `--keep-mtime` (every file producer), its times; steps copy neither.
 - `img-hash`, `img-duplicates`, `img-check`, `img-trim` and `img-reduce` need the `images` extra

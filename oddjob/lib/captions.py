@@ -11,7 +11,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol
 
-from filejobs.pipeline import temp_output_path
+from filejobs.pipeline import DestinationFn, temp_output_path
 from filejobs.progress import ProgressEvent, ProgressStream
 
 DESCRIPTION_SUFFIX = ".description.txt"
@@ -24,17 +24,22 @@ class DescriptionWriter(Protocol):
 @dataclass(frozen=True, slots=True)
 class Caption:
     """An image to caption from `sidecar`, which `oddjob describe` writes
-    first when `generate` is set."""
+    first when `generate` is set; the captioned copy lands at `dest` (the
+    image itself when it is replaced)."""
 
     image: Path
+    dest: Path
     sidecar: Path
     generate: bool = False
 
     def describe(self) -> str:
         image, sidecar = shlex.quote(str(self.image)), shlex.quote(str(self.sidecar))
+        landing = (
+            "" if self.dest == self.image else f" -> {shlex.quote(str(self.dest))}"
+        )
         if self.generate:
-            return f"describe {image} into {sidecar}, then embed it"
-        return f"embed {sidecar} into {image}"
+            return f"describe {image} into {sidecar}, then embed it{landing}"
+        return f"embed {sidecar} into {image}{landing}"
 
     def text(self) -> str:
         """The sidecar's text. ValueError if it is empty: exiftool would
@@ -49,12 +54,15 @@ def description_sidecar(image: Path) -> Path:
     return image.with_suffix(DESCRIPTION_SUFFIX)
 
 
-def plan_captions(images: Sequence[Path], *, redescribe: bool) -> list[Caption]:
-    """One Caption per image. Its description is generated when it has no
-    sidecar yet, or always with `redescribe`."""
+def plan_captions(
+    images: Sequence[Path], *, redescribe: bool, dest_fn: DestinationFn
+) -> list[Caption]:
+    """One Caption per image, landing at `dest_fn(image)`. Its description is
+    generated when it has no sidecar yet, or always with `redescribe`."""
     return [
         Caption(
             image=image,
+            dest=dest_fn(image),
             sidecar=description_sidecar(image),
             generate=redescribe or not description_sidecar(image).is_file(),
         )

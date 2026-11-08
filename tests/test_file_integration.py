@@ -157,9 +157,11 @@ class ImgCaptionIntegrationTest(IntegrationCase):
         image = self.tmp / "a.jpg"
         magick("-size", "16x16", "xc:red", image)
         (self.tmp / "a.description.txt").write_text("Un gato, señor", encoding="utf-8")
-        self.oddjob("img-embed-description", "-y", self.tmp)
-        self.assertEqual(exif_tag(image, "XMP-dc:Description"), "Un gato, señor")
-        self.assertEqual(exif_tag(image, "EXIF:ImageDescription"), "Un gato, señor")
+        self.oddjob("img-embed-description", self.tmp)
+        described = self.tmp / "a.described.jpg"
+        self.assertEqual(exif_tag(described, "XMP-dc:Description"), "Un gato, señor")
+        self.assertEqual(exif_tag(described, "EXIF:ImageDescription"), "Un gato, señor")
+        self.assertEqual(exif_tag(image, "XMP-dc:Description"), "")
 
 
 if __name__ == "__main__":

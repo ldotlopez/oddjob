@@ -165,8 +165,11 @@ class CaptionPlanTests(unittest.TestCase):
         tmp = make_tmp(self)
         described, bare = tmp / "a.jpg", tmp / "b.png"
         (tmp / "a.description.txt").write_text("a cat", encoding="utf-8")
-        planned = captions.plan_captions([described, bare], redescribe=False)
+        planned = captions.plan_captions(
+            [described, bare], redescribe=False, dest_fn=lambda path: path
+        )
         self.assertEqual([caption.image for caption in planned], [described, bare])
+        self.assertEqual([caption.dest for caption in planned], [described, bare])
         self.assertEqual([caption.generate for caption in planned], [False, True])
         self.assertEqual(planned[0].sidecar, tmp / "a.description.txt")
         self.assertEqual(planned[0].text(), "a cat")
@@ -176,13 +179,20 @@ class CaptionPlanTests(unittest.TestCase):
     def test_redescribe_describes_every_image(self) -> None:
         tmp = make_tmp(self)
         (tmp / "a.description.txt").write_text("a cat", encoding="utf-8")
-        planned = captions.plan_captions([tmp / "a.jpg"], redescribe=True)
+        planned = captions.plan_captions(
+            [tmp / "a.jpg"], redescribe=True, dest_fn=lambda path: path
+        )
         self.assertTrue(planned[0].generate)
+
+    def test_embed_description_skips_its_own_outputs(self) -> None:
+        self.assertTrue(media.is_embed_description_input(Path("d/a.jpg")))
+        self.assertFalse(media.is_embed_description_input(Path("d/a.described.jpg")))
 
     def test_an_empty_description_is_an_error(self) -> None:
         tmp = make_tmp(self)
         (tmp / "a.description.txt").write_text(" \n", encoding="utf-8")
-        caption = captions.Caption(tmp / "a.jpg", tmp / "a.description.txt")
+        image = tmp / "a.jpg"
+        caption = captions.Caption(image, image, tmp / "a.description.txt")
         with self.assertRaisesRegex(ValueError, "empty description"):
             caption.text()
 
