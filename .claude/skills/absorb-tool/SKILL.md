@@ -96,8 +96,12 @@ Rules for every shape:
 - Destinations: `suffix_destination` only when the output extension always
   differs from the input's; otherwise `infix_destination` (suffix would
   overwrite the input).
-- `-y/--overwrite` (`overwrite_option`); writing in place always needs `-y`,
-  checked up front with `require_overwrite` (skipped under `-n`).
+- `-y/--overwrite` (`overwrite_option`) replaces an existing output, never
+  the input. A command never changes its input by default: it writes
+  `NAME.<infix>.<ext>`, and `--in-place` (`in_place_option`, implies `-y`,
+  excludes `-o`) replaces the input; it comes with `--keep-mtime`
+  (`same_format_options`; decision 0013). Skip earlier `.<infix>` outputs
+  in the input filter (`media.is_output_of`).
 - `-n/--dry-run` on every command that changes files: plan first, run
   nothing that writes. Read-only tools the plan needs may run (`date-copy
   --from exif -n` reads with exiftool); return before resolving anything

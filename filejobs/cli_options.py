@@ -167,13 +167,6 @@ def check_single_output(output: Path | None, inputs: Sequence[Path]) -> None:
         )
 
 
-def require_overwrite(overwrite: bool, reason: str) -> None:
-    """In-place writes need -y: refuse up front, before any work. `reason`
-    says what would be rewritten, e.g. "--to exif rewrites files in place"."""
-    if not overwrite:
-        raise click.UsageError(f"{reason}: add -y")
-
-
 def finish_batch(*reports: BatchReport) -> None:
     """Print the summary of batch runs; exit 1 if any input failed. Each
     failure was already logged when it happened (filejobs/batch.py)."""
