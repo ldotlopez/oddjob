@@ -37,8 +37,12 @@ jobs:
         run: uv sync --locked --all-extras
 
       # Integration tests skip themselves without ImageMagick, exiftool,
-      # ffmpeg or tests/integration.env.
+      # ffmpeg or tests/integration.env. rich-click forces colored output
+      # when GITHUB_ACTIONS is set, which breaks the tests that read error
+      # messages; PY_COLORS=0 turns that off (rich itself ignores it).
       - name: Run tests
+        env:
+          PY_COLORS: "0"
         run: uv run python -m unittest discover -s tests
 
       - name: Build
