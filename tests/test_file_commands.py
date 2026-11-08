@@ -556,17 +556,26 @@ class DateSyncCommandTests(unittest.TestCase):
         refused = self.invoke("--from", "name", "--to", "exif")
         self.assertEqual(refused.exit_code, 2, refused.output)
         self.assertIn("add -y", refused.output)
+        offset = self.when.strftime("%:z")
         planned = self.invoke("--from", "name", "--to", "exif", "-n")
         self.assertIn(
-            f"exiftool '-AllDates=2019:07:14 18:03:22' '{video}'", planned.stdout
+            f"exiftool '-AllDates=2019:07:14 18:03:22{offset}'", planned.stdout
         )
         done = self.invoke("--from", "name", "--to", "exif", "-y")
         self.assertEqual(done.exit_code, 0, done.output)
         self.assertEqual(done.stdout, "")
         video_tags = json.loads(video.with_name(f"{name}.mp4.tags").read_text())
-        self.assertEqual(video_tags["TrackCreateDate"], "2019:07:14 18:03:22")
+        self.assertEqual(video_tags["TrackCreateDate"], f"2019:07:14 18:03:22{offset}")
         image_tags = json.loads((self.photos / f"{name}.jpg.tags").read_text())
-        self.assertEqual(image_tags, {"AllDates": "2019:07:14 18:03:22"})
+        self.assertEqual(
+            image_tags,
+            {
+                "AllDates": "2019:07:14 18:03:22",
+                "OffsetTimeOriginal": offset,
+                "OffsetTimeDigitized": offset,
+                "OffsetTime": offset,
+            },
+        )
         self.assertIn("-preserve", recorded_argv(exiftool))
 
     def test_from_name_to_mtime_with_a_name_format(self) -> None:

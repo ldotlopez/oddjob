@@ -1,4 +1,4 @@
-"""whisper.cpp (`whisper_cpp`) backend: unit tests against a fake whisper-cli, and an
+"""whisper.cpp (`whisper_cpp`) and OpenAI whisper (`whisper`) backends: unit tests against a fake whisper-cli, and an
 integration test against the real one (ODDJOB_TEST_WHISPER_CPP_* settings)."""
 
 from __future__ import annotations
@@ -14,6 +14,8 @@ from support import drain, recorded_argv, require_settings, write_executable
 
 from oddjob.lib.protocols import Transcriber, TranscriptSegment
 from oddjob.plugins.whisper import (
+    OpenAIWhisperBackend,
+    OpenAIWhisperOptions,
     WhisperCppBackend,
     WhisperCppOptions,
     __oddjob_plugin__,
@@ -48,6 +50,25 @@ sys.exit(3)
 
 SILENT_WHISPER = """
 import sys
+"""
+
+
+FAKE_OPENAI_WHISPER = """
+import json
+import sys
+from pathlib import Path
+
+args = sys.argv[1:]
+Path(__file__).with_suffix(".argv").write_text(json.dumps(args))
+output_dir = Path(args[args.index("--output_dir") + 1])
+print(" 50%|#####     | 10/20 [00:01<00:01]", file=sys.stderr)
+segments = [
+    {"start": 0.0, "end": 1.5, "text": " Hola mundo."},
+    {"start": 1.5, "end": 3.25, "text": " Adiós. "},
+]
+(output_dir / (Path(args[0]).stem + ".json")).write_text(
+    json.dumps({"segments": segments})
+)
 """
 
 
@@ -123,6 +144,86 @@ class WhisperCppBackendTest(unittest.TestCase):
 
         with self.assertRaisesRegex(FileNotFoundError, "whisper binary not found"):
             drain(WhisperCppBackend(options).transcribe(self.audio, language=None))
+
+
+class OpenAIWhisperBackendTest(unittest.TestCase):
+    def setUp(self) -> None:
+        self.workdir = Path(self.enterContext(tempfile.TemporaryDirectory()))
+        self.audio = self.workdir / "audio.wav"
+        self.audio.touch()
+
+    def backend(
+        self, script: str, model: str = "turbo"
+    ) -> tuple[OpenAIWhisperBackend, Path]:
+        binary = write_executable(self.workdir, "whisper", script)
+        options = OpenAIWhisperOptions(model=model, binary=str(binary))
+        return OpenAIWhisperBackend(options), binary
+
+    def test_parses_segments_and_progress(self) -> None:
+        backend, _ = self.backend(FAKE_OPENAI_WHISPER)
+
+        events, result = drain(backend.transcribe(self.audio, language=None))
+
+        self.assertEqual([event.completed for event in events], [50, 100])
+        self.assertEqual(
+            result,
+            [
+                TranscriptSegment(start=0.0, end=1.5, text="Hola mundo."),
+                TranscriptSegment(start=1.5, end=3.25, text="Adiós."),
+            ],
+        )
+
+    def test_invocation_and_cleanup(self) -> None:
+        backend, binary = self.backend(FAKE_OPENAI_WHISPER, model="small")
+
+        drain(backend.transcribe(self.audio, language="es"))
+
+        argv = recorded_argv(binary)
+        self.assertEqual(argv[0], str(self.audio))
+        self.assertEqual(argv[argv.index("--model") + 1], "small")
+        self.assertEqual(argv[argv.index("--language") + 1], "es")
+        self.assertEqual(argv[argv.index("--output_format") + 1], "json")
+        self.assertEqual(argv[argv.index("--verbose") + 1], "False")
+        output_dir = Path(argv[argv.index("--output_dir") + 1])
+        self.assertFalse(output_dir.exists(), "temporary output not removed")
+
+    def test_omits_language_by_default(self) -> None:
+        backend, binary = self.backend(FAKE_OPENAI_WHISPER)
+
+        drain(backend.transcribe(self.audio, language=None))
+
+        self.assertNotIn("--language", recorded_argv(binary))
+
+    def test_failure_reports_stderr(self) -> None:
+        backend, _ = self.backend(FAILING_WHISPER)
+
+        with self.assertRaisesRegex(RuntimeError, "failed to read audio"):
+            drain(backend.transcribe(self.audio, language=None))
+
+    def test_missing_output_is_an_error(self) -> None:
+        backend, _ = self.backend(SILENT_WHISPER)
+
+        with self.assertRaisesRegex(RuntimeError, "expected whisper output"):
+            drain(backend.transcribe(self.audio, language=None))
+
+    def test_missing_binary(self) -> None:
+        options = OpenAIWhisperOptions(binary=str(self.workdir / "nope"))
+
+        with self.assertRaisesRegex(FileNotFoundError, "whisper binary not found"):
+            drain(OpenAIWhisperBackend(options).transcribe(self.audio, language=None))
+
+
+class OpenAIWhisperPluginTest(unittest.TestCase):
+    def test_implements_transcribe_with_defaults(self) -> None:
+        [(task, protocol, backend)] = __oddjob_plugin__("whisper", {})
+
+        self.assertEqual((task, protocol), ("transcribe", Transcriber))
+        self.assertIsInstance(backend, Transcriber)
+        self.assertEqual(backend.options, OpenAIWhisperOptions())
+
+    def test_rejects_unknown_options(self) -> None:
+        with self.assertRaises(pydantic.ValidationError):
+            __oddjob_plugin__("whisper", {"modle": "turbo"})
 
 
 class WhisperCppPluginTest(unittest.TestCase):

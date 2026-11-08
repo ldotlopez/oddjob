@@ -8,12 +8,15 @@ import logging
 import shlex
 import shutil
 import subprocess
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from pathlib import Path
 
 LOGGER = logging.getLogger(__name__)
 # How exiftool reads and writes dates (EXIF's own layout).
 EXIF_DATE_FORMAT = "%Y:%m:%d %H:%M:%S"
+# Reading adds the UTC offset (%z): real for QuickTime dates (stored as UTC),
+# a guess from the system zone for EXIF ones, which have no zone.
+EXIF_ZONED_DATE_FORMAT = EXIF_DATE_FORMAT + "%z"
 
 
 def _run_tool(cmd: Sequence[str]) -> str:
@@ -88,8 +91,9 @@ class ExifTool:
 
     def read_dates(self, path: Path, tags: Sequence[str]) -> dict[str, str]:
         """The `tags` of `path` that are set, as exiftool prints them with
-        EXIF_DATE_FORMAT; QuickTime dates are converted from UTC to local
-        time (`-api QuickTimeUTC`)."""
+        EXIF_ZONED_DATE_FORMAT; QuickTime dates are converted from UTC to
+        local time (`-api QuickTimeUTC`). Tags that are not dates (the EXIF
+        `OffsetTime*` ones) come back as they are."""
         output = _run_tool(
             [
                 self.binary,
@@ -97,7 +101,7 @@ class ExifTool:
                 "-api",
                 "QuickTimeUTC",
                 "-d",
-                EXIF_DATE_FORMAT,
+                EXIF_ZONED_DATE_FORMAT,
                 *(f"-{tag}" for tag in tags),
                 str(path),
             ]
@@ -108,9 +112,10 @@ class ExifTool:
             raise RuntimeError(f"exiftool printed no JSON object: {exc}") from exc
         return {tag: str(entry[tag]) for tag in tags if tag in entry}
 
-    def write_dates(self, path: Path, tags: Sequence[str], value: str) -> None:
-        """Set every one of `tags` of `path` to `value` (EXIF_DATE_FORMAT,
-        local time) in place, keeping the file's modification time."""
+    def write_tags(self, path: Path, values: Mapping[str, str]) -> None:
+        """Set each tag of `values` of `path` in place, keeping the file's
+        modification time. QuickTime dates written with a UTC offset are
+        stored as UTC (`-api QuickTimeUTC`)."""
         _run_tool(
             [
                 self.binary,
@@ -119,7 +124,7 @@ class ExifTool:
                 "-preserve",
                 "-api",
                 "QuickTimeUTC",
-                *(f"-{tag}={value}" for tag in tags),
+                *(f"-{tag}={value}" for tag, value in values.items()),
                 str(path),
             ]
         )

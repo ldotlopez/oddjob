@@ -38,7 +38,8 @@ def img_trim_cmd(
     paths: tuple[Path, ...], output: Path | None, overwrite: bool, dry_run: bool
 ) -> None:
     """Crop each image in PATH... to its non-transparent pixels, writing
-    NAME.cropped.<ext> (images without transparency fail)."""
+    NAME.cropped.<ext> (images without transparency fail). -n lists every
+    candidate without opening the images, so it cannot tell which will fail."""
     inputs = expand_inputs(paths, media.is_autocrop_input)
     check_single_output(output, inputs)
     dest_fn = override_destination(output, infix_destination(media.CROPPED_INFIX))
@@ -82,7 +83,8 @@ def img_reduce_cmd(
 ) -> None:
     """Downscale each image in PATH... whose longest side exceeds --max-size,
     writing NAME.reduced.<ext> in the same format (EXIF and ICC profile
-    kept). Images that already fit are skipped; -n lists every candidate."""
+    kept). Images that already fit are skipped. -n lists every candidate without
+    opening the images, so it cannot tell which will be skipped."""
     if in_place and output is not None:
         raise click.UsageError("--in-place and -o/--output are mutually exclusive")
     inputs = expand_inputs(paths, media.is_img_reduce_input)

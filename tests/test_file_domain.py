@@ -2,9 +2,11 @@
 photos, renames and image hashes."""
 
 import importlib.util
+import os
 import tempfile
+import time
 import unittest
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -347,6 +349,50 @@ class DateTests(unittest.TestCase):
         for name_format in ("%Y-%q", "%Y %Y-%m-%d", "%H.%M"):
             with self.assertRaises(ValueError, msg=name_format):
                 dates.name_pattern(name_format)
+
+    def test_recorded_offsets_resolve_the_repeated_hour(self) -> None:
+        previous = os.environ.get("TZ")
+        self.addCleanup(self._restore_timezone, previous)
+        os.environ["TZ"] = "Europe/Madrid"
+        time.tzset()
+        wall = "2019:10:27 02:30:00"
+
+        first = dates.date_from_tags(
+            {"DateTimeOriginal": wall, "OffsetTimeOriginal": "+02:00"}
+        )
+        second = dates.date_from_tags(
+            {"DateTimeOriginal": wall, "OffsetTimeOriginal": "+01:00"}
+        )
+        quicktime = dates.date_from_tags(
+            {"MediaCreateDate": f"{wall}+0100"}, utc_based=True
+        )
+
+        self.assertEqual(second - first, timedelta(hours=1))
+        self.assertEqual(quicktime, second)
+        self.assertEqual(
+            dates.date_from_tags(
+                {"DateTimeOriginal": wall, "OffsetTimeOriginal": "garbage"}
+            ),
+            first,
+        )
+
+    def test_ambiguous_local_time_takes_the_first_occurrence(self) -> None:
+        previous = os.environ.get("TZ")
+        self.addCleanup(self._restore_timezone, previous)
+        os.environ["TZ"] = "Europe/Madrid"
+        time.tzset()
+
+        repeated = dates.local_time("2019:10:27 02:30:00")
+
+        self.assertEqual(repeated.utcoffset(), timedelta(hours=2))
+
+    @staticmethod
+    def _restore_timezone(previous: str | None) -> None:
+        if previous is None:
+            os.environ.pop("TZ", None)
+        else:
+            os.environ["TZ"] = previous
+        time.tzset()
 
     def test_date_from_tags_prefers_the_original_and_skips_zeroes(self) -> None:
         tags = {

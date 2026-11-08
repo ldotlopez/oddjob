@@ -53,10 +53,6 @@ option set or an approach is settled in a decision record before it is built.
 
 ## Inconsistencies
 
-- **Plans that cannot know the outcome.** Without the `images` extra, `-n`
-  of `img-trim` and `img-reduce` lists every candidate, including images that
-  will fail (no transparency) or be skipped (already small enough). Document
-  it, or check sizes in `-n` when the extra is installed.
 - **Directory inputs.** `filejobs.inputs.expand_inputs` yields files only, so
   `cleanup` walks the trees itself to reach directories. If a second command
   needs directories, move that walk to `filejobs` (decision 0005, rule 4).
@@ -72,12 +68,6 @@ option set or an approach is settled in a decision record before it is built.
 - **`date-copy --to name` reads every file in full for the crc32 while
   planning**, also with `-n`, which is slow on videos. Acceptable for now,
   since `rename-by-hash` does the same.
-
-## Edge cases
-
-- **`date-copy` and DST.** A wall-clock time in the repeated hour at the end
-  of daylight saving is ambiguous. `astimezone()` takes the first one, so
-  `--to mtime` may be an hour off for such files.
 
 ## Tests
 
@@ -100,4 +90,3 @@ option set or an approach is settled in a decision record before it is built.
     (`date-copy --from shotwell`);
   - a folder copied from macOS and Windows with `.DS_Store`, `._NAME`,
     `Thumbs.db` and `desktop.ini` (`cleanup`).
-- **The `whisper` (OpenAI CLI) backend has no tests yet.**

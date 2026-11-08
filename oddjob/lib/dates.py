@@ -2,8 +2,11 @@
 EXIF/QuickTime metadata, its modification time and its name; a Shotwell
 library can also be read as the source.
 
-Cameras record wall-clock times without a zone; they are read as local
-time (aware datetimes in the system's zone). A dated name is
+Cameras record wall-clock times without a zone; they are read with the
+UTC offset the file records next to them (EXIF `OffsetTime*`, or QuickTime's
+UTC), else as local time (aware datetimes in the system's zone). Writing EXIF
+dates records the offset too, so the repeated hour at the end of daylight
+saving stays unambiguous. A dated name is
 `YYYY-mm-dd HH.MM.SS <crc32>.<ext>`: the checksum keeps shots taken in the
 same second apart, and the extension is normalized as fix-extensions does.
 """
@@ -14,7 +17,6 @@ import enum
 import os
 import re
 import shlex
-from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -42,8 +44,18 @@ TARGETS = (Place.EXIF, Place.MTIME, Place.NAME)
 # Read in this order of preference: when the shot was taken, then when it
 # was digitized (images) or created (QuickTime), then the media track's.
 EXIF_READ_TAGS = ("DateTimeOriginal", "CreateDate", "MediaCreateDate")
+# The EXIF tag holding the UTC offset of each image date.
+OFFSET_TAGS = {
+    "DateTimeOriginal": "OffsetTimeOriginal",
+    "CreateDate": "OffsetTimeDigitized",
+}
 # AllDates is DateTimeOriginal, CreateDate and ModifyDate.
 EXIF_IMAGE_WRITE_TAGS = ("AllDates",)
+EXIF_IMAGE_OFFSET_WRITE_TAGS = (
+    "OffsetTimeOriginal",
+    "OffsetTimeDigitized",
+    "OffsetTime",
+)
 EXIF_VIDEO_WRITE_TAGS = (
     "AllDates",
     "TrackCreateDate",
@@ -109,18 +121,41 @@ def date_from_name(name: str, pattern: re.Pattern[str]) -> datetime:
 
 
 def local_time(text: str) -> datetime:
-    """An EXIF_DATE_FORMAT wall-clock time, read as local time."""
+    """An EXIF_DATE_FORMAT wall-clock time, read as local time.
+
+    A time in the repeated hour at the end of daylight saving is ambiguous
+    without an offset; the first occurrence (still daylight time) is taken.
+    """
     return datetime.strptime(text, EXIF_DATE_FORMAT).astimezone()
 
 
-def date_from_tags(tags: dict[str, str]) -> datetime | None:
-    """The first valid date among EXIF_READ_TAGS (zeroed dates are unset)."""
+def date_from_tags(tags: dict[str, str], *, utc_based: bool = False) -> datetime | None:
+    """The first valid date among EXIF_READ_TAGS (zeroed dates are unset).
+
+    The date keeps the UTC offset its file records: the `OffsetTime*` tag of
+    an EXIF date, or, when `utc_based` (QuickTime dates, read through
+    exiftool's UTC conversion), the offset printed after the date. Without
+    one it is read as local time.
+    """
     for tag in EXIF_READ_TAGS:
+        text = tags.get(tag, "")
+        offset = text[19:] if utc_based else tags.get(OFFSET_TAGS.get(tag, ""), "")
         try:
-            return local_time(tags.get(tag, "")[:19])
+            return recorded_time(text[:19], offset)
         except ValueError:
             continue
     return None
+
+
+def recorded_time(text: str, offset: str) -> datetime:
+    """An EXIF_DATE_FORMAT wall-clock time with a recorded UTC offset
+    (`+01:00` or `+0100`); local time when `offset` is empty or invalid."""
+    wall = datetime.strptime(text, EXIF_DATE_FORMAT)  # noqa: DTZ007
+    try:
+        zone = datetime.fromisoformat(f"2000-01-01T00:00:00{offset}").tzinfo
+    except ValueError:
+        zone = None
+    return wall.astimezone() if zone is None else wall.replace(tzinfo=zone)
 
 
 def date_from_mtime(path: Path) -> datetime:
@@ -149,9 +184,22 @@ class SetExifDate:
     path: Path
     when: datetime
 
+    def tags(self) -> dict[str, str]:
+        """The tags to write. A video's dates carry the offset in their value
+        (QuickTime stores UTC); an image's go in the `OffsetTime*` tags,
+        which also replace any stale offset."""
+        wall = self.when.strftime(EXIF_DATE_FORMAT)
+        offset = self.when.strftime("%:z")
+        if media.is_video(self.path):
+            return {tag: f"{wall}{offset}" for tag in EXIF_VIDEO_WRITE_TAGS}
+        return {
+            **dict.fromkeys(EXIF_IMAGE_WRITE_TAGS, wall),
+            **dict.fromkeys(EXIF_IMAGE_OFFSET_WRITE_TAGS, offset),
+        }
+
     def describe(self) -> str:
-        when = f"{self.when:{EXIF_DATE_FORMAT}}"
-        return shlex.join(["exiftool", f"-AllDates={when}", str(self.path)])
+        assignments = [f"-{tag}={value}" for tag, value in self.tags().items()]
+        return shlex.join(["exiftool", *assignments, str(self.path)])
 
 
 type DateChange = renamers.Rename | SetMtime | SetExifDate
@@ -181,7 +229,8 @@ class ExifDates:
         self.exiftool = exiftool
 
     def read(self, path: Path) -> datetime:
-        when = date_from_tags(self.exiftool.read_dates(path, EXIF_READ_TAGS))
+        tags = self.exiftool.read_dates(path, (*EXIF_READ_TAGS, *OFFSET_TAGS.values()))
+        when = date_from_tags(tags, utc_based=media.is_video(path))
         if when is None:
             raise DateNotFoundError("no date in its metadata")
         return when
@@ -239,11 +288,4 @@ def apply_change(
         case SetExifDate():
             if exiftool is None:
                 raise ValueError("writing EXIF dates needs exiftool")
-            tags: Sequence[str] = (
-                EXIF_VIDEO_WRITE_TAGS
-                if media.is_video(change.path)
-                else EXIF_IMAGE_WRITE_TAGS
-            )
-            exiftool.write_dates(
-                change.path, tags, change.when.strftime(EXIF_DATE_FORMAT)
-            )
+            exiftool.write_tags(change.path, change.tags())

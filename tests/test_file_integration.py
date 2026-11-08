@@ -4,10 +4,13 @@ Each class skips when a tool it needs is not on PATH; img-duplicates also
 needs the images extra (Pillow)."""
 
 import importlib.util
+import os
 import shutil
 import subprocess
 import tempfile
+import time
 import unittest
+from datetime import UTC, datetime
 from pathlib import Path
 
 from click.testing import CliRunner, Result
@@ -188,3 +191,65 @@ class DateSyncIntegrationTest(IntegrationCase):
         for name in names:
             self.assertTrue(name.startswith("2019-07-14 18.03.22 "), name)
             self.assertNotIn("00000000", name)
+
+
+@unittest.skipIf(
+    missing("magick", "convert") or missing("exiftool") or missing("ffmpeg"),
+    "needs ImageMagick, exiftool and ffmpeg",
+)
+class DateSyncRepeatedHourIntegrationTest(IntegrationCase):
+    """02:30 happens twice when daylight saving ends: the recorded offset
+    says which one, both on reading and on writing."""
+
+    SECOND_PASS = datetime(2019, 10, 27, 1, 30, tzinfo=UTC)  # 02:30 at +01:00
+
+    def setUp(self) -> None:
+        super().setUp()
+        previous = os.environ.get("TZ")
+        self.addCleanup(self.restore_timezone, previous)
+        os.environ["TZ"] = "Europe/Madrid"
+        time.tzset()
+
+    @staticmethod
+    def restore_timezone(previous: str | None) -> None:
+        if previous is None:
+            os.environ.pop("TZ", None)
+        else:
+            os.environ["TZ"] = previous
+        time.tzset()
+
+    def test_reads_the_recorded_offset(self) -> None:
+        image, video = self.tmp / "a.jpg", self.tmp / "b.mp4"
+        magick("-size", "16x16", "xc:red", image)
+        make_video(video)
+        run_tool(
+            "exiftool", "-q", "-overwrite_original",
+            "-DateTimeOriginal=2019:10:27 02:30:00", "-OffsetTimeOriginal=+01:00",
+            image,
+        )  # fmt: skip
+        run_tool(
+            "exiftool", "-q", "-overwrite_original", "-api", "QuickTimeUTC",
+            "-CreateDate=2019:10:27 02:30:00+01:00", video,
+        )  # fmt: skip
+
+        self.oddjob("date-copy", "--from", "exif", "--to", "mtime", self.tmp)
+
+        for path in (image, video):
+            self.assertEqual(path.stat().st_mtime, self.SECOND_PASS.timestamp(), path)
+
+    def test_writes_the_offset(self) -> None:
+        image, video = self.tmp / "a.jpg", self.tmp / "b.mp4"
+        magick("-size", "16x16", "xc:red", image)
+        make_video(video)
+        for path in (image, video):
+            os.utime(path, (0, self.SECOND_PASS.timestamp()))
+
+        self.oddjob("date-copy", "--from", "mtime", "--to", "exif", "-y", self.tmp)
+
+        self.assertEqual(exif_tag(image, "OffsetTimeOriginal"), "+01:00")
+        self.assertEqual(exif_tag(image, "DateTimeOriginal"), "2019:10:27 02:30:00")
+        local = run_tool(
+            "exiftool", "-s3", "-api", "QuickTimeUTC", "-d", "%Y:%m:%d %H:%M:%S%z",
+            "-MediaCreateDate", video,
+        )  # fmt: skip
+        self.assertEqual(local.strip(), "2019:10:27 02:30:00+0100")
