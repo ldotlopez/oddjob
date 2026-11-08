@@ -50,6 +50,9 @@ def is_autocrop_input(path: Path) -> bool:
     return is_image(path) and not is_output_of(path, CROPPED_INFIX)
 
 
+# `date-copy --to exif` writes NAME.<DATED_INFIX>.<ext>.
+DATED_INFIX = "dated"
+
 # `photo-lint set-zone` writes NAME.<FIXED_INFIX>.<ext>.
 FIXED_INFIX = "fixed"
 

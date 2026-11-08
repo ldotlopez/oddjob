@@ -406,6 +406,24 @@ class DateTests(unittest.TestCase):
         self.assertEqual(dates.date_from_tags(tags).year, 2018)
         self.assertIsNone(dates.date_from_tags({}))
 
+    def test_set_exif_date_plans_a_dated_copy_or_in_place(self) -> None:
+        photo = Path("d/a.jpg")
+        copy = dates.plan_change(
+            photo, self.when, dates.Place.EXIF, exif_dest_fn=dates.dated_copy
+        )
+        self.assertEqual(
+            copy, dates.SetExifDate(photo, Path("d/a.dated.jpg"), self.when)
+        )
+        assert copy is not None
+        self.assertIn("-o d/a.dated.jpg d/a.jpg", copy.describe())
+        in_place = dates.plan_change(
+            photo, self.when, dates.Place.EXIF, exif_dest_fn=lambda path: path
+        )
+        assert in_place is not None
+        self.assertNotIn("-o", in_place.describe())
+        self.assertTrue(dates.is_exif_input(photo))
+        self.assertFalse(dates.is_exif_input(Path("d/a.dated.jpg")))
+
     def test_dated_name_normalizes_the_extension(self) -> None:
         self.assertEqual(
             dates.dated_name(Path("d/IMG_1.JPEG"), self.when, "9f3a01bc"),

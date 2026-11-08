@@ -477,6 +477,26 @@ else:
 """
 
 
+# exiftool keeping each file's tags as its content (JSON), so the tags travel
+# with a copy: -json prints them, -TAG=VALUE arguments store them; a stored
+# FAIL tag makes it fail.
+FAKE_EXIFTOOL_IN_FILE = """\
+import json, sys
+from pathlib import Path
+args = sys.argv[1:]
+Path(__file__).with_suffix(".argv").write_text(json.dumps(args))
+target = Path(args[-1])
+tags = json.loads(target.read_text())
+if "FAIL" in tags:
+    sys.exit("boom")
+if "-json" in args:
+    print(json.dumps([{"SourceFile": str(target), **tags}]))
+else:
+    tags.update(arg[1:].split("=", 1) for arg in args if "=" in arg)
+    target.write_text(json.dumps(tags))
+"""
+
+
 def make_shotwell_db(
     database: Path, photos: dict[Path, int], videos: dict[Path, int]
 ) -> Path:
@@ -548,27 +568,35 @@ class DateSyncCommandTests(unittest.TestCase):
         self.assertEqual(fallback.exit_code, 0, fallback.output)
         self.assertFalse(undated.exists())
 
-    def test_to_exif_needs_y_and_writes_video_track_dates(self) -> None:
-        exiftool = self.exiftool()
+    def in_file_exiftool(self) -> Path:
+        """A fake whose tags travel with a copy (they are the file's content)."""
+        return write_executable(self.bin, "exiftool", FAKE_EXIFTOOL_IN_FILE)
+
+    def test_to_exif_writes_a_dated_copy_with_video_track_dates(self) -> None:
+        exiftool = self.in_file_exiftool()
         name = "2019-07-14 18.03.22 0000abcd"
-        self.photo(f"{name}.jpg")
-        video = self.photo(f"{name}.mp4")
-        refused = self.invoke("--from", "name", "--to", "exif")
-        self.assertEqual(refused.exit_code, 2, refused.output)
-        self.assertIn("add -y", refused.output)
+        image = self.photos / f"{name}.jpg"
+        video = self.photos / f"{name}.mp4"
+        for path in (image, video):
+            path.write_text("{}")
+        dated_image = self.photos / f"{name}.dated.jpg"
+        dated_video = self.photos / f"{name}.dated.mp4"
         offset = self.when.strftime("%:z")
         planned = self.invoke("--from", "name", "--to", "exif", "-n")
+        self.assertEqual(planned.exit_code, 0, planned.output)
         self.assertIn(
             f"exiftool '-AllDates=2019:07:14 18:03:22{offset}'", planned.stdout
         )
-        done = self.invoke("--from", "name", "--to", "exif", "-y")
-        self.assertEqual(done.exit_code, 0, done.output)
-        self.assertEqual(done.stdout, "")
-        video_tags = json.loads(video.with_name(f"{name}.mp4.tags").read_text())
+        self.assertIn(f"-o '{dated_image}' '{image}'", planned.stdout)
+        with self.assertLogs("filejobs", "INFO") as logs:
+            done = self.invoke("--from", "name", "--to", "exif", "-v")
+        self.assertEqual((done.exit_code, done.stdout), (0, ""), done.output)
+        self.assertEqual(sorted(wrote(logs.records)), [dated_image, dated_video])
+        self.assertEqual(json.loads(image.read_text()), {})
+        video_tags = json.loads(dated_video.read_text())
         self.assertEqual(video_tags["TrackCreateDate"], f"2019:07:14 18:03:22{offset}")
-        image_tags = json.loads((self.photos / f"{name}.jpg.tags").read_text())
         self.assertEqual(
-            image_tags,
+            json.loads(dated_image.read_text()),
             {
                 "AllDates": "2019:07:14 18:03:22",
                 "OffsetTimeOriginal": offset,
@@ -577,6 +605,36 @@ class DateSyncCommandTests(unittest.TestCase):
             },
         )
         self.assertIn("-preserve", recorded_argv(exiftool))
+        # The dated copies are not inputs again; replacing them needs -y.
+        again = self.invoke("--from", "name", "--to", "exif")
+        self.assertEqual(again.exit_code, 1, again.output)
+        self.assertIn("0 done, 2 failed", again.stderr)
+        self.assertEqual(
+            self.invoke("--from", "name", "--to", "exif", "-y").exit_code, 0
+        )
+
+    def test_to_exif_in_place_replaces_the_original(self) -> None:
+        self.in_file_exiftool()
+        image = self.photos / "2019-07-14 18.03.22 0000abcd.jpg"
+        image.write_text("{}")
+        os.utime(image, (0, 1000))
+        planned = self.invoke("--from", "name", "--to", "exif", "--in-place", "-n")
+        self.assertNotIn(" -o ", planned.stdout)
+        args = ("--from", "name", "--to", "exif", "--in-place", "--keep-mtime")
+        done = self.invoke(*args)
+        self.assertEqual((done.exit_code, done.stdout), (0, ""), done.output)
+        self.assertEqual(sorted(self.photos.iterdir()), [image])
+        self.assertEqual(
+            json.loads(image.read_text())["AllDates"], "2019:07:14 18:03:22"
+        )
+        self.assertEqual(image.stat().st_mtime, 1000)
+
+    def test_in_place_and_keep_mtime_need_to_exif(self) -> None:
+        self.photo("a.jpg")
+        for flag in ("--in-place", "--keep-mtime"):
+            result = self.invoke("--from", "mtime", "--to", "name", flag)
+            self.assertEqual(result.exit_code, 2, result.output)
+            self.assertIn("--to exif", result.output)
 
     def test_from_name_to_mtime_with_a_name_format(self) -> None:
         photo = self.photo("IMG_20190714_180322.jpg")
@@ -628,26 +686,6 @@ class DateSyncCommandTests(unittest.TestCase):
         bad = self.invoke("--from", "name", "--to", "mtime", "--name-format", "%Y-%q")
         self.assertEqual(bad.exit_code, 2, bad.output)
         self.assertIn("%q", bad.output)
-
-
-# exiftool keeping each file's tags as its content (JSON), so the tags travel
-# with a copy: -json prints them, -TAG=VALUE arguments store them; a stored
-# FAIL tag makes it fail.
-FAKE_EXIFTOOL_IN_FILE = """\
-import json, sys
-from pathlib import Path
-args = sys.argv[1:]
-Path(__file__).with_suffix(".argv").write_text(json.dumps(args))
-target = Path(args[-1])
-tags = json.loads(target.read_text())
-if "FAIL" in tags:
-    sys.exit("boom")
-if "-json" in args:
-    print(json.dumps([{"SourceFile": str(target), **tags}]))
-else:
-    tags.update(arg[1:].split("=", 1) for arg in args if "=" in arg)
-    target.write_text(json.dumps(tags))
-"""
 
 
 class PhotoLintCommandTests(unittest.TestCase):

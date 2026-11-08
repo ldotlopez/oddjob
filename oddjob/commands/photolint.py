@@ -22,7 +22,7 @@ from filejobs.pipeline import Job, infix_destination
 from filejobs.progress import BaseProgressReporter
 from oddjob.commands.dates import build_exiftool
 from oddjob.core.cli_common import logging_options
-from oddjob.lib import media, photolint
+from oddjob.lib import dates, media, photolint
 
 
 def parse_zone(_ctx: click.Context, _param: click.Parameter, name: str) -> ZoneInfo:
@@ -115,7 +115,7 @@ def set_zone_cmd(
 
     def apply(change: photolint.SetOffsets, reporter: BaseProgressReporter) -> Path:
         job = Job(
-            steps=[(photolint.SetOffsetsStep(exiftool, change), "Zoning")],
+            steps=[(dates.WriteTagsStep(exiftool, change.tags()), "Zoning")],
             dest_fn=lambda _path: change.dest,
             keep_times=keep_mtime,
         )

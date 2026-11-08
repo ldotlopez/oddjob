@@ -176,7 +176,9 @@ class DateSyncIntegrationTest(IntegrationCase):
         image, video = self.tmp / f"{stem}.jpg", self.tmp / f"{stem}.mp4"
         magick("-size", "64x48", "gradient:red-blue", image)
         make_video(video)
-        self.oddjob("date-copy", "--from", "name", "--to", "exif", "-y", self.tmp)
+        self.oddjob(
+            "date-copy", "--from", "name", "--to", "exif", "--in-place", self.tmp
+        )
         self.assertEqual(exif_tag(image, "DateTimeOriginal"), "2019:07:14 18:03:22")
         # QuickTime stores UTC: written and read back as local time.
         local = run_tool(
@@ -244,7 +246,9 @@ class DateSyncRepeatedHourIntegrationTest(IntegrationCase):
         for path in (image, video):
             os.utime(path, (0, self.SECOND_PASS.timestamp()))
 
-        self.oddjob("date-copy", "--from", "mtime", "--to", "exif", "-y", self.tmp)
+        self.oddjob(
+            "date-copy", "--from", "mtime", "--to", "exif", "--in-place", self.tmp
+        )
 
         self.assertEqual(exif_tag(image, "OffsetTimeOriginal"), "+01:00")
         self.assertEqual(exif_tag(image, "DateTimeOriginal"), "2019:10:27 02:30:00")

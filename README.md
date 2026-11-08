@@ -227,7 +227,7 @@ File utilities without backends or config, run as `oddjob <command>`:
 | `photo-lint set-zone PATH...` | record the UTC offset `--zone` (an IANA name, e.g. `Europe/Madrid`) had at each EXIF date's wall-clock time in `OffsetTime*` → `NAME.fixed.<ext>` (`--in-place`: replace the original; `--keep-mtime`); offsets already there are kept (`--replace-offsets`: rewrite them); a time the zone skips fails |
 | `rename-by-hash PATH...`       | rename each file to `<digest of its content>.<ext>` (`--algo`)        |
 | `fix-extensions PATH...`    | lowercase extensions; `jpeg` → `jpg`, `mpeg` → `mpg`, `tif` → `tiff`  |
-| `date-copy PATH...`         | copy each image's or video's date `--from` exif/mtime/name/shotwell `--to` exif/mtime/name; `--to name` renames to `YYYY-mm-dd HH.MM.SS <crc32>.<ext>` (`--name-format`, `--shotwell-db`, `--mtime-fallback`) |
+| `date-copy PATH...`         | copy each image's or video's date `--from` exif/mtime/name/shotwell `--to` exif/mtime/name; `--to name` renames to `YYYY-mm-dd HH.MM.SS <crc32>.<ext>`; `--to exif` writes `NAME.dated.<ext>` (`--in-place`: replace the original; `--keep-mtime`) (`--name-format`, `--shotwell-db`, `--mtime-fallback`) |
 | `cleanup PATH...`        | remove macOS, Windows and KDE leftovers (`.DS_Store`, `._NAME`, `Thumbs.db`, `.Trash-<uid>`...); `--perms`: chmod files 644, directories 755 |
 
 ```sh
@@ -239,7 +239,7 @@ uv run oddjob img-duplicates ~/Pictures -x "echo"
 Commands that change files (`jpgize`, `mp4ize`, `motionphotos merge`, `img-trim`,
 `img-reduce`, `img-embed-description`, `photo-lint set-zone`, `rename-by-hash`, `fix-extensions`, `date-copy`, `cleanup`)
 take `-n/--dry-run`; commands that would replace an existing file need `-y/--overwrite`,
-and `img-embed-description`, `date-copy --to exif`, `motionphotos merge` and `motionphotos strip`
+and `img-embed-description`, `motionphotos merge` and `motionphotos strip`
 without `-o` always do (they write in place, and refuse up front without it).
 `img-hash`, `img-duplicates`, `img-check`, `img-trim` and `img-reduce` need the
 `images` extra (`uv sync --extra images`). `img-embed-description` calls the `describe` backend for images without a

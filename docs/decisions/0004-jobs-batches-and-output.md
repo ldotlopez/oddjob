@@ -1,6 +1,6 @@
 # 0004. Jobs, batches, and silent success
 
-Status: accepted (2026-11-07)
+Status: accepted (2026-11-07); its in-place rule superseded by 0013
 
 ## Context
 

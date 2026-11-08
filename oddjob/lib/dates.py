@@ -6,7 +6,8 @@ Cameras record wall-clock times without a zone; they are read with the
 UTC offset the file records next to them (EXIF `OffsetTime*`, or QuickTime's
 UTC), else as local time (aware datetimes in the system's zone). Writing EXIF
 dates records the offset too, so the repeated hour at the end of daylight
-saving stays unambiguous. A dated name is
+saving stays unambiguous; they go into a copy, `NAME.dated.<ext>`
+(`WriteTagsStep`), unless the file is replaced. A dated name is
 `YYYY-mm-dd HH.MM.SS <crc32>.<ext>`: the checksum keeps shots taken in the
 same second apart, and the extension is normalized as fix-extensions does.
 """
@@ -17,11 +18,15 @@ import enum
 import os
 import re
 import shlex
+import shutil
+from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime, tzinfo
 from pathlib import Path
 from typing import Protocol
 
+from filejobs.pipeline import DestinationFn, infix_destination, temp_output_path
+from filejobs.progress import ProgressEvent, ProgressStream
 from oddjob.lib import media, renamers
 from oddjob.lib.external import EXIF_DATE_FORMAT, ExifTool
 from oddjob.lib.shotwell import ShotwellLibrary
@@ -82,6 +87,15 @@ REQUIRED_NAME_FIELDS = ({"Y", "y"}, {"m"}, {"d"})
 def is_input(path: Path) -> bool:
     """Images and videos: the files that carry a capture date."""
     return media.is_image(path) or media.is_video(path)
+
+
+def is_exif_input(path: Path) -> bool:
+    """Inputs of `--to exif`: except earlier dated copies (NAME.dated.<ext>)."""
+    return is_input(path) and not media.is_output_of(path, media.DATED_INFIX)
+
+
+# Where `--to exif` writes, unless it replaces the file.
+dated_copy = infix_destination(media.DATED_INFIX)
 
 
 def name_pattern(name_format: str) -> re.Pattern[str]:
@@ -187,6 +201,7 @@ class SetMtime:
 @dataclass(frozen=True, slots=True)
 class SetExifDate:
     path: Path
+    dest: Path  # `path` itself when the file is replaced
     when: datetime
 
     def tags(self) -> dict[str, str]:
@@ -204,7 +219,8 @@ class SetExifDate:
 
     def describe(self) -> str:
         assignments = [f"-{tag}={value}" for tag, value in self.tags().items()]
-        return shlex.join(["exiftool", *assignments, str(self.path)])
+        output = [] if self.dest == self.path else ["-o", str(self.dest)]
+        return shlex.join(["exiftool", *assignments, *output, str(self.path)])
 
 
 type DateChange = renamers.Rename | SetMtime | SetExifDate
@@ -267,8 +283,11 @@ class MtimeFallback:
             return date_from_mtime(path)
 
 
-def plan_change(path: Path, when: datetime, target: Place) -> DateChange | None:
-    """What sets `path`'s `target` to `when`; None if it already is."""
+def plan_change(
+    path: Path, when: datetime, target: Place, *, exif_dest_fn: DestinationFn
+) -> DateChange | None:
+    """What sets `path`'s `target` to `when`; None if it already is. An EXIF
+    change lands at `exif_dest_fn(path)`."""
     match target:
         case Place.NAME:
             dest = dated_name(path, when, renamers.file_digest(path, "crc32"))
@@ -276,21 +295,40 @@ def plan_change(path: Path, when: datetime, target: Place) -> DateChange | None:
         case Place.MTIME:
             return None if date_from_mtime(path) == when else SetMtime(path, when)
         case Place.EXIF:
-            return SetExifDate(path, when)
+            return SetExifDate(path, exif_dest_fn(path), when)
         case Place.SHOTWELL:
             raise ValueError("the Shotwell library can only be read")
 
 
-def apply_change(
-    change: DateChange, exiftool: ExifTool | None, overwrite: bool
-) -> None:
+def apply_change(change: renamers.Rename | SetMtime, overwrite: bool) -> None:
+    """Rename or touch a file in place; EXIF changes go through a Job with
+    WriteTagsStep instead."""
     match change:
         case renamers.Rename():
             renamers.apply_rename(change, overwrite)
         case SetMtime():
             atime = change.path.stat().st_atime
             os.utime(change.path, (atime, change.when.timestamp()))
-        case SetExifDate():
-            if exiftool is None:
-                raise ValueError("writing EXIF dates needs exiftool")
-            exiftool.write_tags(change.path, change.tags())
+
+
+class TagWriter(Protocol):
+    def write_tags(self, path: Path, values: Mapping[str, str]) -> None: ...
+
+
+class WriteTagsStep:
+    """A copy of the input file with `tags` written. Satisfies
+    ProgressStep[Path]."""
+
+    def __init__(self, writer: TagWriter, tags: Mapping[str, str]) -> None:
+        self.writer = writer
+        self.tags = tags
+
+    def run(self, input_path: Path) -> ProgressStream[Path]:
+        produced = temp_output_path("oddjob-tags-", input_path.suffix)
+        try:
+            shutil.copyfile(input_path, produced)
+            self.writer.write_tags(produced, self.tags)
+        except BaseException:
+            produced.unlink(missing_ok=True)
+            raise
+        yield ProgressEvent(completed=1, total=1, done=True, result=produced)

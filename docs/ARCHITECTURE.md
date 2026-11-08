@@ -227,7 +227,10 @@ renames and checks, and `cli_options` for `PATH...`, `-y` and `-n`; logging come
   destination per input), then apply, so `-n` prints the plan without touching anything
   or requiring the extra, and the external tools only for `date-copy --from exif`.
 - `date-copy` reads every date first (a `dates.DateSource`, under one `run_batch`), then
-  applies the planned `Rename`, `SetMtime` or `SetExifDate` changes under a second one.
+  applies the planned `Rename` or `SetMtime` changes under a second one, or, for
+  `--to exif`, runs a `Job` per `SetExifDate` (`dates.WriteTagsStep`: a copy with the
+  tags written, landing as `NAME.dated.<ext>` or, with `--in-place`, over the input)
+  through `run_jobs(prior=...)` (decision 0013).
   The command picks the source for `--from` (`MtimeDates`, `NameDates`, `ExifDates`,
   `ShotwellDates`), wrapped in `MtimeFallback` with `--mtime-fallback`. EXIF and
   QuickTime dates go through exiftool (`-api QuickTimeUTC`, so video dates are local
@@ -236,7 +239,7 @@ renames and checks, and `cli_options` for `PATH...`, `-y` and `-n`; logging come
 - `photo-lint check` runs every check in `photolint.CHECKS` (a code and a function of
   the tags read with exiftool) on each image. `photo-lint set-zone` reads every
   image's dates and plans a `photolint.SetOffsets` under one `run_batch`, then runs a `Job`
-  per plan (`SetOffsetsStep`: a copy with the offsets written, landing as
+  per plan (`dates.WriteTagsStep` with the offsets, landing as
   `NAME.fixed.<ext>` or, with `--in-place`, over the input) through
   `run_jobs(prior=...)`, so the summary also counts the inputs that failed to plan
   (decision 0012).
@@ -253,7 +256,7 @@ renames and checks, and `cli_options` for `PATH...`, `-y` and `-n`; logging come
   without a `NAME.description.txt` (or with `--redescribe`) is first described by a
   `DescribeStep` Job landing the sidecar, through the same describer as `describe`.
 - Same-format commands (`img-trim`, `img-reduce`, `rewrite`, `summarize`, `expand`,
-  `translate`) take `--in-place`, which lands the result on the input's own path
+  `translate`, `photo-lint set-zone`, `date-copy --to exif`) take `--in-place`, which lands the result on the input's own path
   (decision 0010). `Job` gives the result the input's permissions before it lands and,
   with `--keep-mtime` (every file producer), its times; steps copy neither.
 - `img-hash`, `img-duplicates`, `img-check`, `img-trim` and `img-reduce` need the `images` extra

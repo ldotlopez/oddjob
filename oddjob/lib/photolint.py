@@ -5,22 +5,18 @@ Each check is a function of the tags `READ_TAGS` names (as
 `set-zone` fixes `no-zone`: cameras record wall-clock times without a zone,
 so it takes the zone the user names and records, next to each date, the UTC
 offset that zone had at that wall-clock time, in a copy of the photo
-(`SetOffsetsStep`) that lands as `NAME.fixed.<ext>` or replaces it.
+(`dates.WriteTagsStep`) that lands as `NAME.fixed.<ext>` or replaces it.
 """
 
 from __future__ import annotations
 
 import shlex
-import shutil
-from collections.abc import Callable, Mapping
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Protocol
 from zoneinfo import ZoneInfo, available_timezones
 
-from filejobs.pipeline import temp_output_path
-from filejobs.progress import ProgressEvent, ProgressStream
 from oddjob.lib import dates
 from oddjob.lib.external import EXIF_DATE_FORMAT
 
@@ -123,26 +119,3 @@ def plan_set_zone(
     if not dated:
         raise dates.DateNotFoundError("no date in its metadata")
     return SetOffsets(path, dest, tuple(offsets)) if offsets else None
-
-
-class TagWriter(Protocol):
-    def write_tags(self, path: Path, values: Mapping[str, str]) -> None: ...
-
-
-class SetOffsetsStep:
-    """A copy of the input photo with `change`'s offsets written. Satisfies
-    ProgressStep[Path]."""
-
-    def __init__(self, writer: TagWriter, change: SetOffsets) -> None:
-        self.writer = writer
-        self.change = change
-
-    def run(self, input_path: Path) -> ProgressStream[Path]:
-        produced = temp_output_path("oddjob-set-zone-", input_path.suffix)
-        try:
-            shutil.copyfile(input_path, produced)
-            self.writer.write_tags(produced, self.change.tags())
-        except BaseException:
-            produced.unlink(missing_ok=True)
-            raise
-        yield ProgressEvent(completed=1, total=1, done=True, result=produced)
