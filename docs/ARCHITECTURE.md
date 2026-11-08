@@ -305,8 +305,6 @@ Tests exercise backends directly (options model, transport/backend object,
   import boundaries of filejobs, `oddjob.lib` and `oddjob.plugins`, and where click may
   be imported.
 
-The OpenAI `whisper` backend has no tests yet.
-
 ## Configuration
 
 `Session.config()` (`core/session.py`) loads the config on first use (never at import): `.env`, then

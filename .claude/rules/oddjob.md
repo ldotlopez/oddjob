@@ -94,7 +94,7 @@
   `docs/ARCHITECTURE.md`, "Tests"). Unit tests use fake executables and
   `support.FakeHTTPServer`, never real services. Integration tests read
   `tests/integration.env` (git-ignored, holds secrets: never commit or print it) and
-  skip when unconfigured. The `whisper` (OpenAI CLI) backend has no tests yet.
+  skip when unconfigured.
   The file commands' integration tests (`test_file_integration.py`) run the real
   ImageMagick, exiftool and ffmpeg and skip when one is missing from PATH.
 - `speak` needs `piper` (piper-tts) on PATH and a voice `.onnx` (default
