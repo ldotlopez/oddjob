@@ -96,32 +96,44 @@ class CommandTests(unittest.TestCase):
         self.assertEqual(replaced.stdout, "")
         self.assertEqual((self.tmp / "a.tiff").read_bytes(), b"new")
 
-    def test_motionphotos_merge_keeps_video_unless_rm(self) -> None:
+    def test_motionphotos_merge_writes_a_motion_copy(self) -> None:
         (self.tmp / "a.jpg").write_bytes(JPEG)
         (self.tmp / "a.mp4").write_bytes(MP4)
+        motion = self.tmp / "a.motion.jpg"
+        planned = self.runner.invoke(
+            cli, ["motionphotos", "merge", "-n", str(self.tmp)]
+        )
+        self.assertEqual(
+            planned.stdout,
+            f"merge {self.tmp / 'a.mp4'} into {self.tmp / 'a.jpg'} -> {motion}\n",
+        )
         with self.assertLogs("filejobs", "INFO") as logs:
             result = self.runner.invoke(
-                cli, ["motionphotos", "merge", "-v", "-y", str(self.tmp)]
+                cli, ["motionphotos", "merge", "-v", str(self.tmp)]
             )
+        self.assertEqual((result.exit_code, result.stdout), (0, ""), result.output)
+        self.assertEqual(motionphotos.split(motion.read_bytes()), (JPEG, MP4))
+        self.assertEqual((self.tmp / "a.jpg").read_bytes(), JPEG)
+        self.assertTrue((self.tmp / "a.mp4").exists())
+        self.assertEqual(wrote(logs.records), [motion])
+        # The motion copy has no MP4 of its own; replacing it needs -y.
+        again = self.runner.invoke(cli, ["motionphotos", "merge", str(self.tmp)])
+        self.assertEqual(again.exit_code, 1, again.output)
+        self.assertIn("0 done, 1 failed", again.stderr)
+        forced = self.runner.invoke(cli, ["motionphotos", "merge", "-y", str(self.tmp)])
+        self.assertEqual(forced.exit_code, 0, forced.output)
+
+    def test_motionphotos_merge_in_place_with_rm(self) -> None:
+        (self.tmp / "a.jpg").write_bytes(JPEG)
+        (self.tmp / "a.mp4").write_bytes(MP4)
+        result = self.runner.invoke(
+            cli, ["motionphotos", "merge", "--in-place", "--rm", str(self.tmp)]
+        )
         self.assertEqual(result.exit_code, 0, result.output)
         self.assertEqual(
             motionphotos.split((self.tmp / "a.jpg").read_bytes()), (JPEG, MP4)
         )
-        self.assertTrue((self.tmp / "a.mp4").exists())
-        self.assertEqual(wrote(logs.records), [self.tmp / "a.jpg"])
-        self.assertEqual(result.stdout, "")
-
-    def test_motionphotos_merge_needs_overwrite(self) -> None:
-        (self.tmp / "a.jpg").write_bytes(JPEG)
-        (self.tmp / "a.mp4").write_bytes(MP4)
-        refused = self.runner.invoke(cli, ["motionphotos", "merge", str(self.tmp)])
-        self.assertEqual(refused.exit_code, 2, refused.output)
-        self.assertIn("add -y", refused.stderr)
-        self.assertEqual((self.tmp / "a.jpg").read_bytes(), JPEG)
-        planned = self.runner.invoke(
-            cli, ["motionphotos", "merge", "-n", str(self.tmp)]
-        )
-        self.assertEqual(planned.exit_code, 0, planned.output)
+        self.assertEqual(sorted(self.tmp.iterdir()), [self.tmp / "a.jpg"])
 
     def test_motionphotos_join_and_split(self) -> None:
         (self.tmp / "still.jpg").write_bytes(JPEG)
@@ -166,22 +178,28 @@ class CommandTests(unittest.TestCase):
         still = self.runner.invoke(cli, [*check, str(self.tmp / "still.jpg")])
         self.assertEqual((motion.exit_code, still.exit_code), (0, 1))
 
-    def test_strip_in_place_needs_overwrite(self) -> None:
+    def test_strip_writes_a_still_copy_or_replaces_with_in_place(self) -> None:
         file = self.tmp / "motion.jpg"
-        file.write_bytes(motionphotos.join(JPEG, MP4))
-        with self.assertNoLogs("filejobs", "INFO"):
-            refused = self.runner.invoke(
-                cli, ["motionphotos", "strip", "-v", str(file)]
-            )
-        self.assertEqual(refused.exit_code, 2)
-        self.assertIn("add -y", refused.stderr)
+        motion = motionphotos.join(JPEG, MP4)
+        file.write_bytes(motion)
+        still = self.tmp / "motion.still.jpg"
         with self.assertLogs("filejobs", "INFO") as logs:
-            done = self.runner.invoke(
-                cli, ["motionphotos", "strip", "-v", "-y", str(file)]
-            )
+            done = self.runner.invoke(cli, ["motionphotos", "strip", "-v", str(file)])
         self.assertEqual(done.exit_code, 0, done.output)
+        self.assertEqual((file.read_bytes(), still.read_bytes()), (motion, JPEG))
+        self.assertEqual(wrote(logs.records), [still])
+        again = self.runner.invoke(cli, ["motionphotos", "strip", str(file)])
+        self.assertEqual(again.exit_code, 1, again.output)
+        self.assertIn("already exists", again.stderr)
+        both = self.runner.invoke(
+            cli, ["motionphotos", "strip", "--in-place", "-o", str(still), str(file)]
+        )
+        self.assertEqual(both.exit_code, 2, both.output)
+        in_place = self.runner.invoke(
+            cli, ["motionphotos", "strip", "--in-place", str(file)]
+        )
+        self.assertEqual(in_place.exit_code, 0, in_place.output)
         self.assertEqual(file.read_bytes(), JPEG)
-        self.assertEqual(wrote(logs.records), [file])
 
     def test_sidecars_scan_needs_two_extensions(self) -> None:
         result = self.runner.invoke(

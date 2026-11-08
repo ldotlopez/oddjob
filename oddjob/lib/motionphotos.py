@@ -14,6 +14,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Self
 
+from filejobs.pipeline import DestinationFn
 from oddjob.lib.media import JPEG_EXTENSIONS, MP4_EXTENSION
 from oddjob.lib.sidecars import SidecarGroup
 
@@ -89,22 +90,33 @@ def strip(content: bytes) -> bytes:
 class Merge:
     image: Path
     video: Path
+    dest: Path  # `image` itself when it is replaced
     remove_video: bool
 
     def describe(self) -> str:
         video, image = shlex.quote(str(self.video)), shlex.quote(str(self.image))
         action = f"merge {video} into {image}"
+        if self.dest != self.image:
+            action += f" -> {shlex.quote(str(self.dest))}"
         return f"{action}, then remove {video}" if self.remove_video else action
 
 
-def plan_merges(groups: Iterable[SidecarGroup], remove_video: bool) -> list[Merge]:
-    """One merge per sidecar group with exactly one JPEG and one MP4."""
+def plan_merges(
+    groups: Iterable[SidecarGroup], remove_video: bool, dest_fn: DestinationFn
+) -> list[Merge]:
+    """One merge per sidecar group with exactly one JPEG and one MP4, landing
+    at `dest_fn(image)`."""
     merges: list[Merge] = []
     for group in groups:
         images = [f for f in group.files if f.suffix.lower() in JPEG_EXTENSIONS]
         videos = [f for f in group.files if f.suffix.lower() == MP4_EXTENSION]
         if len(images) == 1 and len(videos) == 1:
             merges.append(
-                Merge(image=images[0], video=videos[0], remove_video=remove_video)
+                Merge(
+                    image=images[0],
+                    video=videos[0],
+                    dest=dest_fn(images[0]),
+                    remove_video=remove_video,
+                )
             )
     return merges

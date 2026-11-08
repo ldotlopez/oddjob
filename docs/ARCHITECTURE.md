@@ -128,7 +128,7 @@ with `pipeline.move_to_destination`, re-checking the destination first (`-y` to
 replace it). On the same filesystem that is a rename. Across filesystems
 (`EXDEV`), the file is copied next to the destination and renamed over it, so an
 interrupted copy never leaves a truncated destination, also when replacing a file in
-place (`motionphotos merge`, `strip -y`).
+place (`--in-place`).
 
 ## Data flow (transcribe)
 
@@ -257,7 +257,8 @@ renames and checks, and `cli_options` for `PATH...`, `-y` and `-n`; logging come
   without a `NAME.description.txt` (or with `--redescribe`) is first described by a
   `DescribeStep` Job landing the sidecar, through the same describer as `describe`.
 - Same-format commands (`img-trim`, `img-reduce`, `rewrite`, `summarize`, `expand`,
-  `translate`, `img-embed-description`, `photo-lint set-zone`, `date-copy --to exif`) take `--in-place`, which lands the result on the input's own path
+  `translate`, `img-embed-description`, `photo-lint set-zone`, `date-copy --to exif`,
+  `motionphotos strip`, `motionphotos merge`) take `--in-place`, which lands the result on the input's own path
   (decision 0010). `Job` gives the result the input's permissions before it lands and,
   with `--keep-mtime` (every file producer), its times; steps copy neither.
 - `img-hash`, `img-duplicates`, `img-check`, `img-trim` and `img-reduce` need the `images` extra

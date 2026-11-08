@@ -213,8 +213,8 @@ File utilities without backends or config, run as `oddjob <command>`:
 | `sidecars scan PATH...`     | list groups of files sharing a name (`-e jpg -e mp4`: only groups with all of them) |
 | `sidecars find FILE`        | list the sidecar files of FILE                                        |
 | `motionphotos check FILE`   | exit 0 if FILE is a motion photo, 1 if not                            |
-| `motionphotos join/split/strip` | build a motion photo from a JPEG and an MP4 (`-i IMAGE --video VIDEO`), take one apart, or drop its video |
-| `motionphotos merge PATH...`| merge each `NAME.jpg` + `NAME.mp4` pair into `NAME.jpg` (`--rm`: remove the video) |
+| `motionphotos join/split/strip` | build a motion photo from a JPEG and an MP4 (`-i IMAGE --video VIDEO`), take one apart, or drop its video (`strip` → `NAME.still.jpg`; `--in-place`: replace FILE) |
+| `motionphotos merge PATH...`| merge each `NAME.jpg` + `NAME.mp4` pair into `NAME.motion.jpg` (`--in-place`: into `NAME.jpg`; `--rm`: remove the video) |
 | `jpgize PATH...`            | HEIC/HEIF/WebP/PNG → JPEG, upright, keeping metadata and timestamps (`--rm`: remove sources) |
 | `mp4ize PATH...`            | remux videos into MP4 without re-encoding the video (`--rm`: remove sources) |
 | `img-hash PATH...`          | print each image's average hash (cached by content; `--no-cache`)    |
@@ -232,15 +232,15 @@ File utilities without backends or config, run as `oddjob <command>`:
 
 ```sh
 uv run oddjob jpgize -n ~/Pictures/import     # print the planned conversions
-uv run oddjob motionphotos merge -y --rm ~/DCIM
+uv run oddjob motionphotos merge --in-place --rm ~/DCIM
 uv run oddjob img-duplicates ~/Pictures -x "echo"
 ```
 
 Commands that change files (`jpgize`, `mp4ize`, `motionphotos merge`, `img-trim`,
 `img-reduce`, `img-embed-description`, `photo-lint set-zone`, `rename-by-hash`, `fix-extensions`, `date-copy`, `cleanup`)
-take `-n/--dry-run`; commands that would replace an existing file need `-y/--overwrite`,
-and `motionphotos merge` and `motionphotos strip`
-without `-o` always do (they write in place, and refuse up front without it).
+take `-n/--dry-run`. A command whose output already exists fails for that input;
+`-y/--overwrite` replaces the output, never the input. Only `--in-place` replaces the
+input itself (it implies `-y`); no command changes its input without it (decision 0013).
 `img-hash`, `img-duplicates`, `img-check`, `img-trim` and `img-reduce` need the
 `images` extra (`uv sync --extra images`). `img-embed-description` calls the `describe` backend for images without a
 `NAME.description.txt`. Commands taking `PATH...`

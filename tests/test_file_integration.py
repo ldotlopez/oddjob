@@ -126,7 +126,7 @@ class MotionPhotoIntegrationTest(IntegrationCase):
         self.assertEqual(video.read_bytes(), clip.read_bytes())
         self.assertEqual(stream_codecs(video), stream_codecs(clip))
 
-        self.oddjob("motionphotos", "strip", "-y", joined)
+        self.oddjob("motionphotos", "strip", "--in-place", joined)
         self.assertIsNone(motionphotos.MotionPhoto.parse(joined.read_bytes()).video)
 
 

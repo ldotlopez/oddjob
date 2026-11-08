@@ -59,6 +59,11 @@ def is_embed_description_input(path: Path) -> bool:
     return is_image(path) and not is_output_of(path, DESCRIBED_INFIX)
 
 
+# `motionphotos strip` writes NAME.<STILL_INFIX>.<ext>, `merge`
+# NAME.<MOTION_INFIX>.<ext>.
+STILL_INFIX = "still"
+MOTION_INFIX = "motion"
+
 # `date-copy --to exif` writes NAME.<DATED_INFIX>.<ext>.
 DATED_INFIX = "dated"
 

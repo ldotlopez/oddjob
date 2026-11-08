@@ -114,9 +114,16 @@ class MotionPhotoTests(unittest.TestCase):
         groups = sidecars.group_sidecars(
             [Path("a.jpg"), Path("a.mp4"), Path("b.jpg"), Path("b.mov")]
         )
-        merges = motionphotos.plan_merges(groups, remove_video=False)
+        merges = motionphotos.plan_merges(
+            groups, remove_video=False, dest_fn=lambda path: path.with_stem("m")
+        )
         self.assertEqual(
-            merges, [motionphotos.Merge(Path("a.jpg"), Path("a.mp4"), False)]
+            merges,
+            [motionphotos.Merge(Path("a.jpg"), Path("a.mp4"), Path("m.jpg"), False)],
+        )
+        in_place = motionphotos.Merge(Path("a.jpg"), Path("a.mp4"), Path("a.jpg"), True)
+        self.assertEqual(
+            in_place.describe(), "merge a.mp4 into a.jpg, then remove a.mp4"
         )
 
 
