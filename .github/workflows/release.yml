@@ -55,9 +55,9 @@ jobs:
           path: dist/
           if-no-files-found: error
 
-  # PyPI publishing is DISABLED: the `foundation` dependency comes from git
-  # (tool.uv.sources), and on PyPI that name belongs to an unrelated package.
-  # To enable, once foundation is on PyPI under its own name:
+  # PyPI publishing is DISABLED: `foundation` is a direct git reference, which
+  # PyPI rejects in dependencies, and on PyPI that name belongs to an unrelated
+  # package. To enable, once foundation is on PyPI under its own name:
   #   1. Create a token at https://pypi.org/manage/account/token/
   #   2. gh secret set PYPI_API_TOKEN
   #   3. Uncomment this job and add `pypi` to the release job's `needs:`

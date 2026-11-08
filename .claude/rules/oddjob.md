@@ -96,7 +96,8 @@
   `wrote <dest>` and plain progress are INFO, shown with `-v`.
   Modules log through `logging.getLogger(__name__)`.
 - Tests: `uv run python -m unittest discover -s tests` (stdlib unittest; see
-  `docs/ARCHITECTURE.md`, "Tests"). Unit tests use fake executables and
+  `docs/ARCHITECTURE.md`, "Tests"). CI (`.github/workflows/ci.yml`) runs them
+  on PRs and pushes to `main`; releases run them again on a `v*` tag. Unit tests use fake executables and
   `support.FakeHTTPServer`, never real services. Integration tests read
   `tests/integration.env` (git-ignored, holds secrets: never commit or print it) and
   skip when unconfigured.

@@ -1,5 +1,11 @@
 # oddjob
 
+[![CI](https://github.com/ldotlopez/oddjob/actions/workflows/ci.yml/badge.svg)](https://github.com/ldotlopez/oddjob/actions/workflows/ci.yml)
+[![Release workflow](https://github.com/ldotlopez/oddjob/actions/workflows/release.yml/badge.svg)](https://github.com/ldotlopez/oddjob/actions/workflows/release.yml)
+[![Release](https://img.shields.io/github/v/release/ldotlopez/oddjob?include_prereleases)](https://github.com/ldotlopez/oddjob/releases)
+[![License](https://img.shields.io/github/license/ldotlopez/oddjob)](LICENSE)
+[![Buy Me a Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-zepolson-FFDD00?logo=buymeacoffee&logoColor=black)](https://www.buymeacoffee.com/zepolson)
+
 CLI toolkit for files, one command each, all under `oddjob`: tasks that go through
 replaceable model backends (below), and [file commands](#file-commands) with no
 backends or config. `oddjob --help` lists them by subject.
