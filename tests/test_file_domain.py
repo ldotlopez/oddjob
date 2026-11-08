@@ -454,14 +454,16 @@ class PhotoLintTests(unittest.TestCase):
             self.assertEqual(photolint.find_problems(tags), expected, tags)
 
     def test_plan_set_zone_fills_missing_offsets_per_date(self) -> None:
-        photo = Path("d/a.jpg")
+        photo, fixed = Path("d/a.jpg"), Path("d/a.fixed.jpg")
         tags = {
             "DateTimeOriginal": "2019:07:14 18:03:22+0200",
             "CreateDate": "2019:07:14 18:03:22+0200",
             "OffsetTimeDigitized": "+05:00",
             "ModifyDate": "2019:12:01 10:00:00+0100",
         }
-        change = photolint.plan_set_zone(photo, tags, self.madrid, replace=False)
+        change = photolint.plan_set_zone(
+            photo, fixed, tags, self.madrid, replace_offsets=False
+        )
         self.assertIsNotNone(change)
         assert change is not None
         self.assertEqual(
@@ -469,22 +471,31 @@ class PhotoLintTests(unittest.TestCase):
         )
         self.assertEqual(
             change.describe(),
-            "exiftool -OffsetTimeOriginal=+02:00 -OffsetTime=+01:00 d/a.jpg",
+            "exiftool -OffsetTimeOriginal=+02:00 -OffsetTime=+01:00"
+            " -o d/a.fixed.jpg d/a.jpg",
         )
-        replaced = photolint.plan_set_zone(photo, tags, self.madrid, replace=True)
+        replaced = photolint.plan_set_zone(
+            photo, photo, tags, self.madrid, replace_offsets=True
+        )
         assert replaced is not None
         self.assertEqual(replaced.tags()["OffsetTimeDigitized"], "+02:00")
+        self.assertNotIn("-o", replaced.describe())
 
     def test_plan_set_zone_skips_zoned_and_fails_undated_photos(self) -> None:
         zoned = {
             "DateTimeOriginal": "2019:07:14 18:03:22",
             "OffsetTimeOriginal": "+02:00",
         }
+        a, b = Path("a.jpg"), Path("b.jpg")
         self.assertIsNone(
-            photolint.plan_set_zone(Path("a.jpg"), zoned, self.madrid, replace=False)
+            photolint.plan_set_zone(a, a, zoned, self.madrid, replace_offsets=False)
         )
         with self.assertRaises(dates.DateNotFoundError):
-            photolint.plan_set_zone(Path("b.jpg"), {}, self.madrid, replace=False)
+            photolint.plan_set_zone(b, b, {}, self.madrid, replace_offsets=False)
+
+    def test_set_zone_skips_its_own_outputs(self) -> None:
+        self.assertTrue(media.is_set_zone_input(Path("d/a.jpg")))
+        self.assertFalse(media.is_set_zone_input(Path("d/a.fixed.jpg")))
 
 
 class CleanupTests(unittest.TestCase):

@@ -50,6 +50,15 @@ def is_autocrop_input(path: Path) -> bool:
     return is_image(path) and not is_output_of(path, CROPPED_INFIX)
 
 
+# `photo-lint set-zone` writes NAME.<FIXED_INFIX>.<ext>.
+FIXED_INFIX = "fixed"
+
+
+def is_set_zone_input(path: Path) -> bool:
+    """Images, except earlier set-zone outputs (NAME.fixed.<ext>)."""
+    return is_image(path) and not is_output_of(path, FIXED_INFIX)
+
+
 # `img-reduce` writes NAME.<REDUCED_INFIX>.<ext>, in a format Pillow can
 # write back.
 REDUCED_INFIX = "reduced"

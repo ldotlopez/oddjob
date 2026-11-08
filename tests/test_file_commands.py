@@ -630,6 +630,26 @@ class DateSyncCommandTests(unittest.TestCase):
         self.assertIn("%q", bad.output)
 
 
+# exiftool keeping each file's tags as its content (JSON), so the tags travel
+# with a copy: -json prints them, -TAG=VALUE arguments store them; a stored
+# FAIL tag makes it fail.
+FAKE_EXIFTOOL_IN_FILE = """\
+import json, sys
+from pathlib import Path
+args = sys.argv[1:]
+Path(__file__).with_suffix(".argv").write_text(json.dumps(args))
+target = Path(args[-1])
+tags = json.loads(target.read_text())
+if "FAIL" in tags:
+    sys.exit("boom")
+if "-json" in args:
+    print(json.dumps([{"SourceFile": str(target), **tags}]))
+else:
+    tags.update(arg[1:].split("=", 1) for arg in args if "=" in arg)
+    target.write_text(json.dumps(tags))
+"""
+
+
 class PhotoLintCommandTests(unittest.TestCase):
     def setUp(self) -> None:
         self.tmp = Path(self.enterContext(tempfile.TemporaryDirectory()))
@@ -638,89 +658,105 @@ class PhotoLintCommandTests(unittest.TestCase):
         self.photos = self.tmp / "photos"
         self.photos.mkdir()
         self.runner = CliRunner()
-        self.exiftool = write_executable(self.bin, "exiftool", FAKE_EXIFTOOL)
+        self.exiftool = write_executable(self.bin, "exiftool", FAKE_EXIFTOOL_IN_FILE)
+        self.summer = {"DateTimeOriginal": "2019:07:14 18:03:22"}
 
     def photo(self, name: str, tags: dict[str, str]) -> Path:
         path = self.photos / name
-        path.write_bytes(name.encode())
-        path.with_name(f"{name}.tags").write_text(json.dumps(tags))
+        path.write_text(json.dumps(tags))
         return path
 
-    def stored_tags(self, path: Path) -> dict[str, str]:
-        return json.loads(path.with_name(f"{path.name}.tags").read_text())
+    def tags(self, path: Path) -> dict[str, str]:
+        return json.loads(path.read_text())
 
     def invoke(self, *args: str) -> Result:
         return self.runner.invoke(
             cli, ["photo-lint", *args, str(self.photos)], env={"PATH": str(self.bin)}
         )
 
+    def set_zone(self, *args: str) -> Result:
+        return self.invoke("set-zone", "--zone", "Europe/Madrid", *args)
+
     def test_check_lists_photos_without_a_zone(self) -> None:
-        bare = self.photo("a.jpg", {"DateTimeOriginal": "2019:07:14 18:03:22"})
-        self.photo(
-            "b.jpg",
-            {"DateTimeOriginal": "2019:07:14 18:03:22", "OffsetTimeOriginal": "+02:00"},
-        )
+        bare = self.photo("a.jpg", self.summer)
+        self.photo("b.jpg", {**self.summer, "OffsetTimeOriginal": "+02:00"})
         self.photo("c.jpg", {})
         result = self.invoke("check")
         self.assertEqual(result.exit_code, 1, result.output)
         self.assertEqual(result.stdout, f"{bare}: no-zone\n")
-        (self.photos / "a.jpg.tags").write_text(
-            json.dumps({"DateTimeOriginal": "2019:07:14 18:03:22", "FAIL": "1"})
-        )
+        self.photo("a.jpg", {**self.summer, "FAIL": "1"})
         failed = self.invoke("check")
         self.assertEqual((failed.exit_code, failed.stdout), (1, ""))
         self.assertIn("2 done, 1 failed", failed.stderr)
 
     def test_check_passes_clean_photos(self) -> None:
-        self.photo(
-            "b.jpg",
-            {"DateTimeOriginal": "2019:07:14 18:03:22", "OffsetTimeOriginal": "+02:00"},
-        )
+        self.photo("b.jpg", {**self.summer, "OffsetTimeOriginal": "+02:00"})
         result = self.invoke("check")
         self.assertEqual((result.exit_code, result.stdout), (0, ""))
 
-    def test_set_zone_needs_y_and_a_known_zone(self) -> None:
-        self.photo("a.jpg", {"DateTimeOriginal": "2019:07:14 18:03:22"})
-        refused = self.invoke("set-zone", "--zone", "Europe/Madrid")
-        self.assertEqual(refused.exit_code, 2, refused.output)
-        self.assertIn("add -y", refused.output)
-        unknown = self.invoke("set-zone", "--zone", "Europe/Atlantis", "-y")
+    def test_set_zone_rejects_an_unknown_zone(self) -> None:
+        self.photo("a.jpg", self.summer)
+        unknown = self.invoke("set-zone", "--zone", "Europe/Atlantis")
         self.assertEqual(unknown.exit_code, 2, unknown.output)
         self.assertIn("Europe/Atlantis", unknown.output)
 
-    def test_set_zone_plans_then_writes_offsets(self) -> None:
-        summer = self.photo("a.jpg", {"DateTimeOriginal": "2019:07:14 18:03:22"})
+    def test_set_zone_writes_a_fixed_sibling(self) -> None:
+        summer = self.photo("a.jpg", self.summer)
         winter = self.photo("b.jpg", {"CreateDate": "2019:01:14 18:03:22"})
-        zoned = self.photo(
-            "c.jpg",
-            {"DateTimeOriginal": "2019:07:14 18:03:22", "OffsetTimeOriginal": "+05:00"},
-        )
+        zoned = self.photo("c.jpg", {**self.summer, "OffsetTimeOriginal": "+05:00"})
+        fixed = self.photos / "a.fixed.jpg"
         planned = self.invoke("set-zone", "--zone", "europe/madrid", "-n")
         self.assertEqual(planned.exit_code, 0, planned.output)
         self.assertEqual(
             planned.stdout,
-            f"exiftool -OffsetTimeOriginal=+02:00 {summer}\n"
-            f"exiftool -OffsetTimeDigitized=+01:00 {winter}\n",
+            f"exiftool -OffsetTimeOriginal=+02:00 -o {fixed} {summer}\n"
+            f"exiftool -OffsetTimeDigitized=+01:00"
+            f" -o {self.photos / 'b.fixed.jpg'} {winter}\n",
         )
-        self.assertNotIn("OffsetTimeOriginal", self.stored_tags(summer))
-        done = self.invoke("set-zone", "--zone", "Europe/Madrid", "-y")
+        self.assertFalse(fixed.exists())
+
+        with self.assertLogs("filejobs", "INFO") as logs:
+            done = self.set_zone("-v")
         self.assertEqual((done.exit_code, done.stdout), (0, ""), done.output)
-        self.assertEqual(self.stored_tags(summer)["OffsetTimeOriginal"], "+02:00")
-        self.assertEqual(self.stored_tags(winter)["OffsetTimeDigitized"], "+01:00")
-        self.assertEqual(self.stored_tags(zoned)["OffsetTimeOriginal"], "+05:00")
+        self.assertEqual(wrote(logs.records), [fixed, self.photos / "b.fixed.jpg"])
+        self.assertEqual(self.tags(fixed)["OffsetTimeOriginal"], "+02:00")
+        self.assertEqual(self.tags(summer), self.summer)
+        self.assertFalse((self.photos / "c.fixed.jpg").exists())
         self.assertIn("-preserve", recorded_argv(self.exiftool))
-        replaced = self.invoke("set-zone", "--zone", "Europe/Madrid", "-y", "--replace")
+
+        # The fixed files are not inputs again; replacing them needs -y.
+        again = self.set_zone()
+        self.assertEqual(again.exit_code, 1, again.output)
+        self.assertIn("0 done, 2 failed", again.stderr)
+        self.assertEqual(self.set_zone("-y").exit_code, 0)
+        self.assertEqual(self.tags(zoned)["OffsetTimeOriginal"], "+05:00")
+
+    def test_set_zone_in_place_replaces_the_original(self) -> None:
+        summer = self.photo("a.jpg", self.summer)
+        zoned = self.photo("c.jpg", {**self.summer, "OffsetTimeOriginal": "+05:00"})
+        os.utime(summer, (0, 1000))
+        planned = self.set_zone("--in-place", "-n")
+        self.assertEqual(
+            planned.stdout, f"exiftool -OffsetTimeOriginal=+02:00 {summer}\n"
+        )
+        done = self.set_zone("--in-place", "--keep-mtime")
+        self.assertEqual((done.exit_code, done.stdout), (0, ""), done.output)
+        self.assertEqual(self.tags(summer)["OffsetTimeOriginal"], "+02:00")
+        self.assertEqual(summer.stat().st_mtime, 1000)
+        self.assertEqual(sorted(self.photos.iterdir()), [summer, zoned])
+        replaced = self.set_zone("--in-place", "--replace-offsets")
         self.assertEqual(replaced.exit_code, 0, replaced.output)
-        self.assertEqual(self.stored_tags(zoned)["OffsetTimeOriginal"], "+02:00")
+        self.assertEqual(self.tags(zoned)["OffsetTimeOriginal"], "+02:00")
 
     def test_set_zone_fails_skipped_hour_and_undated_photos(self) -> None:
         self.photo("a.jpg", {"DateTimeOriginal": "2024:03:31 02:30:00"})
         self.photo("b.jpg", {})
-        good = self.photo("c.jpg", {"DateTimeOriginal": "2019:07:14 18:03:22"})
-        result = self.invoke("set-zone", "--zone", "Europe/Madrid", "-y")
+        self.photo("c.jpg", self.summer)
+        result = self.set_zone()
         self.assertEqual(result.exit_code, 1, result.output)
         self.assertIn("1 done, 2 failed", result.stderr)
-        self.assertEqual(self.stored_tags(good)["OffsetTimeOriginal"], "+02:00")
+        fixed = self.photos / "c.fixed.jpg"
+        self.assertEqual(self.tags(fixed)["OffsetTimeOriginal"], "+02:00")
 
 
 class FsCleanupCommandTests(unittest.TestCase):

@@ -4,18 +4,23 @@ Each check is a function of the tags `READ_TAGS` names (as
 `ExifTool.read_dates` returns them) listed in `CHECKS` under its code.
 `set-zone` fixes `no-zone`: cameras record wall-clock times without a zone,
 so it takes the zone the user names and records, next to each date, the UTC
-offset that zone had at that wall-clock time.
+offset that zone had at that wall-clock time, in a copy of the photo
+(`SetOffsetsStep`) that lands as `NAME.fixed.<ext>` or replaces it.
 """
 
 from __future__ import annotations
 
 import shlex
-from collections.abc import Callable
+import shutil
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Protocol
 from zoneinfo import ZoneInfo, available_timezones
 
+from filejobs.pipeline import temp_output_path
+from filejobs.progress import ProgressEvent, ProgressStream
 from oddjob.lib import dates
 from oddjob.lib.external import EXIF_DATE_FORMAT
 
@@ -87,22 +92,25 @@ def find_problems(tags: Tags) -> list[str]:
 @dataclass(frozen=True, slots=True)
 class SetOffsets:
     path: Path
+    dest: Path  # `path` itself when the photo is replaced
     offsets: tuple[tuple[str, str], ...]  # (offset tag, `+01:00`)
 
     def tags(self) -> Tags:
         return dict(self.offsets)
 
     def describe(self) -> str:
+        """The exiftool call that would do it (`-o DEST` unless in place)."""
         assignments = [f"-{tag}={value}" for tag, value in self.offsets]
-        return shlex.join(["exiftool", *assignments, str(self.path)])
+        output = [] if self.dest == self.path else ["-o", str(self.dest)]
+        return shlex.join(["exiftool", *assignments, *output, str(self.path)])
 
 
 def plan_set_zone(
-    path: Path, tags: Tags, zone: ZoneInfo, *, replace: bool
+    path: Path, dest: Path, tags: Tags, zone: ZoneInfo, *, replace_offsets: bool
 ) -> SetOffsets | None:
-    """The offsets `zone` gives `path`'s dates: those missing, or all with
-    `replace`; None if there is nothing to write. DateNotFoundError when the
-    photo has no date."""
+    """The offsets `zone` gives `path`'s dates, to land at `dest`: those
+    missing, or all with `replace_offsets`; None if there is nothing to
+    write. DateNotFoundError when the photo has no date."""
     offsets: list[tuple[str, str]] = []
     dated = False
     for date_tag, offset_tag in DATE_OFFSET_TAGS.items():
@@ -110,8 +118,31 @@ def plan_set_zone(
         if wall is None:
             continue
         dated = True
-        if replace or dates.utc_offset(tags.get(offset_tag, "")) is None:
+        if replace_offsets or dates.utc_offset(tags.get(offset_tag, "")) is None:
             offsets.append((offset_tag, zone_offset(wall, zone)))
     if not dated:
         raise dates.DateNotFoundError("no date in its metadata")
-    return SetOffsets(path, tuple(offsets)) if offsets else None
+    return SetOffsets(path, dest, tuple(offsets)) if offsets else None
+
+
+class TagWriter(Protocol):
+    def write_tags(self, path: Path, values: Mapping[str, str]) -> None: ...
+
+
+class SetOffsetsStep:
+    """A copy of the input photo with `change`'s offsets written. Satisfies
+    ProgressStep[Path]."""
+
+    def __init__(self, writer: TagWriter, change: SetOffsets) -> None:
+        self.writer = writer
+        self.change = change
+
+    def run(self, input_path: Path) -> ProgressStream[Path]:
+        produced = temp_output_path("oddjob-set-zone-", input_path.suffix)
+        try:
+            shutil.copyfile(input_path, produced)
+            self.writer.write_tags(produced, self.change.tags())
+        except BaseException:
+            produced.unlink(missing_ok=True)
+            raise
+        yield ProgressEvent(completed=1, total=1, done=True, result=produced)

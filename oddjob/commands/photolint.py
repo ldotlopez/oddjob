@@ -9,13 +9,16 @@ import rich_click as click
 
 from filejobs.batch import BatchReport, run_batch
 from filejobs.cli_options import (
+    check_single_output,
     dry_run_option,
     finish_batch,
-    overwrite_option,
     paths_argument,
-    require_overwrite,
+    run_jobs,
+    same_format_destination,
+    same_format_options,
 )
 from filejobs.inputs import expand_inputs
+from filejobs.pipeline import Job, infix_destination
 from filejobs.progress import BaseProgressReporter
 from oddjob.commands.dates import build_exiftool
 from oddjob.core.cli_common import logging_options
@@ -65,47 +68,64 @@ def check_cmd(paths: tuple[Path, ...]) -> None:
     callback=parse_zone,
     help="IANA time zone the EXIF dates' wall-clock times are in (Europe/Madrid)",
 )
-@click.option("--replace", is_flag=True, help="also rewrite offsets already recorded")
-@overwrite_option
+@click.option(
+    "--replace-offsets", is_flag=True, help="also rewrite offsets already recorded"
+)
+@same_format_options
 @dry_run_option
 @logging_options
 def set_zone_cmd(
     paths: tuple[Path, ...],
     zone: ZoneInfo,
-    replace: bool,
+    replace_offsets: bool,
+    output: Path | None,
     overwrite: bool,
+    in_place: bool,
+    keep_mtime: bool,
     dry_run: bool,
 ) -> None:
     """Record, next to each EXIF date of the images in PATH..., the UTC
     offset --zone had at that wall-clock time (OffsetTimeOriginal,
-    OffsetTimeDigitized, OffsetTime). Dates that already have one are kept
-    unless --replace. Rewrites files in place (needs -y); -n reads the dates
-    and prints the changes."""
-    if not dry_run:
-        require_overwrite(overwrite, "set-zone rewrites files in place")
+    OffsetTimeDigitized, OffsetTime), writing NAME.fixed.<ext> (--in-place:
+    replace the image). Dates that already have one are kept unless
+    --replace-offsets; images with nothing to write are skipped. -n reads the
+    dates and prints the changes."""
+    inputs = expand_inputs(paths, media.is_set_zone_input)
+    check_single_output(output, inputs)
+    dest_fn = same_format_destination(
+        output, in_place, infix_destination(media.FIXED_INFIX)
+    )
     exiftool = build_exiftool()
     planned: list[photolint.SetOffsets] = []
 
     def plan(path: Path, _reporter: BaseProgressReporter) -> None:
         tags = exiftool.read_dates(path, photolint.READ_TAGS)
-        change = photolint.plan_set_zone(path, tags, zone, replace=replace)
+        change = photolint.plan_set_zone(
+            path, dest_fn(path), tags, zone, replace_offsets=replace_offsets
+        )
         if change is not None:
             planned.append(change)
 
-    reading = run_batch(
-        expand_inputs(paths, media.is_image), plan, description="Reading dates"
-    )
+    reading = run_batch(inputs, plan, description="Reading dates")
     if dry_run or not planned:
         for change in planned:
             click.echo(change.describe())
         finish_batch(reading)
         return
 
-    def apply(change: photolint.SetOffsets, _reporter: BaseProgressReporter) -> None:
-        exiftool.write_tags(change.path, change.tags())
+    def apply(change: photolint.SetOffsets, reporter: BaseProgressReporter) -> Path:
+        job = Job(
+            steps=[(photolint.SetOffsetsStep(exiftool, change), "Zoning")],
+            dest_fn=lambda _path: change.dest,
+            keep_times=keep_mtime,
+        )
+        return job.run(change.path, reporter, overwrite=overwrite or in_place)
 
-    applying = run_batch(
-        planned, apply, description="Zoning", label=lambda change: change.describe()
-    )
     # Each file once: the ones read fine are counted by the apply batch.
-    finish_batch(BatchReport(failures=reading.failures), applying)
+    run_jobs(
+        planned,
+        apply,
+        "Zoning",
+        label=lambda change: str(change.path),
+        prior=[BatchReport(failures=reading.failures)],
+    )

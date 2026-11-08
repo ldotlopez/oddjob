@@ -234,9 +234,12 @@ renames and checks, and `cli_options` for `PATH...`, `-y` and `-n`; logging come
   time); Shotwell's exposure times come from its database, opened read-only. Shotwell is
   a source only. Dates are aware datetimes in the local zone.
 - `photo-lint check` runs every check in `photolint.CHECKS` (a code and a function of
-  the tags read with exiftool) on each image. `photo-lint set-zone` works like
-  `date-copy`: it reads every image's dates and plans a `photolint.SetOffsets` under one
-  `run_batch`, then writes the offsets under a second one (decision 0011).
+  the tags read with exiftool) on each image. `photo-lint set-zone` reads every
+  image's dates and plans a `photolint.SetOffsets` under one `run_batch`, then runs a `Job`
+  per plan (`SetOffsetsStep`: a copy with the offsets written, landing as
+  `NAME.fixed.<ext>` or, with `--in-place`, over the input) through
+  `run_jobs(prior=...)`, so the summary also counts the inputs that failed to plan
+  (decision 0012).
 - `cleanup` walks the trees itself (`cleanup.plan_cleanup`) instead of using
   `filejobs.inputs.expand_inputs`, since it removes and chmods directories as well as
   files; it does not descend into junk directories or follow symlinks.

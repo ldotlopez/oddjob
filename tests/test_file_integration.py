@@ -271,9 +271,16 @@ class PhotoLintIntegrationTest(IntegrationCase):
         found = self.runner.invoke(cli, ["photo-lint", "check", str(self.tmp)])
         self.assertEqual((found.exit_code, found.stdout), (1, f"{image}: no-zone\n"))
 
-        self.oddjob("photo-lint", "set-zone", "--zone", "Europe/Madrid", "-y", self.tmp)
+        set_zone = ("photo-lint", "set-zone", "--zone", "Europe/Madrid", self.tmp)
+        self.oddjob(*set_zone)
 
+        fixed = self.tmp / "a.fixed.jpg"
+        self.assertEqual(exif_tag(fixed, "OffsetTimeOriginal"), "+02:00")
+        self.assertEqual(exif_tag(fixed, "OffsetTime"), "+01:00")
+        self.assertEqual(exif_tag(fixed, "DateTimeOriginal"), "2019:07:14 18:03:22")
+        self.assertEqual(exif_tag(image, "OffsetTimeOriginal"), "")
+
+        fixed.unlink()
+        self.oddjob(*set_zone, "--in-place")
         self.assertEqual(exif_tag(image, "OffsetTimeOriginal"), "+02:00")
-        self.assertEqual(exif_tag(image, "OffsetTime"), "+01:00")
-        self.assertEqual(exif_tag(image, "DateTimeOriginal"), "2019:07:14 18:03:22")
         self.assertEqual(self.oddjob("photo-lint", "check", self.tmp).stdout, "")

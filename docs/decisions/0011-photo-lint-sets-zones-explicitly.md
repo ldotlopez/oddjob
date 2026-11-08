@@ -1,6 +1,6 @@
 # 0011. `photo-lint set-zone` records a zone the user names
 
-Status: accepted (2026-11-08)
+Status: superseded by 0012
 
 ## Context
 

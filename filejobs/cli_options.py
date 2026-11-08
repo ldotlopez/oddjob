@@ -207,17 +207,20 @@ def run_jobs[T](
     action: JobAction[T],
     description: str,
     label: Callable[[T], str] = str,
+    prior: Sequence[BatchReport] = (),
 ) -> None:
     """Run `action` on every item, logging each path it wrote at INFO, then
-    the batch summary (only on failure, decision 0004). An action returning
-    None had nothing to write for that item, which still counts as done."""
+    the batch summary (only on failure, decision 0004), counting the `prior`
+    reports too (e.g. a planning pass whose failed inputs never got here).
+    An action returning None had nothing to write for that item, which still
+    counts as done."""
 
     def run(item: T, reporter: BaseProgressReporter) -> None:
         if (written := action(item, reporter)) is not None:
             LOGGER.info("wrote %s", written)
 
     report = run_batch(items, run, description=description, label=label)
-    finish_batch(report)
+    finish_batch(*prior, report)
 
 
 def run_single_job(job: Job, input_path: Path, overwrite: bool) -> Path:
