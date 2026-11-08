@@ -16,15 +16,16 @@ import rich_click as click
 
 from filejobs.cli_options import (
     check_single_output,
-    common_file_options,
     dry_run_option,
     job_action,
     paths_argument,
     print_plan,
     run_jobs,
+    same_format_destination,
+    same_format_options,
 )
 from filejobs.inputs import expand_inputs, text_inputs_except_outputs
-from filejobs.pipeline import Job, TextStep, infix_destination, override_destination
+from filejobs.pipeline import Job, TextStep, infix_destination
 from oddjob.core.cli_common import (
     backend_option,
     logging_options,
@@ -48,7 +49,7 @@ DEFAULT_INFIX = "rewrite"
 )
 @model_option
 @backend_option("rewrite")
-@common_file_options
+@same_format_options
 @dry_run_option
 @logging_options
 @pass_session
@@ -60,12 +61,16 @@ def rewrite_cmd(
     backend: str | None,
     output: Path | None,
     overwrite: bool,
+    in_place: bool,
+    keep_mtime: bool,
     dry_run: bool,
 ) -> None:
     """Rewrite each input in PATH... per --instructions."""
     inputs = expand_inputs(paths, text_inputs_except_outputs(DEFAULT_INFIX))
     check_single_output(output, inputs)
-    dest_fn = override_destination(output, infix_destination(DEFAULT_INFIX))
+    dest_fn = same_format_destination(
+        output, in_place, infix_destination(DEFAULT_INFIX)
+    )
     if dry_run:
         print_plan(inputs, dest_fn)
         return
@@ -76,8 +81,9 @@ def rewrite_cmd(
             (TextStep(lambda text: rewriter.rewrite(text, prompt=prompt)), "Rewriting")
         ],
         dest_fn=dest_fn,
+        keep_times=keep_mtime,
     )
-    run_jobs(inputs, job_action(job, overwrite), "Rewriting")
+    run_jobs(inputs, job_action(job, overwrite or in_place), "Rewriting")
 
 
 if __name__ == "__main__":

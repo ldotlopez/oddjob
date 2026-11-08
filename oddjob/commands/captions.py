@@ -10,6 +10,7 @@ import rich_click as click
 
 from filejobs.cli_options import (
     dry_run_option,
+    keep_mtime_option,
     overwrite_option,
     paths_argument,
     require_overwrite,
@@ -56,6 +57,7 @@ from oddjob.lib.protocols import Describer
 @model_option
 @backend_option("describe")
 @overwrite_option
+@keep_mtime_option
 @dry_run_option
 @logging_options
 @pass_session
@@ -68,6 +70,7 @@ def img_embed_description_cmd(
     model: str | None,
     backend: str | None,
     overwrite: bool,
+    keep_mtime: bool,
     dry_run: bool,
 ) -> None:
     """Write each image's NAME.description.txt into its XMP and EXIF
@@ -107,6 +110,7 @@ def img_embed_description_cmd(
             job = Job(
                 steps=[(step, f"Embedding {caption.image.name}")],
                 dest_fn=lambda _image: caption.image,
+                keep_times=keep_mtime,
             )
             return job.run(caption.image, reporter, overwrite=overwrite)
 

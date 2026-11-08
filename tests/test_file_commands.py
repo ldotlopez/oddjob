@@ -718,5 +718,48 @@ class CommandTreeTests(unittest.TestCase):
                 self.assertLessEqual(expected, names)
 
 
+class TextTasksInPlaceTests(unittest.TestCase):
+    """--in-place on the text tasks (decision 0010), checked through -n,
+    which needs no backend."""
+
+    def setUp(self) -> None:
+        self.tmp = Path(self.enterContext(tempfile.TemporaryDirectory()))
+        self.note = self.tmp / "note.txt"
+        self.note.write_text("hello", encoding="utf-8")
+        self.runner = CliRunner()
+
+    def test_plan_lands_on_the_input(self) -> None:
+        for command in ("rewrite", "summarize", "expand"):
+            with self.subTest(command=command):
+                result = self.runner.invoke(
+                    cli, [command, "-n", "--in-place", str(self.note)]
+                )
+                self.assertEqual(result.exit_code, 0, result.output)
+                self.assertEqual(result.stdout, f"{self.note} -> {self.note}\n")
+
+    def test_in_place_excludes_output(self) -> None:
+        for command in ("rewrite", "summarize", "expand", "translate"):
+            with self.subTest(command=command):
+                required = ["-l", "es"] if command == "translate" else []
+                args = [command, *required, "--in-place"]
+                args += ["-o", str(self.tmp / "b.txt")]
+                result = self.runner.invoke(cli, [*args, str(self.note)])
+                self.assertEqual(result.exit_code, 2, result.output)
+                self.assertIn("mutually exclusive", result.output)
+
+    def test_only_same_format_commands_take_in_place(self) -> None:
+        for command in ("jpgize", "mp4ize", "describe"):
+            with self.subTest(command=command):
+                result = self.runner.invoke(cli, [command, "--in-place", str(self.tmp)])
+                self.assertEqual(result.exit_code, 2, result.output)
+                self.assertIn("No such option", result.output)
+
+    def test_keep_mtime_is_offered_by_every_file_producer(self) -> None:
+        for command in ("img-trim", "img-reduce", "jpgize", "mp4ize", "rewrite"):
+            with self.subTest(command=command):
+                result = self.runner.invoke(cli, [command, "--help"])
+                self.assertIn("--keep-mtime", result.output)
+
+
 if __name__ == "__main__":
     unittest.main()

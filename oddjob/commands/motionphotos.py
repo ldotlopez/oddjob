@@ -12,6 +12,7 @@ import rich_click as click
 
 from filejobs.cli_options import (
     dry_run_option,
+    keep_mtime_option,
     overwrite_option,
     paths_argument,
     require_overwrite,
@@ -27,8 +28,14 @@ from oddjob.lib import motionphotos, sidecars
 existing_file = click.Path(exists=True, dir_okay=False, path_type=Path)
 
 
-def to_destination(step: BytesStep, description: str, destination: Path) -> Job:
-    return Job(steps=[(step, description)], dest_fn=lambda _input: destination)
+def to_destination(
+    step: BytesStep, description: str, destination: Path, keep_mtime: bool
+) -> Job:
+    return Job(
+        steps=[(step, description)],
+        dest_fn=lambda _input: destination,
+        keep_times=keep_mtime,
+    )
 
 
 def joining_step(video: Path) -> BytesStep:
@@ -60,13 +67,19 @@ def check_cmd(file: Path) -> None:
 @click.option("--video", required=True, type=existing_file)
 @click.option("-o", "--output", required=True, type=click.Path(path_type=Path))
 @overwrite_option
+@keep_mtime_option
 @click.option("--rm", "remove_video", is_flag=True, help="remove VIDEO afterwards")
 @logging_options
 def join_cmd(
-    image: Path, video: Path, output: Path, overwrite: bool, remove_video: bool
+    image: Path,
+    video: Path,
+    output: Path,
+    overwrite: bool,
+    keep_mtime: bool,
+    remove_video: bool,
 ) -> None:
     """Join IMAGE and VIDEO into the motion photo OUTPUT."""
-    job = to_destination(joining_step(video), "Joining", output)
+    job = to_destination(joining_step(video), "Joining", output, keep_mtime)
     run_single_job(job, image, overwrite)
     if remove_video:
         video.unlink()
@@ -77,8 +90,11 @@ def join_cmd(
 @click.option("-i", "--image", required=True, type=click.Path(path_type=Path))
 @click.option("--video", required=True, type=click.Path(path_type=Path))
 @overwrite_option
+@keep_mtime_option
 @logging_options
-def split_cmd(file: Path, image: Path, video: Path, overwrite: bool) -> None:
+def split_cmd(
+    file: Path, image: Path, video: Path, overwrite: bool, keep_mtime: bool
+) -> None:
     """Split motion photo FILE into IMAGE and VIDEO."""
     for destination in (image, video):
         try:
@@ -87,8 +103,12 @@ def split_cmd(file: Path, image: Path, video: Path, overwrite: bool) -> None:
             raise click.ClickException(str(exc)) from exc
     still = BytesStep(lambda content: motionphotos.split(content)[0], image.suffix)
     clip = BytesStep(lambda content: motionphotos.split(content)[1], video.suffix)
-    run_single_job(to_destination(still, "Extracting image", image), file, overwrite)
-    run_single_job(to_destination(clip, "Extracting video", video), file, overwrite)
+    run_single_job(
+        to_destination(still, "Extracting image", image, keep_mtime), file, overwrite
+    )
+    run_single_job(
+        to_destination(clip, "Extracting video", video, keep_mtime), file, overwrite
+    )
 
 
 @motionphotos_cmd.command("strip")
@@ -97,12 +117,17 @@ def split_cmd(file: Path, image: Path, video: Path, overwrite: bool) -> None:
     "-o", "--output", type=click.Path(path_type=Path), help="default: FILE itself"
 )
 @overwrite_option
+@keep_mtime_option
 @logging_options
-def strip_cmd(file: Path, output: Path | None, overwrite: bool) -> None:
+def strip_cmd(
+    file: Path, output: Path | None, overwrite: bool, keep_mtime: bool
+) -> None:
     """Remove the video of motion photo FILE (in place needs -y)."""
     if output is None:
         require_overwrite(overwrite, "strip without -o rewrites FILE in place")
-    job = to_destination(BytesStep(motionphotos.strip), "Stripping", output or file)
+    job = to_destination(
+        BytesStep(motionphotos.strip), "Stripping", output or file, keep_mtime
+    )
     run_single_job(job, file, overwrite)
 
 
@@ -110,10 +135,15 @@ def strip_cmd(file: Path, output: Path | None, overwrite: bool) -> None:
 @paths_argument
 @click.option("--rm", "remove_video", is_flag=True, help="remove each merged video")
 @overwrite_option
+@keep_mtime_option
 @dry_run_option
 @logging_options
 def merge_cmd(
-    paths: tuple[Path, ...], remove_video: bool, overwrite: bool, dry_run: bool
+    paths: tuple[Path, ...],
+    remove_video: bool,
+    overwrite: bool,
+    keep_mtime: bool,
+    dry_run: bool,
 ) -> None:
     """Merge each NAME.jpg + NAME.mp4 pair in PATH... into NAME.jpg, in
     place (needs -y)."""
@@ -128,7 +158,9 @@ def merge_cmd(
 
     def apply(merge: motionphotos.Merge, reporter: BaseProgressReporter) -> Path:
         description = f"Merging {merge.image.name}"
-        job = to_destination(joining_step(merge.video), description, merge.image)
+        job = to_destination(
+            joining_step(merge.video), description, merge.image, keep_mtime
+        )
         written = job.run(merge.image, reporter, overwrite=overwrite)
         if merge.remove_video:
             merge.video.unlink()

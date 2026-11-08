@@ -5,18 +5,6 @@ option set or an approach is settled in a decision record before it is built.
 
 ## Features
 
-- **`--in-place` for every file transformation.** Done for `img-reduce`: the
-  result replaces the original atomically (the `Job` lands its temp file on
-  the input's own path), so no `NAME.<infix>.<ext>` is left behind. Offer the
-  same option on the other file producers (`img-trim`, `jpgize`, `mp4ize`,
-  and the text tasks where output and input formats match). It changes a
-  shared option set, so it needs its own decision record.
-- **`--keep-mtime` (or similar) next to `--in-place`.** Copy mtime, atime,
-  permissions and the like from the original onto the result. Today it
-  depends on the step: `BytesStep` (`img-trim`, `img-reduce`,
-  `motionphotos`) and `mp4ize`'s remux already call `shutil.copystat`;
-  `TextStep` (the text tasks) does not. Decide in the same record as
-  `--in-place` whether it is an option or the default.
 - **Image commands keep all metadata.** Every image-manipulating command must
   carry the input's metadata over. Today `img-trim` and `img-reduce` keep
   EXIF and the ICC profile (`imgedit._encode`), and `jpgize` copies all tags

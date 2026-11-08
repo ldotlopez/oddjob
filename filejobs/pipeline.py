@@ -13,6 +13,7 @@ import errno
 import logging
 import os
 import shutil
+import stat
 import subprocess
 import tempfile
 from collections.abc import Callable, Sequence
@@ -175,9 +176,8 @@ type BytesTransform = Callable[[bytes], bytes]
 
 class BytesStep:
     """Reads `input_path` as bytes, runs `transform` on it and writes the
-    result to a temp file with `suffix` (default: the input's), carrying
-    over the input's permissions and timestamps. The byte-level
-    counterpart of TextStep, for quick in-memory transforms."""
+    result to a temp file with `suffix` (default: the input's). The
+    byte-level counterpart of TextStep, for quick in-memory transforms."""
 
     def __init__(self, transform: BytesTransform, suffix: str | None = None) -> None:
         self.transform = transform
@@ -190,7 +190,6 @@ class BytesStep:
         )
         try:
             output_path.write_bytes(content)
-            shutil.copystat(input_path, output_path)
         except BaseException:
             output_path.unlink(missing_ok=True)
             raise
@@ -223,6 +222,10 @@ class Job:
     either check passes when `overwrite` is set. Intermediate temp files
     are removed whether or not the run succeeds.
 
+    A produced file is created owner-only; before it lands it takes the
+    input's permissions and, with `keep_times`, its access and modification
+    times (decision 0010). Steps do not copy either.
+
     A step may pass its input through unchanged. Only files the steps
     created are removed or moved, never the input: when no step produced
     a new file, the input is copied to the destination (or left alone when
@@ -233,9 +236,11 @@ class Job:
         self,
         steps: Sequence[tuple[ProgressStep[Path], str]],
         dest_fn: DestinationFn,
+        keep_times: bool = False,
     ) -> None:
         self.steps = steps
         self.dest_fn = dest_fn
+        self.keep_times = keep_times
 
     def run(
         self, input_path: Path, reporter: BaseProgressReporter, overwrite: bool = False
@@ -245,6 +250,7 @@ class Job:
 
         dest = self.dest_fn(input_path)
         check_destination(dest, overwrite)
+        input_stat = input_path.stat()
 
         current = input_path
         created: list[Path] = []
@@ -256,6 +262,8 @@ class Job:
                 if current != input_path and current not in created:
                     created.append(current)
 
+            if current != input_path:
+                copy_attributes(input_stat, current, keep_times=self.keep_times)
             land_result(input_path, current, dest, overwrite)
             landed = True
             return dest
@@ -265,6 +273,17 @@ class Job:
             for produced in created:
                 if not (landed and produced == current):
                     produced.unlink(missing_ok=True)
+
+
+def copy_attributes(
+    source: os.stat_result, produced: Path, *, keep_times: bool
+) -> None:
+    """Give `produced` the permissions recorded in `source` (a stat taken
+    before the input was read), and with `keep_times` its access and
+    modification times."""
+    produced.chmod(stat.S_IMODE(source.st_mode))
+    if keep_times:
+        os.utime(produced, ns=(source.st_atime_ns, source.st_mtime_ns))
 
 
 def land_result(input_path: Path, result: Path, dest: Path, overwrite: bool) -> None:

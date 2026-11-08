@@ -16,7 +16,7 @@ from foundation.clilib import click_logging_options
 from foundation.loglib import setup_logger_from_click
 
 from filejobs.batch import BatchReport, run_batch
-from filejobs.pipeline import JOB_ERRORS, DestinationFn, Job
+from filejobs.pipeline import JOB_ERRORS, DestinationFn, Job, override_destination
 from filejobs.progress import BaseProgressReporter, create_reporter
 
 type Decorator[F] = Callable[[F], F]
@@ -51,6 +51,46 @@ def overwrite_option[F: Callable[..., object]](func: F) -> F:
 def common_file_options[F: Callable[..., object]](func: F) -> F:
     """-o/--output and -y/--overwrite, identical across every task."""
     return output_option(overwrite_option(func))
+
+
+def keep_mtime_option[F: Callable[..., object]](func: F) -> F:
+    """--keep-mtime: the result takes the input's access and modification
+    times (decision 0010)."""
+    return click.option(
+        "--keep-mtime",
+        is_flag=True,
+        default=False,
+        help="give the result the input's access and modification times",
+    )(func)
+
+
+def in_place_option[F: Callable[..., object]](func: F) -> F:
+    """--in-place: the result replaces the input (decision 0010)."""
+    return click.option(
+        "--in-place",
+        is_flag=True,
+        default=False,
+        help="replace each input atomically instead of writing a new file"
+        " (implies -y, excludes -o)",
+    )(func)
+
+
+def same_format_options[F: Callable[..., object]](func: F) -> F:
+    """-o, -y, --in-place and --keep-mtime, for commands whose output keeps
+    the input's format."""
+    return keep_mtime_option(in_place_option(common_file_options(func)))
+
+
+def same_format_destination(
+    output: Path | None, in_place: bool, default_fn: DestinationFn
+) -> DestinationFn:
+    """The destination function of a same-format command: the input itself
+    with --in-place, else `-o` or `default_fn`."""
+    if in_place and output is not None:
+        raise click.UsageError("--in-place and -o/--output are mutually exclusive")
+    if in_place:
+        return lambda input_path: input_path
+    return override_destination(output, default_fn)
 
 
 def dry_run_option[F: Callable[..., object]](func: F) -> F:

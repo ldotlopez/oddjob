@@ -60,16 +60,30 @@ class ConversionTests(unittest.TestCase):
         )
 
     def convert(
-        self, source: Path, remove_source: bool, overwrite: bool = False
+        self,
+        source: Path,
+        remove_source: bool,
+        overwrite: bool = False,
+        keep_times: bool = False,
     ) -> None:
         (conversion,) = plan_conversions([source], "jpg", remove_source)
-        run_conversion(conversion, self.step, NullReporter(), overwrite=overwrite)
+        run_conversion(
+            conversion,
+            self.step,
+            NullReporter(),
+            overwrite=overwrite,
+            keep_times=keep_times,
+        )
 
-    def test_jpeg_conversion_keeps_timestamps_and_removes_source(self) -> None:
+    def test_jpeg_conversion_keeps_times_on_request(self) -> None:
+        self.convert(self.source, remove_source=False, keep_times=True)
+        self.assertEqual((self.tmp / "photo.jpg").stat().st_mtime, 1_000_000)
+
+    def test_jpeg_conversion_removes_source_and_takes_a_new_time(self) -> None:
         self.convert(self.source, remove_source=True)
         dest = self.tmp / "photo.jpg"
         self.assertEqual(dest.read_bytes(), b"converted")
-        self.assertEqual(dest.stat().st_mtime, 1_000_000)
+        self.assertNotEqual(dest.stat().st_mtime, 1_000_000)
         self.assertFalse(self.source.exists())
         self.assertEqual(recorded_argv(self.magick)[0], f"{self.source}[0]")
         exif_argv = recorded_argv(self.exiftool)
@@ -120,6 +134,7 @@ class CaptionStepTests(unittest.TestCase):
         job = Job(
             steps=[(CaptionStep(ExifTool(str(exiftool)), "un gato"), "Captioning")],
             dest_fn=lambda _image: image,
+            keep_times=True,
         )
         with self.assertRaises(FileExistsError):
             job.run(image, NullReporter())

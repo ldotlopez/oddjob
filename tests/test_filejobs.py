@@ -131,10 +131,26 @@ class BytesStepAndRunJobsTests(unittest.TestCase):
             dest_fn=suffix_destination("out"),
         )
 
-    def test_bytes_step_keeps_timestamps(self) -> None:
+    def test_result_has_a_new_time_and_the_inputs_permissions(self) -> None:
+        self.inputs[0].chmod(0o640)
         dest = self.job.run(self.inputs[0], NullReporter(), overwrite=False)
         self.assertEqual(dest.read_bytes(), b"A.DAT")
+        self.assertNotEqual(dest.stat().st_mtime, 1_000_000)
+        self.assertEqual(dest.stat().st_mode & 0o777, 0o640)
+
+    def test_keep_times_gives_the_result_the_inputs_times(self) -> None:
+        job = Job(steps=self.job.steps, dest_fn=self.job.dest_fn, keep_times=True)
+        dest = job.run(self.inputs[0], NullReporter(), overwrite=False)
         self.assertEqual(dest.stat().st_mtime, 1_000_000)
+        self.assertEqual(dest.stat().st_atime, 1_000_000)
+
+    def test_in_place_replaces_the_input_keeping_its_permissions(self) -> None:
+        self.inputs[0].chmod(0o600)
+        job = Job(steps=self.job.steps, dest_fn=lambda path: path)
+        dest = job.run(self.inputs[0], NullReporter(), overwrite=True)
+        self.assertEqual(dest, self.inputs[0])
+        self.assertEqual(dest.read_bytes(), b"A.DAT")
+        self.assertEqual(dest.stat().st_mode & 0o777, 0o600)
 
     def test_run_jobs_continues_and_exits_1_on_failure(self) -> None:
         (self.tmp / "a.out").write_text("exists")

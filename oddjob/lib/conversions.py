@@ -5,7 +5,6 @@ from __future__ import annotations
 
 import logging
 import shlex
-import shutil
 from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
@@ -38,7 +37,6 @@ class JpegConversionStep:
         try:
             self.magick.to_jpeg(input_path, produced)
             self.exiftool.copy_tags(input_path, produced)
-            shutil.copystat(input_path, produced)
         except BaseException:
             produced.unlink(missing_ok=True)
             raise
@@ -57,7 +55,6 @@ class Mp4RemuxStep:
         duration = self.ffmpeg.probe_duration(input_path)
         try:
             yield from self._remux(input_path, produced, duration)
-            shutil.copystat(input_path, produced)
         except BaseException:
             produced.unlink(missing_ok=True)
             raise
@@ -121,6 +118,7 @@ def run_conversion(
     reporter: BaseProgressReporter,
     *,
     overwrite: bool,
+    keep_times: bool = False,
 ) -> Path:
     """Run `step` on the source as a Job, then remove the source if asked.
     Returns the written destination."""
@@ -129,6 +127,7 @@ def run_conversion(
     job = Job(
         steps=[(step, f"Converting {conversion.source.name}")],
         dest_fn=lambda _source: conversion.destination,
+        keep_times=keep_times,
     )
     written = job.run(conversion.source, reporter, overwrite=overwrite)
     if conversion.remove_source:

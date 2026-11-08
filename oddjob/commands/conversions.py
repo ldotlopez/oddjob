@@ -9,6 +9,7 @@ import rich_click as click
 
 from filejobs.cli_options import (
     dry_run_option,
+    keep_mtime_option,
     overwrite_option,
     paths_argument,
     run_jobs,
@@ -31,6 +32,7 @@ from oddjob.lib.external import ExifTool, ImageMagick
 
 def conversion_options[F: Callable[..., object]](func: F) -> F:
     func = dry_run_option(func)
+    func = keep_mtime_option(func)
     func = click.option(
         "--rm", "remove_source", is_flag=True, help="remove each converted source"
     )(func)
@@ -42,6 +44,7 @@ def convert_all(
     conversions: Sequence[Conversion],
     build_step: Callable[[], ProgressStep[Path]],
     overwrite: bool,
+    keep_mtime: bool,
     dry_run: bool,
 ) -> None:
     """Print the plan, or build the step (adapters checked once) and run one
@@ -56,7 +59,9 @@ def convert_all(
         raise click.ClickException(str(exc)) from exc
 
     def convert(conversion: Conversion, reporter: BaseProgressReporter) -> Path:
-        return run_conversion(conversion, step, reporter, overwrite=overwrite)
+        return run_conversion(
+            conversion, step, reporter, overwrite=overwrite, keep_times=keep_mtime
+        )
 
     run_jobs(
         conversions,
@@ -70,7 +75,11 @@ def convert_all(
 @conversion_options
 @logging_options
 def jpgize_cmd(
-    paths: tuple[Path, ...], overwrite: bool, remove_source: bool, dry_run: bool
+    paths: tuple[Path, ...],
+    overwrite: bool,
+    keep_mtime: bool,
+    remove_source: bool,
+    dry_run: bool,
 ) -> None:
     """Convert HEIC/HEIF/WebP/PNG images in PATH... to JPEG, keeping metadata."""
     conversions = plan_conversions(
@@ -80,6 +89,7 @@ def jpgize_cmd(
         conversions,
         lambda: JpegConversionStep(ImageMagick(), ExifTool()),
         overwrite,
+        keep_mtime,
         dry_run,
     )
 
@@ -88,10 +98,20 @@ def jpgize_cmd(
 @conversion_options
 @logging_options
 def mp4ize_cmd(
-    paths: tuple[Path, ...], overwrite: bool, remove_source: bool, dry_run: bool
+    paths: tuple[Path, ...],
+    overwrite: bool,
+    keep_mtime: bool,
+    remove_source: bool,
+    dry_run: bool,
 ) -> None:
     """Remux videos in PATH... into MP4 without re-encoding the video."""
     conversions = plan_conversions(
         expand_inputs(paths, media.converts_to_mp4), "mp4", remove_source
     )
-    convert_all(conversions, lambda: Mp4RemuxStep(FFMpegRunner()), overwrite, dry_run)
+    convert_all(
+        conversions,
+        lambda: Mp4RemuxStep(FFMpegRunner()),
+        overwrite,
+        keep_mtime,
+        dry_run,
+    )

@@ -63,8 +63,8 @@ def plan_captions(images: Sequence[Path], *, redescribe: bool) -> list[Caption]:
 
 
 class CaptionStep:
-    """A copy of the input image with `text` as its description, keeping the
-    input's timestamps. Satisfies ProgressStep[Path]."""
+    """A copy of the input image with `text` as its description. Satisfies
+    ProgressStep[Path]."""
 
     def __init__(self, writer: DescriptionWriter, text: str) -> None:
         self.writer = writer
@@ -73,9 +73,8 @@ class CaptionStep:
     def run(self, input_path: Path) -> ProgressStream[Path]:
         produced = temp_output_path("oddjob-caption-", input_path.suffix)
         try:
-            shutil.copy2(input_path, produced)
+            shutil.copyfile(input_path, produced)
             self.writer.set_description(produced, self.text)
-            shutil.copystat(input_path, produced)
         except BaseException:
             produced.unlink(missing_ok=True)
             raise
