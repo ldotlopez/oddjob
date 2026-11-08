@@ -45,7 +45,7 @@ A new task needs everything, in this order.
 7. **Entry points**: in `pyproject.toml`,
    `[project.entry-points."oddjob.backends.<task>"]` with
    `<backend> = "oddjob.plugins.<module>:__oddjob_plugin__"`. A backend names
-   the same module in every group. Run `uv sync`.
+   the same module in every group. Run `uv sync --all-extras`.
 
 8. **Command**: `oddjob/commands/<task>.py`, object `<task>_cmd`, decorator stack as in
    `oddjob/commands/rewrite.py`:

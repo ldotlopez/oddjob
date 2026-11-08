@@ -160,7 +160,7 @@ unittest discover -s tests` must be green. Each tool needs:
       `-o` only with one input.
 - [ ] Failures are `JOB_ERRORS`; batch continues; exit 1 + summary.
 - [ ] Tests green; ruff clean.
-- [ ] `pyproject.toml` (entry points, extra, description) + `uv sync`.
+- [ ] `pyproject.toml` (entry points, extra, keywords) + `uv sync --all-extras`.
 - [ ] Docs proposal made (step 7), nothing edited without a yes.
 
 ### 7. Propose documentation (never edit without explicit approval)
@@ -172,7 +172,8 @@ List the affected files with a one- or two-line summary each, then wait:
   a new kind of flow.
 - `.claude/rules/oddjob.md`: implemented tasks or file commands list,
   runtime binaries, any new extra.
-- `pyproject.toml` description: the tool list.
+- `pyproject.toml` `description` (a one-line summary, no tool list) and
+  `keywords`, only if the tool changes what oddjob is about.
 - `docs/decisions/`: a new record only if the port changes an approach
   (new command shape, new `JOB_ERRORS` member, code moved to `filejobs`, a
   tool that does not fit the classification, a tool left out for a reason

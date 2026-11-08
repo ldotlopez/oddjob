@@ -1,0 +1,94 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+jobs:
+  # Test, then build sdist + wheel once; later jobs reuse the artifact.
+  build:
+    name: Build distribution
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out
+        uses: actions/checkout@v7
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v10
+
+      - name: Install Python (from .python-version)
+        run: uv python install
+
+      - name: Check tag matches version
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          version="$(python3 -c 'import tomllib; print(tomllib.load(open("pyproject.toml", "rb"))["project"]["version"])')"
+          if [ "$tag" != "$version" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME does not match pyproject.toml version $version"
+            exit 1
+          fi
+          echo "Tag and pyproject.toml agree on $version"
+
+      - name: Install dependencies (with the images extra)
+        run: uv sync --locked --all-extras
+
+      # Integration tests skip themselves without ImageMagick, exiftool,
+      # ffmpeg or tests/integration.env.
+      - name: Run tests
+        run: uv run python -m unittest discover -s tests
+
+      - name: Build
+        run: uv build
+
+      - name: Upload dist
+        uses: actions/upload-artifact@v7
+        with:
+          name: dist
+          path: dist/
+          if-no-files-found: error
+
+  # PyPI publishing is DISABLED: the `foundation` dependency comes from git
+  # (tool.uv.sources), and on PyPI that name belongs to an unrelated package.
+  # To enable, once foundation is on PyPI under its own name:
+  #   1. Create a token at https://pypi.org/manage/account/token/
+  #   2. gh secret set PYPI_API_TOKEN
+  #   3. Uncomment this job and add `pypi` to the release job's `needs:`
+  #
+  # pypi:
+  #   name: Publish to PyPI
+  #   needs: build
+  #   runs-on: ubuntu-latest
+  #   environment: pypi
+  #   steps:
+  #     - name: Download dist
+  #       uses: actions/download-artifact@v8
+  #       with:
+  #         name: dist
+  #         path: dist/
+  #     - name: Publish
+  #       uses: pypa/gh-action-pypi-publish@release/v1
+  #       with:
+  #         password: ${{ secrets.PYPI_API_TOKEN }}
+
+  # Create the GitHub release, with the built files, once the build passed.
+  release:
+    name: Create GitHub release
+    needs: [build]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download dist
+        uses: actions/download-artifact@v8
+        with:
+          name: dist
+          path: dist/
+
+      - name: Create release
+        uses: softprops/action-gh-release@v3
+        with:
+          files: dist/*
+          generate_release_notes: true

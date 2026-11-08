@@ -268,6 +268,19 @@ and ffmpeg, and skip when they are not on `PATH`.
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the module layout and how to add a
 backend, and [docs/decisions/](docs/decisions/) for recorded decisions.
 
+### Releasing
+
+A `vX.Y.Z` tag runs `.github/workflows/release.yml`: it checks the tag against
+`[project].version`, runs the tests, builds the sdist and wheel and attaches them to a
+GitHub release. Before tagging:
+
+1. Point `foundation` in `pyproject.toml` at the commit of
+   [foundation](https://github.com/ldotlopez/foundation) to ship with
+   (`git ls-remote https://github.com/ldotlopez/foundation main` for the latest), then
+   `uv lock && uv sync --all-extras` and run the tests. The wheel installs exactly that
+   commit.
+2. Bump `[project].version`, commit, and tag: `git tag vX.Y.Z && git push origin vX.Y.Z`.
+
 ## Roadmap
 
 - **whisper.cpp on the AMD Ryzen AI NPU.** whisper.cpp ≥ 1.9 can offload the encoder
@@ -282,3 +295,7 @@ backend, and [docs/decisions/](docs/decisions/) for recorded decisions.
   - verify: `whisper-cli` prints `VITISAI = 1` and logs the offload mode.
 
   Cheaper interim step: build with `-DGGML_VULKAN=1` to use the integrated GPU.
+
+## License
+
+GPL-3.0-or-later (see `LICENSE`).

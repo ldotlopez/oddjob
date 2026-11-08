@@ -107,7 +107,7 @@ exist yet, not an import or fixture error).
 Follow absorb-tool step 4 ("Port") with this tool as the source: the
 reference for its kind, and the closest existing command read first and
 matched. Register it in `FILE_COMMANDS` or `TASK_COMMANDS` and its panel;
-a task also gets its entry-point group in `pyproject.toml` and `uv sync`.
+a task also gets its entry-point group in `pyproject.toml` and `uv sync --all-extras`.
 
 ## 7. Verify and report
 

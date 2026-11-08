@@ -1,6 +1,29 @@
-*.pyc
-__pycache__
+# Python
+__pycache__/
+*.py[cod]
+
+# Build output (uv build, setuptools)
+build/
+dist/
 *.egg-info/
+
+# Environments and tool caches
+.venv/
+.ruff_cache/
+
+# Local configuration and secrets (.env.example is committed)
 .env
 tests/integration.env
+secrets.md
+
+# Claude Code: per-user settings and agent worktrees
+.claude/settings.local.json
 .claude/worktrees/
+
+# Editors and OS
+*.swp
+*.swo
+*~
+.idea/
+.vscode/
+.DS_Store

@@ -53,7 +53,8 @@
   the task list (`core.backends.tasks()`): a new task needs its group, nothing
   else lists tasks. The name is the backend,
   and the value must be `oddjob.plugins.<module>:__oddjob_plugin__`; a backend must
-  name the same module in every group. Run `uv sync` after editing it. See
+  name the same module in every group. Run `uv sync --all-extras` after editing it
+  (a plain `uv sync` uninstalls the `images` extra). See
   `docs/decisions/0001`.
 - `__oddjob_plugin__(backend, options)` builds only the named backend, validating
   its global options with that backend's own pydantic model (`extra="forbid"`,
@@ -82,6 +83,10 @@
   validated.
 - Tasks whose output has the same extension as the input must use
   `infix_destination`; `suffix_destination` would overwrite the input.
+- `foundation` is a direct git reference to one commit (`foundation @ git+...@<sha>`
+  in `pyproject.toml`), not a branch or a `[tool.uv.sources]` entry, so a release
+  wheel installs the tested code. Before a release tag, update that commit, run
+  `uv lock && uv sync --all-extras` and the tests (README, "Releasing").
 - Console and logging come from `foundation`: progress reporters use
   `foundation.clilib.get_stderr_console()`/`RICH_STDERR_ENABLED`; every command
   takes `--log-level`/`-v`/`-q` after its name via `cli_common.logging_options`
