@@ -3,9 +3,7 @@
 A single filejobs.pipeline.TextStep driving the backend selected by
 core/backends.py, with the system prompt rendered from `[prompts] translate`
 in the config. Lands at infix_destination(<language>), so with `-l es`
-file.txt -> file.es.txt (tasks/translate.py names the infix). The same
-click.Command is the `oddjob translate` subcommand and the standalone
-`translate` tool.
+file.txt -> file.es.txt (lib/translate.py names the infix).
 """
 
 from __future__ import annotations
@@ -15,17 +13,13 @@ from pathlib import Path
 import rich_click as click
 
 from filejobs.cli_options import (
-    check_single_output,
     dry_run_option,
-    job_action,
     paths_argument,
-    print_plan,
-    run_jobs,
-    same_format_destination,
+    run_same_format_jobs,
     same_format_options,
 )
-from filejobs.inputs import expand_inputs, text_inputs_except_outputs
-from filejobs.pipeline import Job, TextStep, infix_destination
+from filejobs.inputs import text_inputs_except_outputs
+from filejobs.pipeline import TextStep
 from oddjob.core.cli_common import (
     backend_option,
     logging_options,
@@ -78,25 +72,24 @@ def translate_cmd(
 ) -> None:
     """Translate each input in PATH... into --language."""
     language, infix = target
-    inputs = expand_inputs(paths, text_inputs_except_outputs(infix))
-    check_single_output(output, inputs)
-    dest_fn = same_format_destination(output, in_place, infix_destination(infix))
-    if dry_run:
-        print_plan(inputs, dest_fn)
-        return
-    prompt = session.config().prompts.render_translate(language)
-    translator = session.backend("translate", Translator, backend, {"model": model})
-    job = Job(
-        steps=[
-            (
-                TextStep(lambda text: translator.translate(text, prompt=prompt)),
-                "Translating",
-            )
-        ],
-        dest_fn=dest_fn,
-        keep_times=keep_mtime,
+
+    def make_step() -> TextStep:
+        prompt = session.config().prompts.render_translate(language)
+        translator = session.backend("translate", Translator, backend, {"model": model})
+        return TextStep(lambda text: translator.translate(text, prompt=prompt))
+
+    run_same_format_jobs(
+        paths,
+        text_inputs_except_outputs(infix),
+        infix,
+        make_step,
+        "Translating",
+        output=output,
+        overwrite=overwrite,
+        in_place=in_place,
+        keep_mtime=keep_mtime,
+        dry_run=dry_run,
     )
-    run_jobs(inputs, job_action(job, overwrite or in_place), "Translating")
 
 
 if __name__ == "__main__":

@@ -8,17 +8,13 @@ from pathlib import Path
 import rich_click as click
 
 from filejobs.cli_options import (
-    check_single_output,
     dry_run_option,
-    job_action,
     paths_argument,
-    print_plan,
-    run_jobs,
-    same_format_destination,
+    run_same_format_jobs,
     same_format_options,
 )
-from filejobs.inputs import expand_inputs, text_inputs_except_outputs
-from filejobs.pipeline import Job, TextStep, infix_destination
+from filejobs.inputs import text_inputs_except_outputs
+from filejobs.pipeline import TextStep
 from oddjob.core.cli_common import (
     backend_option,
     logging_options,
@@ -58,24 +54,24 @@ def expand_cmd(
     dry_run: bool,
 ) -> None:
     """Expand each input in PATH... with more detail and examples."""
-    inputs = expand_inputs(paths, text_inputs_except_outputs(DEFAULT_INFIX))
-    check_single_output(output, inputs)
-    dest_fn = same_format_destination(
-        output, in_place, infix_destination(DEFAULT_INFIX)
+
+    def make_step() -> TextStep:
+        prompt = session.config().prompts.render_expand(target_length)
+        expander = session.backend("expand", Expander, backend, {"model": model})
+        return TextStep(lambda text: expander.expand(text, prompt=prompt))
+
+    run_same_format_jobs(
+        paths,
+        text_inputs_except_outputs(DEFAULT_INFIX),
+        DEFAULT_INFIX,
+        make_step,
+        "Expanding",
+        output=output,
+        overwrite=overwrite,
+        in_place=in_place,
+        keep_mtime=keep_mtime,
+        dry_run=dry_run,
     )
-    if dry_run:
-        print_plan(inputs, dest_fn)
-        return
-    prompt = session.config().prompts.render_expand(target_length)
-    expander = session.backend("expand", Expander, backend, {"model": model})
-    job = Job(
-        steps=[
-            (TextStep(lambda text: expander.expand(text, prompt=prompt)), "Expanding")
-        ],
-        dest_fn=dest_fn,
-        keep_times=keep_mtime,
-    )
-    run_jobs(inputs, job_action(job, overwrite or in_place), "Expanding")
 
 
 if __name__ == "__main__":

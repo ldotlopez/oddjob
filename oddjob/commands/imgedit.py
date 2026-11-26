@@ -11,10 +11,10 @@ import rich_click as click
 from filejobs.cli_options import (
     check_single_output,
     dry_run_option,
-    job_action,
     paths_argument,
     print_plan,
     run_jobs,
+    run_same_format_jobs,
     same_format_destination,
     same_format_options,
 )
@@ -46,21 +46,18 @@ def img_trim_cmd(
     """Crop each image in PATH... to its non-transparent pixels, writing
     NAME.cropped.<ext> (images without transparency fail). -n lists every
     candidate without opening the images, so it cannot tell which will fail."""
-    inputs = expand_inputs(paths, media.is_autocrop_input)
-    check_single_output(output, inputs)
-    dest_fn = same_format_destination(
-        output, in_place, infix_destination(media.CROPPED_INFIX)
+    run_same_format_jobs(
+        paths,
+        media.is_autocrop_input,
+        media.CROPPED_INFIX,
+        lambda: BytesStep(load_extra_module("imgedit").autocrop),
+        "Cropping",
+        output=output,
+        overwrite=overwrite,
+        in_place=in_place,
+        keep_mtime=keep_mtime,
+        dry_run=dry_run,
     )
-    if dry_run:
-        print_plan(inputs, dest_fn)
-        return
-    imgedit = load_extra_module("imgedit")
-    job = Job(
-        steps=[(BytesStep(imgedit.autocrop), "Cropping")],
-        dest_fn=dest_fn,
-        keep_times=keep_mtime,
-    )
-    run_jobs(inputs, job_action(job, overwrite or in_place), "Cropping")
 
 
 @click.command("img-reduce")

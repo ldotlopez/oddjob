@@ -2,8 +2,7 @@
 
 No task module of its own: a single filejobs.pipeline.TextStep driving the backend selected by
 core/backends.py, with the system prompt rendered from `[prompts] rewrite`
-in the config. The same click.Command is the `oddjob rewrite` subcommand and
-the standalone `rewrite` tool. Lands at infix_destination("rewrite"), so
+in the config. Lands at infix_destination("rewrite"), so
 file.txt -> file.rewrite.txt by default (see suffix_destination's docstring
 for why it isn't safe here).
 """
@@ -15,17 +14,13 @@ from pathlib import Path
 import rich_click as click
 
 from filejobs.cli_options import (
-    check_single_output,
     dry_run_option,
-    job_action,
     paths_argument,
-    print_plan,
-    run_jobs,
-    same_format_destination,
+    run_same_format_jobs,
     same_format_options,
 )
-from filejobs.inputs import expand_inputs, text_inputs_except_outputs
-from filejobs.pipeline import Job, TextStep, infix_destination
+from filejobs.inputs import text_inputs_except_outputs
+from filejobs.pipeline import TextStep
 from oddjob.core.cli_common import (
     backend_option,
     logging_options,
@@ -66,24 +61,24 @@ def rewrite_cmd(
     dry_run: bool,
 ) -> None:
     """Rewrite each input in PATH... per --instructions."""
-    inputs = expand_inputs(paths, text_inputs_except_outputs(DEFAULT_INFIX))
-    check_single_output(output, inputs)
-    dest_fn = same_format_destination(
-        output, in_place, infix_destination(DEFAULT_INFIX)
+
+    def make_step() -> TextStep:
+        prompt = session.config().prompts.render_rewrite(instructions)
+        rewriter = session.backend("rewrite", Rewriter, backend, {"model": model})
+        return TextStep(lambda text: rewriter.rewrite(text, prompt=prompt))
+
+    run_same_format_jobs(
+        paths,
+        text_inputs_except_outputs(DEFAULT_INFIX),
+        DEFAULT_INFIX,
+        make_step,
+        "Rewriting",
+        output=output,
+        overwrite=overwrite,
+        in_place=in_place,
+        keep_mtime=keep_mtime,
+        dry_run=dry_run,
     )
-    if dry_run:
-        print_plan(inputs, dest_fn)
-        return
-    prompt = session.config().prompts.render_rewrite(instructions)
-    rewriter = session.backend("rewrite", Rewriter, backend, {"model": model})
-    job = Job(
-        steps=[
-            (TextStep(lambda text: rewriter.rewrite(text, prompt=prompt)), "Rewriting")
-        ],
-        dest_fn=dest_fn,
-        keep_times=keep_mtime,
-    )
-    run_jobs(inputs, job_action(job, overwrite or in_place), "Rewriting")
 
 
 if __name__ == "__main__":

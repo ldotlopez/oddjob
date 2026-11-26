@@ -16,7 +16,15 @@ from foundation.clilib import click_logging_options
 from foundation.loglib import setup_logger_from_click
 
 from filejobs.batch import BatchReport, run_batch
-from filejobs.pipeline import JOB_ERRORS, DestinationFn, Job, override_destination
+from filejobs.inputs import FileFilter, expand_inputs
+from filejobs.pipeline import (
+    JOB_ERRORS,
+    DestinationFn,
+    Job,
+    ProgressStep,
+    infix_destination,
+    override_destination,
+)
 from filejobs.progress import BaseProgressReporter, create_reporter
 
 type Decorator[F] = Callable[[F], F]
@@ -214,6 +222,35 @@ def run_jobs[T](
 
     report = run_batch(items, run, description=description, label=label)
     finish_batch(*prior, report)
+
+
+def run_same_format_jobs(
+    paths: Sequence[Path],
+    accepts: FileFilter,
+    infix: str,
+    make_step: Callable[[], ProgressStep[Path]],
+    description: str,
+    *,
+    output: Path | None,
+    overwrite: bool,
+    in_place: bool,
+    keep_mtime: bool,
+    dry_run: bool,
+) -> None:
+    """The whole run of a one-step same-format command: expand PATH...,
+    settle the destination (NAME.<infix>.<ext>, -o or --in-place), then
+    print the plan (-n) or run one Job per input. `make_step` is only called
+    for a real run, so -n resolves no backend, config or optional module."""
+    inputs = expand_inputs(paths, accepts)
+    check_single_output(output, inputs)
+    dest_fn = same_format_destination(output, in_place, infix_destination(infix))
+    if dry_run:
+        print_plan(inputs, dest_fn)
+        return
+    job = Job(
+        steps=[(make_step(), description)], dest_fn=dest_fn, keep_times=keep_mtime
+    )
+    run_jobs(inputs, job_action(job, overwrite or in_place), description)
 
 
 def run_single_job(job: Job, input_path: Path, overwrite: bool) -> Path:
