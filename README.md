@@ -19,6 +19,7 @@ backends or config. `oddjob --help` lists them by subject.
 | `expand`     | implemented     | text → `<name>.expanded.<ext>`                   |
 | `translate`  | implemented     | text → `<name>.<language>.<ext>`                 |
 | `describe`   | implemented     | image → description on stdout, or `<name>.description.txt` with `-w` (needs a model that takes images) |
+| `tag`        | implemented     | text, `--text`/stdin or any file → type, short description and hashtags on stdout (`--json`: JSON Lines; uses the `rewrite`, `describe` and `transcribe` backends) |
 | `audio-grep` | implemented     | video/audio → grep's output over the transcriptions, on stdout (uses the `transcribe` backends) |
 
 Backends:
@@ -53,6 +54,8 @@ Backends:
   - `llm`: `llm` on `PATH`, with its own keys and plugins configured.
 - `describe`: a backend model that takes images (e.g. `gpt-4.1-mini`, or an Ollama
   vision model such as `llama3.2-vision` via `-m`).
+- `tag`: the backends of the tasks its inputs need (`rewrite` for text and documents,
+  `describe` for images, `transcribe` and `rewrite` plus `ffmpeg`/`ffprobe` for audio and video).
 - For the file commands: ImageMagick (`magick` or `convert`) and `exiftool` for `jpgize`,
   `exiftool` for `img-embed-description`, `photo-lint` and `date-copy` with `exif`, `ffmpeg`/`ffprobe` for
   `mp4ize`, and the `images` extra (Pillow, pillow-heif) for `img-hash`,
@@ -108,6 +111,26 @@ Common options:
 `LC_MESSAGES`, `LANG`), and in no particular language under `C`/`POSIX` or an unset locale.
 Descriptions are cached; `--no-cache` skips it.
 
+`tag` prints `PATH: type · description #tag ...` per input: three or four words
+and up to three hashtags (lowercase, accents kept, no spaces or punctuation). Its
+input is `PATH...` (any file; directories recursed), `-t, --text TEXT` or stdin (`-`,
+or a pipe); text and stdin are labelled `text` and `stdin`. It has no backend of its
+own and so no `-b`/`-m`: images go to the `describe` backend in one call, audio and
+video are transcribed by the `transcribe` backend (the first 60 seconds;
+`--max-duration SECONDS`, or `--full-audio` for all of it) and sent to `rewrite`, text
+goes to `rewrite`, and any other file is tagged by its name and media type. The type
+(`text`, `image`, `audio`, `video`, `document`) comes from the file name; `--type`
+reports another one instead (e.g. `link`) without changing how the input is handled.
+`--context TEXT` adds text that comes with the content (a caption, a post's title).
+`-l, --language` works as in `describe`. `--json` prints one object per line with
+`path` (null for text and stdin), `type`, `description` and `hashtags`. A reply that
+is not the expected JSON fails that input. Results are cached; `--no-cache` skips it.
+
+```sh
+uv run oddjob tag -t "Receta de paella valenciana"   # text: text · receta de paella valenciana #paella #receta #valencia
+uv run oddjob tag --json --type link --context "Post title" page.txt
+```
+
 `speak` voices text as WAV audio. Its text comes from text files (`PATH...`, each
 written next to itself as `<name>.wav`), from `-t, --text TEXT`, or from stdin (`-`, or
 a pipe when nothing else is given; a pipe is ignored if `PATH...` or `--text` is given).
@@ -138,12 +161,14 @@ no paths.
 
 ### Cache
 
-`audio-grep`, `describe`, `img-hash` and `img-duplicates` share one cache in
+`audio-grep`, `describe`, `tag`, `img-hash` and `img-duplicates` share one cache in
 `$XDG_CACHE_HOME/oddjob`, owner-only, with keys `<command>/<digest>`. Entries expire
 after 180 days, and the least recently used are dropped when the cache passes 1 GiB
 (checked once a day). `describe` keys on the image's content, the prompt, the backend
-and its configured options (not `api_key`); `img-hash` on the content and `--hash-size`.
-`describe` and the hash commands take `--no-cache`. The cache can be deleted at any
+and its configured options (not `api_key`); `tag` on the content (or text), its name,
+`--context`, the prompt, the backends and options of the tasks it used and, for audio and
+video, the transcribed duration; `img-hash` on the content and `--hash-size`.
+`describe`, `tag` and the hash commands take `--no-cache`. The cache can be deleted at any
 time.
 
 ## Configuration
@@ -194,9 +219,10 @@ summarize = "Summarize the text the user sends as bullet points. {length}"
 ```
 
 `[prompts]` overrides the default prompt of `rewrite`, `summarize`, `expand`,
-`translate` or `describe`. Each may use only its own placeholder: `{instructions}` in
+`translate`, `describe` or `tag`. Each may use only its own placeholder: `{instructions}` in
 `rewrite` and `describe`, `{length}` in `summarize` and `expand`, `{language}` in
-`translate`; a literal brace is `{{` or `}}`.
+`translate`, none in `tag` (whose prompt must ask for the JSON object `tag` reads:
+`{{"description": ..., "hashtags": [...]}}`); a literal brace is `{{` or `}}`.
 
 Backend selection: `-b`, then `ODDJOB_<TASK>_BACKEND`, then `[tasks]`, then the only
 installed backend; with several backends installed for a task (both whisper ones for

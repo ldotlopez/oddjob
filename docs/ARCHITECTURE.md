@@ -26,7 +26,7 @@ filejobs/             backend-free core: no backends, config or oddjob imports
 oddjob/
   cli.py              entry point: the `oddjob` group, every command, help panels by subject
   commands/           one module per command or command family (wiring only):
-                      tasks: transcribe, speak, rewrite, summarize, expand, translate, describe, audio_grep;
+                      tasks: transcribe, speak, rewrite, summarize, expand, translate, describe, tag, audio_grep;
                       file commands: sidecars, motionphotos, conversions (jpgize, mp4ize),
                       imghash (img-hash, img-duplicates, img-check), imgedit (img-trim,
                       img-reduce), captions (img-embed-description), renames (rename-by-hash,
@@ -39,7 +39,9 @@ oddjob/
                       cache.py (ByteStore Protocol; `<tool>/<digest>` cache keys, file digest),
                       text_backend.py (ChatTransport Protocol; TextBackend: every text task over it),
                       audio_grep.py (argument split, transcript cache, grep over transcripts),
-                      grep.py (GrepRunner: the system grep);
+                      grep.py (GrepRunner: the system grep),
+                      tag.py (Tagger: kind by file name, routing to rewrite/describe/transcribe,
+                      reply parsing, hashtag normalization, result cache);
                       sidecars.py, motionphotos.py, conversions.py, imghash.py, imgedit.py,
                       captions.py, renamers.py, dates.py, photolint.py, cleanup.py (grouping,
                       motion-photo parsing, conversion steps, average hash and decode checks,
@@ -52,6 +54,7 @@ oddjob/
   core/               backend machinery
     session.py        Session: config and backends without click
     describing.py     describe's language, prompt and cached backend, shared with img-embed-description
+    tagging.py        tag's backends (SessionBackends: rewrite, describe, transcribe) and prompt
     cli_common.py     pass_session (injects the Session), backend/model options, the logging options
     config.py         Config model, config file loading and validation
     backends.py       backend discovery (entry-point metadata), selection, loading
@@ -202,6 +205,24 @@ describe PATH... -i INSTRUCTIONS [-l LANGUAGE] [-w | -o FILE]
   -> Job([DescribeStep], dest = INPUT.description.txt or -o)
        DescribeStep: transport.complete(prompt, "", images=[INPUT]) -> land_text_stream -> temp .txt
   -> run_jobs
+```
+
+`tag` has no task of its own: it composes rewrite, describe and transcribe, all
+with its own prompt (decision 0005 lets a command reuse other tasks' backends):
+
+```
+tag PATH... | -t TEXT | stdin  [--context C] [--type T] [-l L] [--max-duration S | --full-audio] [--json]
+  -> prompt = config.prompts.render_tag(language)  (asks for {"description", "hashtags"})
+  -> Tagger(SessionBackends(session), prompt, cache, max_duration)  (core/tagging.py)
+       each task's backend selected as for its own command, built on first use
+  -> run_batch: per input, by lib/tag.kind_of (file name):
+       image       -> Describer.describe(INPUT, prompt + context)
+       audio/video -> AudioExtractor(-t S) -> Transcriber -> Rewriter.rewrite(name, type, context, transcript)
+       text        -> Rewriter.rewrite(text, context)
+       other       -> Rewriter.rewrite(name, media type, context)
+       -> parse_reply: first JSON object, validated; hashtags normalized -> TagResult
+       key = tag/ + sha256(kind, name, content, context, [duration], prompt, task backends and options minus api_key)
+  -> --type replaces the reported kind; print "LABEL: type · description #tags" or JSON Lines; finish_batch
 ```
 
 Each transport attaches the images its own way: openai as `image_url` data-URI

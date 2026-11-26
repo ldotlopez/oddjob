@@ -46,10 +46,12 @@ def choose_source(
     output: Path | None,
     *,
     stdin_is_terminal: bool,
+    needs_output: bool = True,
 ) -> FileSource | TextSource:
     """The text source the arguments select. Files win over a pipe, which is
     then left unread. A text or stdin source has no file name to derive the
-    destination from, so it needs `output`."""
+    destination from, so it needs `output` unless `needs_output` is false
+    (a command that writes no file)."""
     reads_stdin = STDIN_ARGUMENT in paths
     if reads_stdin and (len(paths) > 1 or text is not None):
         raise SourceError("'-' (stdin) must be used alone")
@@ -68,7 +70,7 @@ def choose_source(
     else:
         raise SourceError("no input: give PATH..., --text, or pipe text into stdin")
 
-    if output is None:
+    if needs_output and output is None:
         raise SourceError("-o/--output is required with --text or stdin")
     return source
 

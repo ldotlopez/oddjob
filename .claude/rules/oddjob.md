@@ -8,7 +8,10 @@
   replies in `-l` or else the system locale's language: `Prompts.render_describe`
   appends "Reply in <language>.", not a template placeholder), and
   `audio-grep` (system grep over cached transcripts, through the `transcribe`
-  backends; decision 0006).
+  backends; decision 0006), and `tag` (type, description and hashtags of text or
+  any file; no backend or `-b` of its own: it composes `rewrite`, `describe` and
+  `transcribe` with `[prompts] tag`, so `tests/test_backends.py` lists it in
+  `COMPOSING_COMMANDS`).
 - File commands (no backends or config): `sidecars`, `motionphotos`, `jpgize`, `mp4ize`, `img-hash`,
   `img-duplicates`, `img-check`, `img-trim`, `img-reduce`, `img-embed-description`,
   `photo-lint` (`check`, `set-zone`), `rename-by-hash`, `fix-extensions`, `date-copy`, `cleanup`.

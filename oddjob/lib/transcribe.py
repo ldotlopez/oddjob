@@ -121,17 +121,30 @@ FORMATTERS: dict[str, SegmentFormatter] = {
 
 
 class AudioExtractor:
-    """Extracts the first audio stream to a temporary mono 16kHz WAV file.
-    Satisfies ProgressStep[Path]."""
+    """Extracts the first audio stream to a temporary mono 16kHz WAV file,
+    only its first `max_duration` seconds when given. Satisfies
+    ProgressStep[Path]."""
 
-    def __init__(self, runner: FFMpegRunner | None = None) -> None:
+    def __init__(
+        self, runner: FFMpegRunner | None = None, *, max_duration: float | None = None
+    ) -> None:
         self.runner = runner or FFMpegRunner()
+        self.max_duration = max_duration
 
     def run(self, input_path: Path) -> ProgressStream[Path]:
         extracted_audio_path = temp_output_path("whisper-audio-", ".wav")
 
         duration = self.runner.probe_duration(input_path)
+        limit: CliArgs = []
+        if self.max_duration is not None:
+            limit = ["-t", f"{self.max_duration:g}"]
+            duration = (
+                self.max_duration
+                if duration is None
+                else min(duration, self.max_duration)
+            )
         args: CliArgs = [
+            *limit,
             "-i",
             str(input_path),
             "-map",

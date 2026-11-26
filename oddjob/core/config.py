@@ -28,6 +28,7 @@ _PROMPT_PLACEHOLDERS = {
     "expand": "length",
     "translate": "language",
     "describe": "instructions",
+    "tag": None,
 }
 
 
@@ -35,7 +36,7 @@ class Prompts(pydantic.BaseModel):
     """System prompt templates for the text tasks, the same for every
     backend. Each may use only its own `str.format` placeholder:
     `{instructions}` in rewrite and describe, `{length}` in summarize and
-    expand, `{language}` in translate. Write
+    expand, `{language}` in translate, none in tag. Write
     them with plain braces, not `${...}` (that is environment expansion);
     a literal brace is `{{` or `}}`."""
 
@@ -68,7 +69,18 @@ class Prompts(pydantic.BaseModel):
         " with no preamble or commentary."
     )
 
-    @pydantic.field_validator("rewrite", "summarize", "expand", "translate", "describe")
+    tag: str = (
+        "Classify the content the user sends: text, a transcript, a file's"
+        " name and type, or an image, with any context the user gives."
+        ' Reply with a JSON object only: {{"description": "<three or four'
+        ' words>", "hashtags": ["<tag>", ...]}}, with at most three short,'
+        " lowercase hashtags useful to find it later, and no preamble or"
+        " commentary."
+    )
+
+    @pydantic.field_validator(
+        "rewrite", "summarize", "expand", "translate", "describe", "tag"
+    )
     @classmethod
     def _check_placeholders(cls, value: str, info: pydantic.ValidationInfo) -> str:
         allowed = _PROMPT_PLACEHOLDERS[info.field_name]
@@ -80,9 +92,9 @@ class Prompts(pydantic.BaseModel):
             raise ValueError(f"invalid template: {exc}") from exc
         unknown = names - {allowed}
         if unknown:
+            hint = f"allowed: {{{allowed}}}" if allowed else "none allowed"
             raise ValueError(
-                f"unknown placeholder(s) {', '.join(sorted(unknown))}"
-                f" (allowed: {{{allowed}}})"
+                f"unknown placeholder(s) {', '.join(sorted(unknown))} ({hint})"
             )
         return value
 
@@ -100,6 +112,10 @@ class Prompts(pydantic.BaseModel):
 
     def render_describe(self, instructions: str | None, language: str | None) -> str:
         prompt = self.describe.format(instructions=instructions or "")
+        return f"{prompt} Reply in {language}." if language else prompt
+
+    def render_tag(self, language: str | None) -> str:
+        prompt = self.tag.format()
         return f"{prompt} Reply in {language}." if language else prompt
 
 

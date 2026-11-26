@@ -29,6 +29,7 @@ from oddjob.commands.rewrite import rewrite_cmd
 from oddjob.commands.sidecars import sidecars_cmd
 from oddjob.commands.speak import speak_cmd
 from oddjob.commands.summarize import summarize_cmd
+from oddjob.commands.tag import tag_cmd
 from oddjob.commands.transcribe import transcribe_cmd
 from oddjob.commands.translate import translate_cmd
 
@@ -40,6 +41,7 @@ TASK_COMMANDS: list[click.Command] = [
     expand_cmd,
     translate_cmd,
     describe_cmd,
+    tag_cmd,
     audio_grep_cmd,
 ]
 
@@ -63,7 +65,7 @@ FILE_COMMANDS: list[click.Command] = [
 
 # `oddjob --help` sections, by what a command works on.
 PANELS: dict[str, list[str]] = {
-    "Text": ["rewrite", "summarize", "expand", "translate"],
+    "Text": ["rewrite", "summarize", "expand", "translate", "tag"],
     "Audio": ["transcribe", "speak", "audio-grep"],
     "Images": [
         "img-hash",
@@ -91,7 +93,7 @@ def add_panels[F](func: F) -> F:
 @add_panels
 def cli() -> None:
     """Apply model backends and file utilities to files: transcribe,
-    rewrite, summarize, translate and describe; convert, hash, crop,
+    rewrite, summarize, translate, describe and tag; convert, hash, crop,
     caption, rename, date-copy and clean up."""
 
 

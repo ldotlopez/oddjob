@@ -14,6 +14,10 @@ from oddjob.lib.protocols import Describer, Translator
 
 BACKEND_ENVVAR = re.compile(r"^ODDJOB_(\w+)_BACKEND$")
 
+# Task commands with no -b of their own: they compose several tasks, each on
+# the backend selected for it.
+COMPOSING_COMMANDS = {"tag"}
+
 
 class TaskListTests(unittest.TestCase):
     def test_every_command_backend_names_a_known_task(self) -> None:
@@ -28,7 +32,8 @@ class TaskListTests(unittest.TestCase):
                 assert match is not None
                 self.assertIn(match.group(1).lower(), known, command.name)
                 checked.append(command.name)
-        self.assertEqual(len(checked), len(TASK_COMMANDS))
+        expected = [c.name for c in TASK_COMMANDS if c.name not in COMPOSING_COMMANDS]
+        self.assertEqual(checked, expected)
 
     def test_unknown_task_in_tasks_table_lists_the_known_ones(self) -> None:
         with self.assertRaisesRegex(ConfigError, r"tasks\.nope: unknown task"):
