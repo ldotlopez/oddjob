@@ -1,11 +1,9 @@
 """Shared Click plumbing: common options, and pass_session, which hands
 every task command the run's Session (core/session.py).
 
-The Session lives on click's context object (ctx.obj), so it is the same
-one whether a command runs under the `oddjob` group (`oddjob transcribe
-...`) or as its own standalone tool (`transcribe ...`, no group at all):
-ensure_object() creates it when no parent group already did, and leaf
-commands never have to special-case which way they were invoked.
+The Session lives on click's context object (ctx.obj): ensure_object()
+creates it on first use, unless the caller already put one there (tests
+pass their own through CliRunner's `obj`).
 """
 
 from __future__ import annotations

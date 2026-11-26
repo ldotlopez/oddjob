@@ -42,7 +42,7 @@ class LlmOptions(pydantic.BaseModel):
 class LlmCliTransport:
     """Runs `llm prompt -s <system>` with the user text on stdin (no argv
     length limit) and each image as `-a PATH`, and streams its stdout. Satisfies
-    tasks.text_backend.ChatTransport."""
+    lib.text_backend.ChatTransport."""
 
     def __init__(self, options: LlmOptions) -> None:
         self.options = options
@@ -113,6 +113,6 @@ def __oddjob_plugin__(
     backend: str, options: Mapping[str, Any]
 ) -> list[tuple[str, type, object]]:
     """Build the transport with its global options; one triple per text
-    task (see tasks/text_backend.py). This module provides only the
+    task (see lib/text_backend.py). This module provides only the
     `llm` backend, so `backend` is not consulted."""
     return text_plugin_triples(LlmCliTransport(LlmOptions.model_validate(options)))

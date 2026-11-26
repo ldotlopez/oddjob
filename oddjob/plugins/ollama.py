@@ -45,7 +45,7 @@ def _error_message(response: requests.Response) -> str:
 
 class OllamaTransport:
     """Streams one `/api/chat` reply (newline-delimited JSON) per call.
-    Satisfies tasks.text_backend.ChatTransport."""
+    Satisfies lib.text_backend.ChatTransport."""
 
     def __init__(self, options: OllamaOptions) -> None:
         self.options = options
@@ -119,6 +119,6 @@ def __oddjob_plugin__(
     backend: str, options: Mapping[str, Any]
 ) -> list[tuple[str, type, object]]:
     """Build the transport with its global options; one triple per text
-    task (see tasks/text_backend.py). This module provides only the
+    task (see lib/text_backend.py). This module provides only the
     `ollama` backend, so `backend` is not consulted."""
     return text_plugin_triples(OllamaTransport(OllamaOptions.model_validate(options)))

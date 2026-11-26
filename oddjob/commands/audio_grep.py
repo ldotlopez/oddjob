@@ -1,4 +1,4 @@
-"""`oddjob audio-grep` and the standalone `audio-grep` tool: grep over the
+"""`oddjob audio-grep`: grep over the
 transcriptions of audio/video files (logic in oddjob/lib/audio_grep.py).
 
 Every argument that is not one of the options below, an existing directory

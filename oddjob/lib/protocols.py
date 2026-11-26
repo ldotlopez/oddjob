@@ -6,7 +6,7 @@ implements, under that task's Protocol (see plugins/whisper.py).
 Transcriber is implemented by plugins/whisper.py, Speaker by
 plugins/piper.py; Rewriter, Summarizer,
 Expander, Translator and Describer by plugins/openai.py, plugins/ollama.py
-and plugins/llm.py, all through tasks/text_backend.py.
+and plugins/llm.py, all through lib/text_backend.py.
 """
 
 from __future__ import annotations
@@ -47,7 +47,7 @@ class Speaker(Protocol):
 #
 # Kept as distinct Protocols rather than one generic "text
 # transform" so each task checks its backend against exactly what it
-# calls, even though one backend class (tasks.text_backend.TextBackend)
+# calls, even though one backend class (lib.text_backend.TextBackend)
 # satisfies them all. `prompt` is the task's system prompt, already
 # rendered from `[prompts]` in the config (core.config.Prompts); the
 # backend sends it as-is with `text` as the user message.

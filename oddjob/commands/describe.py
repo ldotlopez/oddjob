@@ -8,8 +8,7 @@ takes images implements it (lib/text_backend.py). Descriptions are cached
 (oddjob/lib/cache.py) by image content, prompt, backend and its options;
 --no-cache skips it. Printing is a report
 under run_batch; writing is a file producer (Job + run_jobs), so -o, -y and
--n apply only then. The same click.Command is the `oddjob describe`
-subcommand and the standalone `describe` tool.
+-n apply only then.
 """
 
 from __future__ import annotations

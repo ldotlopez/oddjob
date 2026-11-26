@@ -68,7 +68,7 @@ def _user_content(user: str, images: Sequence[Path]) -> str | list[dict[str, Any
 
 class OpenAITransport:
     """Streams one chat completion (server-sent events) per call.
-    Satisfies tasks.text_backend.ChatTransport."""
+    Satisfies lib.text_backend.ChatTransport."""
 
     def __init__(self, options: OpenAIOptions) -> None:
         self.options = options
@@ -141,6 +141,6 @@ def __oddjob_plugin__(
     backend: str, options: Mapping[str, Any]
 ) -> list[tuple[str, type, object]]:
     """Build the transport with its global options; one triple per text
-    task (see tasks/text_backend.py). This module provides only the
+    task (see lib/text_backend.py). This module provides only the
     `openai` backend, so `backend` is not consulted."""
     return text_plugin_triples(OpenAITransport(OpenAIOptions.model_validate(options)))

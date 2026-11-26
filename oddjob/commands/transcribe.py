@@ -1,12 +1,10 @@
-"""`oddjob transcribe` and the standalone `transcribe` tool: video/audio ->
+"""`oddjob transcribe`: video/audio ->
 subtitle/text sidecar via a Transcriber backend (steps in
 oddjob/lib/transcribe.py).
 
 The Transcriber backend is selected and loaded by core/backends.py;
 -m/--model overrides its global `model` option, while --language and
---format are per-run arguments. The same click.Command is the `oddjob`
-subcommand (cli.py adds it to the group) and the standalone tool
-(pyproject.toml's [project.scripts] points straight at it).
+--format are per-run arguments.
 """
 
 from __future__ import annotations
