@@ -72,10 +72,18 @@ class Prompts(pydantic.BaseModel):
     tag: str = (
         "Classify the content the user sends: text, a transcript, a file's"
         " name and type, or an image, with any context the user gives."
-        ' Reply with a JSON object only: {{"description": "<three or four'
-        ' words>", "hashtags": ["<tag>", ...]}}, with at most three short,'
-        " lowercase hashtags useful to find it later, and no preamble or"
-        " commentary."
+        ' Reply with a JSON object only: {{"description": "<what it is'
+        ' about, a noun phrase of three to six words>", "hashtags":'
+        ' ["<tag>", ...]}}, with at most three short, lowercase hashtags'
+        " useful to find it later, and no preamble or commentary. The"
+        ' description names the subject, e.g. "Receta de pan de masa madre",'
+        ' never the format ("brief text") and never a comma-separated list'
+        " of keywords; it does not repeat the hashtags. Write it in sentence"
+        " case: capitalize its first word and proper nouns, as the language's"
+        " spelling rules require. Hashtags name the"
+        " topic, never the format or medium (no #link, #video, #audio, #image"
+        " or #text). Write the description and hashtags in the requested"
+        " language even when the content is in another one."
     )
 
     @pydantic.field_validator(

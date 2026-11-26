@@ -1,4 +1,4 @@
-"""tag: text or a file -> its kind, a three- or four-word description and up
+"""tag: text or a file -> its kind, a three- to six-word description and up
 to three hashtags.
 
 There is no tag backend: Tagger composes other tasks, all with tag's own

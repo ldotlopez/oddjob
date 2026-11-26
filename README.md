@@ -111,7 +111,7 @@ Common options:
 `LC_MESSAGES`, `LANG`), and in no particular language under `C`/`POSIX` or an unset locale.
 Descriptions are cached; `--no-cache` skips it.
 
-`tag` prints `PATH: type · description #tag ...` per input: three or four words
+`tag` prints `PATH: type · description #tag ...` per input: three to six words
 and up to three hashtags (lowercase, accents kept, no spaces or punctuation). Its
 input is `PATH...` (any file; directories recursed), `-t, --text TEXT` or stdin (`-`,
 or a pipe); text and stdin are labelled `text` and `stdin`. It has no backend of its
