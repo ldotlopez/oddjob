@@ -12,12 +12,11 @@ from __future__ import annotations
 import csv
 import io
 import json
-import os
-import tempfile
 from collections.abc import Callable
 from dataclasses import replace
 from pathlib import Path
 
+from filejobs.pipeline import temp_output_path
 from filejobs.progress import ProgressEvent, ProgressStream
 from filejobs.runners import CliArgs, FFMpegRunner
 from oddjob.lib.protocols import Transcriber, TranscriptSegment
@@ -129,11 +128,7 @@ class AudioExtractor:
         self.runner = runner or FFMpegRunner()
 
     def run(self, input_path: Path) -> ProgressStream[Path]:
-        file_descriptor, extracted_audio_path_str = tempfile.mkstemp(
-            prefix="whisper-audio-", suffix=".wav"
-        )
-        os.close(file_descriptor)
-        extracted_audio_path = Path(extracted_audio_path_str)
+        extracted_audio_path = temp_output_path("whisper-audio-", ".wav")
 
         duration = self.runner.probe_duration(input_path)
         args: CliArgs = [
@@ -198,11 +193,7 @@ class TranscribeStep:
 
         content = FORMATTERS[self.output_format](final_event.result)
 
-        file_descriptor, output_path_str = tempfile.mkstemp(
-            prefix="whisper-out-", suffix=f".{self.output_format}"
-        )
-        os.close(file_descriptor)
-        output_path = Path(output_path_str)
+        output_path = temp_output_path("whisper-out-", f".{self.output_format}")
         try:
             output_path.write_text(content, encoding="utf-8")
         except BaseException:

@@ -13,8 +13,7 @@ from typing import Protocol
 
 from filejobs.pipeline import DestinationFn, temp_output_path
 from filejobs.progress import ProgressEvent, ProgressStream
-
-DESCRIPTION_SUFFIX = ".description.txt"
+from oddjob.lib.describe import DESCRIPTION_EXTENSION
 
 
 class DescriptionWriter(Protocol):
@@ -51,7 +50,7 @@ class Caption:
 
 
 def description_sidecar(image: Path) -> Path:
-    return image.with_suffix(DESCRIPTION_SUFFIX)
+    return image.with_suffix(f".{DESCRIPTION_EXTENSION}")
 
 
 def plan_captions(

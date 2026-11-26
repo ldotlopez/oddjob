@@ -20,6 +20,7 @@ from filejobs.cli_options import (
 from filejobs.inputs import expand_inputs
 from filejobs.pipeline import Job, infix_destination
 from filejobs.progress import BaseProgressReporter
+from oddjob.commands.dates import build_exiftool
 from oddjob.core.cli_common import (
     backend_option,
     logging_options,
@@ -31,7 +32,6 @@ from oddjob.core.session import Session
 from oddjob.lib import media
 from oddjob.lib.captions import Caption, CaptionStep, plan_captions
 from oddjob.lib.describe import DescribeStep
-from oddjob.lib.external import ExifTool
 from oddjob.lib.protocols import Describer
 
 
@@ -90,10 +90,7 @@ def img_embed_description_cmd(
         for caption in captions:
             click.echo(caption.describe())
         return
-    try:
-        exiftool = ExifTool()
-    except FileNotFoundError as exc:
-        raise click.ClickException(str(exc)) from exc
+    exiftool = build_exiftool()
 
     with contextlib.ExitStack() as stack:
         describer: Describer | None = None
