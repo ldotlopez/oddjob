@@ -23,6 +23,9 @@ from oddjob.core.cli_common import logging_options
 from oddjob.lib import media
 from oddjob.lib.external import run_command_with_paths
 
+DEFAULT_HASH_SIZE = 16  # 16x16 = 256-bit hash
+DEFAULT_MAX_DISTANCE = 8  # bits that may differ between duplicates
+
 
 def load_extra_module(name: str) -> ModuleType:
     """oddjob.lib.<name>, a module that needs the optional `images` extra
@@ -42,7 +45,7 @@ def hash_options[F: Callable[..., object]](func: F) -> F:
     func = click.option(
         "--hash-size",
         type=click.IntRange(min=2),
-        default=16,
+        default=DEFAULT_HASH_SIZE,
         show_default=True,
         help="hash side in pixels (bits = size²)",
     )(func)
@@ -106,7 +109,7 @@ def img_check_cmd(paths: tuple[Path, ...]) -> None:
 @click.option(
     "--max-distance",
     type=click.IntRange(min=0),
-    default=8,
+    default=DEFAULT_MAX_DISTANCE,
     show_default=True,
     help="bits two hashes may differ in and still be duplicates",
 )

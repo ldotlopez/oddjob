@@ -146,13 +146,9 @@ def date_copy_cmd(
     reading = run_batch(
         expand_inputs(paths, accepts), plan, description="Reading dates"
     )
-    if dry_run:
+    if dry_run or not planned:
         for change in planned:
             click.echo(change.describe())
-        finish_batch(reading)
-        return
-
-    if not planned:
         finish_batch(reading)
         return
 

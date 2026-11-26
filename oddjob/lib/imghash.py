@@ -14,9 +14,6 @@ from PIL import Image, UnidentifiedImageError
 
 from oddjob.lib.cache import ByteStore, cache_key, file_sha256
 
-DEFAULT_HASH_SIZE = 16  # 16x16 = 256-bit hash
-DEFAULT_MAX_DISTANCE = 8  # bits that may differ between duplicates
-
 CACHE_TOOL = "img-hash"
 # Bumped when the cached value's layout changes, so old entries are misses.
 CACHE_LAYOUT_VERSION = "1"
