@@ -44,7 +44,8 @@ class FFMpegRunner:
     from `-progress pipe:1` machine-readable output.
 
     Callers supply only their input/filter/output arguments — `-progress`,
-    `-nostats`, `-loglevel` and the overwrite flag are added here. `result`
+    `-nostats`, `-loglevel` and `-y` (outputs are temp files that already
+    exist) are added here. `result`
     on the final event is always None: this layer doesn't know what output
     paths the caller's args produced, only whether ffmpeg succeeded.
     """
@@ -77,12 +78,10 @@ class FFMpegRunner:
         except (subprocess.CalledProcessError, ValueError):
             return None  # caller falls back to an indeterminate progress display
 
-    def run(
-        self, args: CliArgs, duration: float | None = None, overwrite: bool = True
-    ) -> ProgressStream:
+    def run(self, args: CliArgs, duration: float | None = None) -> ProgressStream:
         cmd = [
             self.ffmpeg_bin,
-            "-y" if overwrite else "-n",
+            "-y",
             "-loglevel",
             "error",
             "-progress",
