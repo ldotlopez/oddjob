@@ -34,3 +34,4 @@ Python conventions, architecture and `foundation` usage come from `~/.claude/rul
 - Never edit these files without explicit permission. After a change that makes one inaccurate (module added/renamed/re-scoped, CLI flag or behavior changed, roadmap item done, architectural decision made), list the affected files with a one- or two-line summary of the edit each, and wait for a yes. Once approved, change only what became inaccurate.
 - `docs/decisions/` is append-only: to reverse a decision, add a superseding record and change only the old record's status line to `superseded by NNNN`.
 - If unsure whether a doc update is warranted, ask.
+- Open, unscheduled work goes in `docs/BACKLOG.md`, one self-standing entry per item; do not start new TODO or audit files elsewhere.

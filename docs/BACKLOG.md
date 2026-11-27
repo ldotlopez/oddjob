@@ -1,7 +1,70 @@
 # Backlog
 
-Open work found while absorbing tools. Each item that changes a shared
-option set or an approach is settled in a decision record before it is built.
+Every open, unscheduled piece of work in oddjob, in one place. Each item that
+changes a shared option set or an approach is settled in a decision record
+before it is built. Scheduled work does not live here: when an entry is
+scheduled it moves to the plan for that work and leaves this file.
+
+Last updated: 2026-11-27
+
+## General
+
+- **Audit leftovers (2026-11-26).** A complexity and duplication audit of
+  `filejobs/`, `oddjob/` and `tests/` (313 tests, 1 skipped, green before and
+  after; ruff clean) applied its changes in `e071ae8`, `a8fddaa`, `9b29453`,
+  `f215f32` and `59ad1ba`. What remained open:
+  - *Proposed, awaiting a decision:*
+    - Optionally remove the `if __name__ == "__main__"` blocks in the task
+      command modules (`oddjob/commands/`). They are leftovers of the
+      standalone-tool idea that decision 0003 dropped, and none of the 15 file
+      commands has one. They were left in because removing them stops
+      `python -m oddjob.commands.<task>` from working.
+  - *Documentation edits awaiting approval* (the project rule that docs change
+    only with explicit permission overrides the global "docs land with the
+    code" rule, so none were made):
+    - `docs/ARCHITECTURE.md`, the `cli_options.py` line in the layout: add
+      `run_same_format_jobs` (`filejobs/cli_options.py`, added in `e071ae8`:
+      the shared run body of `rewrite`, `summarize`, `expand`, `translate` and
+      `img-trim`).
+    - `docs/ARCHITECTURE.md`, "Contracts": add the missing Protocols
+      `Speaker`, `Translator`, `Describer` (inaccurate before the audit).
+    - `docs/ARCHITECTURE.md`, "To add a backend": `uv sync` →
+      `uv sync --all-extras`; a plain sync uninstalls the `images` extra
+      (`.claude/rules/oddjob.md`). Inaccurate before the audit.
+  - *Left alone on purpose:*
+    - `_format_srt_timestamp` and `_format_vtt_timestamp` in
+      `oddjob/lib/transcribe.py` differ by one character (`,` vs `.`); each
+      belongs to its own output format (SRT, WebVTT) so each can change on its
+      own.
+    - The single-entry `_FACTORIES` registry in `oddjob/plugins/piper.py`
+      could be a plain `if`, but it mirrors `whisper.py` and its
+      unknown-backend error is tested.
+
+## Transcription
+
+- **whisper.cpp on the AMD Ryzen AI NPU.** whisper.cpp ≥ 1.9 can offload the
+  encoder to the XDNA NPU via VitisAI (`-DWHISPER_VITISAI=1`); no oddjob change
+  is needed, only the host setup:
+  - `amdxdna` kernel driver (mainline since 6.14, or AMD's out-of-tree
+    `xdna-driver`) and the NPU firmware for the chip revision
+    (`/usr/lib/firmware/amdnpu/17f0_20`);
+  - XRT (`xrt-smi examine` must list the NPU) and FlexML runtime, both sourced
+    before building and running;
+  - rebuild whisper.cpp with `-DWHISPER_VITISAI=1`, and fetch each model's
+    `.rai` encoder cache with `models/download-vitisai-model.sh <model>`;
+  - verify: `whisper-cli` prints `VITISAI = 1` and logs the offload mode.
+
+  Cheaper interim step: build with `-DGGML_VULKAN=1` to use the integrated GPU.
+
+## Tagging
+
+- **Text from PDF and other binary documents in `tag`.** Today `tag` sends a
+  document to `rewrite` with its name and mimetype, plus its content only when
+  it is `text/*`; there is no PDF extraction, by design of the first version
+  (no new dependencies). Extracting text from PDF and other binary formats
+  would need an approved dependency (CLAUDE.md, "Dependency Policy") and
+  changes the cached value, so bump the `tag` cache layout version
+  (decision 0007).
 
 ## Features
 
@@ -25,11 +88,11 @@ option set or an approach is settled in a decision record before it is built.
   - HEIC + MOV cannot be joined as-is: the `MotionPhoto_Data` trailer is a
     JPEG layout. Either convert with `jpgize` (lossy) or write a HEIF motion
     photo, a different container and a new writer.
-  - Next step, once real iOS samples exist: open both variants in an Android
-    gallery. If the MOV trailer plays, let `merge` accept `.mov`; if not, let
-    `merge` remux a `.mov` sidecar through `Mp4RemuxStep` before joining.
-    HEIC stays a `jpgize` step before `merge`.
-
+  - Next step, once real iOS samples exist (see "Integration tests on real
+    files" below): open both variants in an Android gallery. If the MOV
+    trailer plays, let `merge` accept `.mov`; if not, let `merge` remux a
+    `.mov` sidecar through `Mp4RemuxStep` before joining. HEIC stays a
+    `jpgize` step before `merge`.
 - **Text input for the text tasks.** `rewrite`, `summarize`, `expand` and
   `translate` take only `PATH...` today. Let them also take stdin (`-`, or a
   pipe) and text from the command line (`--text`/`-t`), as `speak` already
