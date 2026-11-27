@@ -138,7 +138,7 @@ place (`--in-place`).
 ```
 transcribe PATH...
   -> inputs = expand_inputs(PATH..., audio/video)
-  -> Session.backend("transcribe", Transcriber, -b, {"model": -m})
+  -> Session.backend("transcribe", Transcriber, -b, {"model": -m, "threads": --threads})
        config (lazy) -> backends.select -> backends.load -> e.g. WhisperCppBackend
   -> Job([AudioExtractor, TranscribeStep], dest = INPUT.<format> or -o)
        AudioExtractor: ffmpeg -> temp mono 16 kHz WAV
@@ -211,9 +211,9 @@ describe PATH... -i INSTRUCTIONS [-l LANGUAGE] [-w | -o FILE]
 with its own prompt (decision 0005 lets a command reuse other tasks' backends):
 
 ```
-tag PATH... | -t TEXT | stdin  [--context C] [--type T] [-l L] [--max-duration S | --full-audio] [--json]
+tag PATH... | -t TEXT | stdin  [--context C] [--type T] [-l L] [--max-duration S | --full-audio] [--threads N] [--json]
   -> prompt = config.prompts.render_tag(language)  (asks for {"description", "hashtags"})
-  -> Tagger(SessionBackends(session), prompt, cache, max_duration)  (core/tagging.py)
+  -> Tagger(SessionBackends(session, {threads}), prompt, cache, max_duration)  (core/tagging.py)
        each task's backend selected as for its own command, built on first use
   -> run_batch: per input, by lib/tag.kind_of (file name):
        image       -> Describer.describe(INPUT, prompt + context)

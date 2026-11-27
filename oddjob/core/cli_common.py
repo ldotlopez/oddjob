@@ -66,6 +66,18 @@ def backend_option[F: Callable[..., object]](task: str) -> Callable[[F], F]:
     return decorator
 
 
+def threads_option[F: Callable[..., object]](func: F) -> F:
+    """--threads: overrides the transcribe backend's `threads` option. A
+    backend without one rejects it when it loads."""
+    return click.option(
+        "--threads",
+        type=click.IntRange(min=1),
+        default=None,
+        help="CPU threads for transcription, overriding [backends.<name>] threads"
+        " (whisper_cpp default: half the cores)",
+    )(func)
+
+
 def model_option[F: Callable[..., object]](func: F) -> F:
     """-m/--model: overrides the backend's global `model` option. A
     backend without one rejects it when it loads."""

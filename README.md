@@ -96,6 +96,7 @@ Common options:
 | `-n, --dry-run`         | print `input -> destination` per input; resolve no backend, write nothing |
 | `-b, --backend NAME`    | backend for this task (also `ODDJOB_<TASK>_BACKEND`)        |
 | `-m, --model MODEL`     | overrides the backend's `model` option (name or path)       |
+| `--threads N`           | transcribe only: overrides the backend's `threads` option (`whisper_cpp`; default: half the CPU cores) |
 | `-v` / `-q`             | more / less logging (repeatable); `-v` shows progress lines and `wrote <dest>` |
 | `--log-level SPEC`      | e.g. `debug` or `oddjob.core:debug,*:info` (also `ODDJOB_LOG_LEVEL`) |
 
@@ -116,8 +117,9 @@ and up to three hashtags (lowercase, accents kept, no spaces or punctuation). It
 input is `PATH...` (any file; directories recursed), `-t, --text TEXT` or stdin (`-`,
 or a pipe); text and stdin are labelled `text` and `stdin`. It has no backend of its
 own and so no `-b`/`-m`: images go to the `describe` backend in one call, audio and
-video are transcribed by the `transcribe` backend (the first 60 seconds;
-`--max-duration SECONDS`, or `--full-audio` for all of it) and sent to `rewrite`, text
+video are transcribed by the `transcribe` backend (the first 30 seconds;
+`--max-duration SECONDS`, or `--full-audio` for all of it; `--threads N` as in
+`transcribe`) and sent to `rewrite`, text
 goes to `rewrite`, and any other file is tagged by its name and media type. The type
 (`text`, `image`, `audio`, `video`, `document`) comes from the file name; `--type`
 reports another one instead (e.g. `link`) without changing how the input is handled.
@@ -152,7 +154,7 @@ uv run oddjob audio-grep -i -n budget talks/ meeting.mp4   # talks/q3.mp4:4:[01:
 Arguments that are existing directories or audio/video files are the inputs; every
 other argument goes to grep unchanged, and grep's output names the media files. Its
 own options are long-only, since grep owns the short ones: `--backend`, `--model`,
-`--language`, `--transcript-format` (what grep searches, default `lrc`: one
+`--threads`, `--language`, `--transcript-format` (what grep searches, default `lrc`: one
 timestamped line per segment) and `--log-level`. A pattern starting with `-` needs
 `-e`. Exit status is grep's, or 2 if a file could not be transcribed. No sidecar is
 written: transcripts go to the shared cache (see below), keyed by a digest of the
@@ -189,6 +191,7 @@ binary = "whisper"
 [backends.whisper_cpp]          # whisper.cpp
 model = "~/models/ggml-small.bin"
 binary = "whisper-cli"
+threads = 8                     # default: half the CPU cores; --threads overrides it
 
 [backends.piper]                # piper-tts
 model = "~/voices/en_US-lessac-medium.onnx"

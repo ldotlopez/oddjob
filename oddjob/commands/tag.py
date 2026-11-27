@@ -23,14 +23,14 @@ from filejobs.cli_options import finish_batch
 from filejobs.inputs import accept_all, expand_inputs
 from filejobs.progress import BaseProgressReporter
 from oddjob.core.cache import open_user_cache
-from oddjob.core.cli_common import logging_options, pass_session
+from oddjob.core.cli_common import logging_options, pass_session, threads_option
 from oddjob.core.session import Session
 from oddjob.core.tagging import SessionBackends, tag_prompt
 from oddjob.lib.speak import FileSource, SourceError, choose_source
 from oddjob.lib.tag import ContentKind, Tagger, TagResult
 from oddjob.lib.transcribe import AudioExtractor
 
-DEFAULT_MAX_DURATION = 60.0
+DEFAULT_MAX_DURATION = 30.0
 
 
 def format_line(label: str, result: TagResult) -> str:
@@ -90,6 +90,7 @@ def format_json(path: Path | None, result: TagResult) -> str:
     default=False,
     help="transcribe the whole audio/video (excludes --max-duration)",
 )
+@threads_option
 @click.option(
     "--json",
     "as_json",
@@ -114,6 +115,7 @@ def tag_cmd(
     language: str | None,
     max_duration: float | None,
     full_audio: bool,
+    threads: int | None,
     as_json: bool,
     no_cache: bool,
 ) -> None:
@@ -138,7 +140,7 @@ def tag_cmd(
     results: list[tuple[str, Path | None, TagResult]] = []
     with contextlib.ExitStack() as stack:
         tagger = Tagger(
-            SessionBackends(session),
+            SessionBackends(session, {"threads": threads}),
             tag_prompt(session, language),
             store=None if no_cache else stack.enter_context(open_user_cache()),
             max_duration=limit,

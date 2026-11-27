@@ -18,8 +18,12 @@ class SessionBackends:
     one selected for it (`[tasks]`, ODDJOB_<TASK>_BACKEND, the only one
     installed), loaded only when called."""
 
-    def __init__(self, session: Session) -> None:
+    def __init__(
+        self, session: Session, transcribe_overrides: Mapping[str, object] | None = None
+    ) -> None:
         self.session = session
+        # CLI flags for transcribe (None: not given), as in Session.backend.
+        self.transcribe_overrides = transcribe_overrides or {}
 
     def rewriter(self) -> Rewriter:
         return self.session.backend("rewrite", Rewriter)
@@ -28,10 +32,13 @@ class SessionBackends:
         return self.session.backend("describe", Describer)
 
     def transcriber(self) -> Transcriber:
-        return self.session.backend("transcribe", Transcriber)
+        return self.session.backend(
+            "transcribe", Transcriber, overrides=self.transcribe_overrides
+        )
 
     def settings(self, task: str) -> tuple[str, Mapping[str, Any]]:
-        return self.session.backend_options(task)
+        overrides = self.transcribe_overrides if task == "transcribe" else None
+        return self.session.backend_options(task, overrides=overrides)
 
 
 def tag_prompt(session: Session, language: str | None) -> str:

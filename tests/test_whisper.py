@@ -7,6 +7,7 @@ import shutil
 import subprocess
 import tempfile
 import unittest
+import unittest.mock
 from pathlib import Path
 
 import pydantic
@@ -19,7 +20,14 @@ from oddjob.plugins.whisper import (
     WhisperCppBackend,
     WhisperCppOptions,
     __oddjob_plugin__,
+    default_threads,
 )
+
+
+def default_threads_for(cores: int | None) -> int:
+    with unittest.mock.patch("os.cpu_count", return_value=cores):
+        return default_threads()
+
 
 FAKE_WHISPER = """
 import json
@@ -119,6 +127,27 @@ class WhisperCppBackendTest(unittest.TestCase):
 
         argv = recorded_argv(binary)
         self.assertEqual(argv[argv.index("--language") + 1], "auto")
+
+    def test_threads_default_to_half_the_cores(self) -> None:
+        backend, binary = self.backend(FAKE_WHISPER)
+
+        with unittest.mock.patch("os.cpu_count", return_value=16):
+            drain(backend.transcribe(self.audio, language=None))
+
+        argv = recorded_argv(binary)
+        self.assertEqual(argv[argv.index("--threads") + 1], "8")
+        self.assertEqual(default_threads_for(1), 1)
+        self.assertEqual(default_threads_for(None), 1)
+
+    def test_threads_option(self) -> None:
+        binary = write_executable(self.workdir, "whisper-cli", FAKE_WHISPER)
+        options = WhisperCppOptions(model=self.model, binary=str(binary), threads=3)
+
+        drain(WhisperCppBackend(options).transcribe(self.audio, language=None))
+
+        self.assertEqual(recorded_argv(binary)[-1], "3")
+        with self.assertRaises(pydantic.ValidationError):
+            WhisperCppOptions(threads=0)
 
     def test_failure_reports_stderr(self) -> None:
         backend, _ = self.backend(FAILING_WHISPER)

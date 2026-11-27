@@ -41,6 +41,7 @@ describe = "openai"
 [backends.whisper_cpp]
 model = "~/models/ggml-small.bin"    # default: data dir whisper/default-model.bin
 binary = "whisper-cli"
+threads = 8                          # default: half the CPU cores; --threads overrides it
 
 # OpenAI's reference implementation. Needs the whisper CLI (uv tool install openai-whisper);
 # models are downloaded by name on first use.

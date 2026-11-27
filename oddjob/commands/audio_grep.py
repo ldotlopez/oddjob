@@ -18,7 +18,7 @@ from filejobs.cli_options import setup_logging
 from filejobs.inputs import expand_inputs, media_type_filter
 from filejobs.progress import BaseProgressReporter
 from oddjob.core.cache import open_user_cache
-from oddjob.core.cli_common import APP_LOGGER, pass_session
+from oddjob.core.cli_common import APP_LOGGER, pass_session, threads_option
 from oddjob.core.session import Session
 from oddjob.lib.audio_grep import (
     DEFAULT_TRANSCRIPT_FORMAT,
@@ -56,6 +56,7 @@ is_media = media_type_filter("audio/", "video/")
     default=None,
     help="model file/name, overriding [backends.<name>] model",
 )
+@threads_option
 @click.option(
     "--language",
     default=None,
@@ -79,6 +80,7 @@ def audio_grep_cmd(
     arguments: tuple[str, ...],
     backend: str | None,
     model: str | None,
+    threads: int | None,
     language: str | None,
     transcript_format: str,
     log_level: str | None,
@@ -97,7 +99,9 @@ def audio_grep_cmd(
         raise click.ClickException(str(exc)) from exc
 
     def make_transcriber() -> Transcriber:
-        return session.backend("transcribe", Transcriber, backend, {"model": model})
+        return session.backend(
+            "transcribe", Transcriber, backend, {"model": model, "threads": threads}
+        )
 
     transcripts: list[Transcript] = []
     with open_user_cache() as cache:

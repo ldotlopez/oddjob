@@ -116,11 +116,19 @@ class WhisperCppOptions(pydantic.BaseModel):
 
     model: Path = DEFAULT_CPP_MODEL
     binary: str = "whisper-cli"
+    # None: half the CPU cores (whisper-cli's own default is 4).
+    threads: pydantic.PositiveInt | None = None
 
     @pydantic.field_validator("model")
     @classmethod
     def _expand_user(cls, value: Path) -> Path:
         return value.expanduser()
+
+
+def default_threads() -> int:
+    """Half the CPU cores, at least one: more threads than that measured
+    slower on whisper.cpp."""
+    return max(1, (os.cpu_count() or 2) // 2)
 
 
 def _parse_whisper_cpp_json(json_path: Path) -> list[TranscriptSegment]:
@@ -175,6 +183,8 @@ class WhisperCppBackend:
             str(model),
             "--language",
             language or "auto",
+            "--threads",
+            str(self.options.threads or default_threads()),
         ]
 
         try:

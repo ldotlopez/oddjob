@@ -29,6 +29,7 @@ from oddjob.core.cli_common import (
     logging_options,
     model_option,
     pass_session,
+    threads_option,
 )
 from oddjob.core.session import Session
 from oddjob.lib.protocols import Transcriber
@@ -56,6 +57,7 @@ def resolve_output_format(requested: str | None, output: Path | None) -> str:
 @click.command("transcribe")
 @paths_argument
 @model_option
+@threads_option
 @click.option(
     "-l",
     "--language",
@@ -82,6 +84,7 @@ def transcribe_cmd(
     session: Session,
     paths: tuple[Path, ...],
     model: str | None,
+    threads: int | None,
     language: str | None,
     output_format: str | None,
     backend: str | None,
@@ -97,7 +100,9 @@ def transcribe_cmd(
     if dry_run:
         print_plan(inputs, dest_fn)
         return
-    transcriber = session.backend("transcribe", Transcriber, backend, {"model": model})
+    transcriber = session.backend(
+        "transcribe", Transcriber, backend, {"model": model, "threads": threads}
+    )
     job = Job(
         steps=[
             (AudioExtractor(), "Extracting audio"),

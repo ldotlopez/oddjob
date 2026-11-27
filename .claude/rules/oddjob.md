@@ -67,8 +67,8 @@
 - Backend selection per task: `-b`, then `ODDJOB_<TASK>_BACKEND`, then `[tasks]` in
   the config, then the only installed implementor. Options: model defaults, then
   `[backends.<name>]`, then `[backends.<name>.tasks.<task>]` (decision 0002; `tasks`
-  is a reserved key), then CLI overrides (`-m` → `model`). Per-run values are
-  method arguments, not options.
+  is a reserved key), then CLI overrides (`-m` → `model`; `--threads` → `threads`
+  on the transcribe backend). Per-run values are method arguments, not options.
 - Config is optional: `$XDG_CONFIG_HOME/oddjob/config.toml`, `${VAR}` expanded,
   `.env` loaded. It is read on first use in `Session` (`core/session.py`),
   injected by `pass_session`, never at import.
